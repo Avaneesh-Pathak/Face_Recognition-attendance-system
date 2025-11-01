@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Register - FaceAttend{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="card-header bg-gradient text-white text-center" style="background: linear-gradient(90deg, #007bff, #6610f2);">
+                    <h3 class="mb-0 fw-bold"><i class="fas fa-user-plus me-2"></i>Employee Registration</h3>
+                </div>
+
+                <div class="card-body p-4">
+                    {% if error %}
+                    <div class="alert alert-danger shadow-sm">
+                        <i class="fas fa-exclamation-triangle me-2"></i>{{ error }}
+                    </div>
+                    {% endif %}
+
+                    <form method="post" enctype="multipart/form-data" id="registerForm">
+                        {% csrf_token %}
+
+                        <!-- Account Info -->
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2"><i class="fas fa-user-circle me-2 text-primary"></i>Account Information</h5>
+                            {% for field in user_form %}
+                            <div class="mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors }}</div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Employee Info -->
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2"><i class="fas fa-id-badge me-2 text-success"></i>Employee Information</h5>
+                            {% for field in employee_form %}
+                                {% if field.name != 'face_image' %}
+                                <div class="mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                    <div class="text-danger small">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+
+                        <!-- Face Capture Section -->
+                        <div class="alert alert-info d-flex align-items-start shadow-sm">
+                            <i class="fas fa-camera fa-lg me-3 mt-1"></i>
+                            <div>
+                                <h6 class="fw-bold mb-1">Face Image Options</h6>
+                                <p class="mb-0 small">You can upload a photo or capture one directly using your webcam.</p>
+                            </div>
+                        </div>
+
+                        <div class="text-center mb-3">
+                            <div class="camera-box mx-auto p-2 border rounded-3 bg-light">
+                                <video id="camera" width="320" height="240" autoplay muted class="rounded-3 shadow-sm"></video>
+                                <canvas id="snapshot" width="320" height="240" class="d-none"></canvas>
+                            </div>
+                            <button type="button" id="capture-btn" class="btn btn-outline-primary mt-3 px-4">
+                                <i class="fas fa-camera me-2"></i> Capture from Camera
+                            </button>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="id_face_image" class="form-label fw-semibold">Or Upload Face Image</label>
+                            <input type="file" name="face_image" accept="image/*" id="id_face_image" class="form-control">
+                        </div>
+
+                        <input type="hidden" name="captured_image" id="captured_image">
+
+                        <!-- Buttons -->
+                        <div class="d-grid gap-3 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg shadow-sm">
+                                <i class="fas fa-user-plus me-2"></i>Register
+                            </button>
+                            <a href="{% url 'login' %}" class="btn btn-outline-secondary">
+                                Already have an account? <span class="fw-semibold">Login here</span>
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Camera Script -->
+<script>
+const video = document.getElementById('camera');
+const canvas = document.getElementById('snapshot');
+const captureBtn = document.getElementById('capture-btn');
+const capturedImageInput = document.getElementById('captured_image');
+
+// Access webcam
+navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => video.srcObject = stream)
+    .catch(err => console.error("Camera access denied:", err));
+
+// Capture image
+captureBtn.addEventListener('click', () => {
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = canvas.toDataURL('image/png');
+    capturedImageInput.value = imageData;
+
+    captureBtn.classList.replace('btn-outline-primary', 'btn-success');
+    captureBtn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Captured!';
+    setTimeout(() => captureBtn.classList.replace('btn-success', 'btn-outline-primary'), 2000);
+});
+</script>
+
+<!-- Custom Style -->
+<style>
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+.card:hover {
+    transform: translateY(-4px);
+}
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+input:focus, select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
+}
+.camera-box {
+    display: inline-block;
+    position: relative;
+}
+#camera {
+    border: 2px solid #dee2e6;
+}
+.btn-lg {
+    border-radius: 8px;
+}
+</style>
+{% endblock %}

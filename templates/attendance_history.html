@@ -1,0 +1,481 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load attendance_filters %}
+
+{% block title %}Attendance History - Timeline & Analytics{% endblock %}
+
+{% block page_title %}Attendance History{% endblock %}
+{% block page_subtitle %}Comprehensive timeline of employee check-ins and check-outs{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Filters and Summary Cards -->
+        <div class="col-lg-3 mb-4">
+            <!-- Time Period Filter -->
+            <div class="card dashboard-card mb-4">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-calendar-alt me-2"></i>Time Period
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <form method="get" class="row g-2">
+                        <div class="col-12">
+                            <label class="form-label small text-muted">Select Range</label>
+                            <select name="days" class="form-select" onchange="this.form.submit()">
+                                <option value="7" {% if days == 7 %}selected{% endif %}>Last 7 days</option>
+                                <option value="14" {% if days == 14 %}selected{% endif %}>Last 14 days</option>
+                                <option value="30" {% if days == 30 %}selected{% endif %}>Last 30 days</option>
+                                <option value="60" {% if days == 60 %}selected{% endif %}>Last 60 days</option>
+                                <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 days</option>
+                            </select>
+                        </div>
+                        <div class="col-12 mt-2">
+                            <label class="form-label small text-muted">Custom Range</label>
+                            <div class="input-group">
+                                <input type="date" class="form-control form-control-sm" placeholder="Start">
+                                <span class="input-group-text">to</span>
+                                <input type="date" class="form-control form-control-sm" placeholder="End">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+
+            <!-- Quick Stats -->
+            <div class="card dashboard-card">
+  <div class="card-header">
+    <h6 class="card-title mb-0">
+      <i class="fas fa-chart-pie me-2"></i>Quick Stats
+    </h6>
+  </div>
+  <div class="card-body">
+
+    {% with check_ins=attendance_records|filter_attendance_type:"check_in" %}
+    {% with check_outs=attendance_records|filter_attendance_type:"check_out" %}
+    {% with avg_conf=attendance_records|get_confidence_scores %}
+    {% with total=attendance_records.count %}
+    
+    <div class="stat-item mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="small text-muted">Total Records</span>
+        <strong>{{ total }}</strong>
+      </div>
+      <div class="progress" style="height:4px;">
+        <div class="progress-bar bg-primary" style="width:100%"></div>
+      </div>
+    </div>
+
+    <div class="stat-item mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="small text-muted">Check-ins</span>
+        <strong>{{ check_ins|length }}</strong>
+      </div>
+      <div class="progress" style="height:4px;">
+        <div class="progress-bar bg-success" style="width:{{ check_ins|length|get_percentage:total|floatformat:1 }}%"></div>
+      </div>
+    </div>
+
+    <div class="stat-item mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="small text-muted">Check-outs</span>
+        <strong>{{ check_outs|length }}</strong>
+      </div>
+      <div class="progress" style="height:4px;">
+        <div class="progress-bar bg-info" style="width:{{ check_outs|length|get_percentage:total|floatformat:1 }}%"></div>
+      </div>
+    </div>
+
+    <div class="stat-item mt-3 pt-3 border-top">
+      <div class="d-flex justify-content-between align-items-center">
+        <span class="small text-muted">Avg. Confidence</span>
+        <strong>{{ avg_conf|floatformat:1 }}%</strong>
+      </div>
+      <div class="progress mt-1" style="height:6px;">
+        <div class="progress-bar 
+          {% if avg_conf >= 90 %}bg-success
+          {% elif avg_conf >= 70 %}bg-warning
+          {% else %}bg-danger{% endif %}" 
+          style="width:{{ avg_conf }}%">
+        </div>
+      </div>
+    </div>
+
+    {% endwith %}
+    {% endwith %}
+    {% endwith %}
+    {% endwith %}
+  </div>
+</div>
+
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-lg-9">
+            <!-- Admin Notice -->
+            {% if request.user.is_staff %}
+            <div class="alert alert-primary d-flex align-items-center mb-4" role="alert">
+                <i class="fas fa-user-shield me-2 fa-lg"></i>
+                <div>
+                    <strong>Administrator View</strong> - Showing attendance records for all employees
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- View Toggle -->
+            <div class="card dashboard-card mb-4">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary active" data-view="table">
+                                <i class="fas fa-table me-2"></i>Table View
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" data-view="timeline">
+                                <i class="fas fa-stream me-2"></i>Timeline View
+                            </button>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="text-muted me-3 small">
+                                Showing {{ attendance_records.count }} records
+                            </span>
+                            <button class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-download me-1"></i> Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table View -->
+            <div class="card dashboard-card" id="tableView">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-history me-2"></i>Attendance Records
+                    </h5>
+                    <div class="d-flex align-items-center">
+                        <div class="input-group input-group-sm" style="width: 200px;">
+                            <span class="input-group-text bg-transparent">
+                                <i class="fas fa-search text-muted"></i>
+                            </span>
+                            <input type="text" class="form-control" placeholder="Search records..." id="searchInput">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="attendanceTable">
+                            <thead class="table-light">
+                                <tr>
+                                    {% if request.user.is_staff %}
+                                    <th class="ps-4">
+                                        <div class="d-flex align-items-center">
+                                            Employee
+                                            <button class="btn btn-sm btn-link text-muted p-0 ms-1 sort-btn" data-sort="employee">
+                                                <i class="fas fa-sort"></i>
+                                            </button>
+                                        </div>
+                                    </th>
+                                    {% endif %}
+                                    <th>
+                                        <div class="d-flex align-items-center">
+                                            Date & Time
+                                            <button class="btn btn-sm btn-link text-muted p-0 ms-1 sort-btn" data-sort="timestamp">
+                                                <i class="fas fa-sort"></i>
+                                            </button>
+                                        </div>
+                                    </th>
+                                    <th>Type</th>
+                                    <th>
+                                        <div class="d-flex align-items-center">
+                                            Confidence
+                                            <button class="btn btn-sm btn-link text-muted p-0 ms-1 sort-btn" data-sort="confidence">
+                                                <i class="fas fa-sort"></i>
+                                            </button>
+                                        </div>
+                                    </th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in attendance_records %}
+                                <tr class="attendance-record">
+                                    {% if request.user.is_staff %}
+                                    <td class="ps-4">
+                                        <div class="d-flex align-items-center">
+                                            <div class="flex-shrink-0">
+                                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" 
+                                                     style="width: 32px; height: 32px;">
+                                                    <span class="text-white fw-bold small">
+                                                        {{ record.employee.user.get_full_name|default:record.employee.user.username|make_list|first|upper }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div class="flex-grow-1 ms-3">
+                                                <h6 class="mb-0 small">{{ record.employee.user.get_full_name|default:record.employee.user.username }}</h6>
+                                                <small class="text-muted">{{ record.employee.department|default:"No Department" }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {% endif %}
+                                    <td>
+                                        <div>
+                                            <strong class="small">{{ record.timestamp|date:"M d, Y" }}</strong>
+                                            <div class="text-muted small">{{ record.timestamp|time:"H:i A" }}</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if record.attendance_type == 'check_in' %}bg-success{% else %}bg-info{% endif %}">
+                                            <i class="fas {% if record.attendance_type == 'check_in' %}fa-sign-in-alt{% else %}fa-sign-out-alt{% endif %} me-1"></i>
+                                            {{ record.get_attendance_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if record.confidence_score %}
+                                                <div class="progress flex-grow-1 me-2" style="height: 6px; width: 80px;">
+                                                    <div class="progress-bar 
+                                                        {% if record.confidence_score >= 90 %}bg-success
+                                                        {% elif record.confidence_score >= 70 %}bg-warning
+                                                        {% else %}bg-danger{% endif %}" 
+                                                        style="width: {{ record.confidence_score }}%">
+                                                    </div>
+                                                </div>
+                                                <span class="fw-bold small">{{ record.confidence_score|floatformat:1 }}%</span>
+                                            {% else %}
+                                                <span class="text-muted small">N/A</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if record.attendance_type == 'check_in' %}
+                                            <i class="fas fa-check-circle text-success" title="Checked In"></i>
+                                        {% else %}
+                                            <i class="fas fa-door-closed text-info" title="Checked Out"></i>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="{% if request.user.is_staff %}5{% else %}4{% endif %}" class="text-center py-5">
+                                        <div class="py-4">
+                                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                            <h5 class="text-muted">No attendance records found</h5>
+                                            <p class="text-muted mb-0">No data available for the selected time period</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                {% if attendance_records.has_other_pages %}
+                <div class="card-footer">
+                    <nav aria-label="Attendance records navigation">
+                        <ul class="pagination justify-content-center mb-0 pagination-sm">
+                            {% if attendance_records.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ attendance_records.previous_page_number }}&days={{ days }}">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                            
+                            {% for i in attendance_records.paginator.page_range %}
+                                {% if attendance_records.number == i %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ i }}</span>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ i }}&days={{ days }}">{{ i }}</a>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if attendance_records.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ attendance_records.next_page_number }}&days={{ days }}">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Timeline View (Hidden by default) -->
+            <div class="card dashboard-card d-none" id="timelineView">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-stream me-2"></i>Attendance Timeline
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for record in attendance_records|slice:":10" %}
+                        <div class="timeline-item {% cycle '' 'timeline-item-right' %}">
+                            <div class="timeline-marker 
+                                {% if record.attendance_type == 'check_in' %}bg-success{% else %}bg-info{% endif %}">
+                                <i class="fas {% if record.attendance_type == 'check_in' %}fa-sign-in-alt{% else %}fa-sign-out-alt{% endif %}"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <div class="d-flex justify-content-between">
+                                    <h6 class="mb-1">
+                                        {% if request.user.is_staff %}
+                                        {{ record.employee.user.get_full_name|default:record.employee.user.username }}
+                                        {% else %}
+                                        {{ record.get_attendance_type_display }}
+                                        {% endif %}
+                                    </h6>
+                                    <small class="text-muted">{{ record.timestamp|time:"H:i A" }}</small>
+                                </div>
+                                <p class="mb-1 text-muted small">
+                                    {{ record.timestamp|date:"F j, Y" }}
+                                    {% if record.confidence_score %}
+                                    • {{ record.confidence_score|floatformat:1 }}% confidence
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-stream fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No timeline data available</h5>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 2rem;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -2rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    z-index: 2;
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    border-left: 3px solid #4361ee;
+}
+
+.timeline-item-right .timeline-content {
+    margin-left: 3rem;
+    border-left: none;
+    border-right: 3px solid #4361ee;
+}
+
+.sort-btn {
+    text-decoration: none;
+}
+
+.sort-btn:hover {
+    color: var(--primary-color) !important;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.attendance-record:hover {
+    background-color: rgba(67, 97, 238, 0.05) !important;
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // View Toggle
+    const viewButtons = document.querySelectorAll('[data-view]');
+    const tableView = document.getElementById('tableView');
+    const timelineView = document.getElementById('timelineView');
+    
+    viewButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const view = this.getAttribute('data-view');
+            
+            // Update active button
+            viewButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show/hide views
+            if (view === 'table') {
+                tableView.classList.remove('d-none');
+                timelineView.classList.add('d-none');
+            } else {
+                tableView.classList.add('d-none');
+                timelineView.classList.remove('d-none');
+            }
+        });
+    });
+
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#attendanceTable tbody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+    }
+
+    // Sort functionality
+    const sortButtons = document.querySelectorAll('.sort-btn');
+    sortButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const sortBy = this.getAttribute('data-sort');
+            alert(`Sorting by ${sortBy} would be implemented here with JavaScript`);
+            // Actual sorting implementation would require additional JavaScript
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,1081 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load attendance_filters %}
+
+{% block title %}Dashboard - {% if is_admin %}Admin Panel{% else %}My Attendance{% endif %}{% endblock %}
+
+{% block page_title %}
+    {% if is_admin %}
+        <i class="fas fa-tachometer-alt me-2"></i>Admin Dashboard
+    {% else %}
+        <i class="fas fa-user-clock me-2"></i>My Dashboard
+    {% endif %}
+{% endblock %}
+
+{% block page_subtitle %}
+    {% if is_admin %}
+        Overview of all employee attendance and system analytics
+    {% else %}
+        Welcome back, {{ employee.user.get_full_name }}! Here's your attendance summary.
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Admin Overview Section -->
+    {% if is_admin %}
+    <!-- Admin Employee Selector -->
+    <div class="card dashboard-card mb-4">
+        <div class="card-body py-3">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h6 class="mb-1 text-primary">
+                        <i class="fas fa-user-cog me-2"></i>Employee Dashboard Selector
+                    </h6>
+                    <small class="text-muted">Switch between admin overview and individual employee views</small>
+                </div>
+                <div class="col-md-4">
+                    <form method="get" class="d-flex align-items-center">
+                        <label class="me-2 fw-bold">Select Employee:</label>
+                        <select name="emp_id" class="form-select w-auto" onchange="this.form.submit()">
+                        <option value="">All Employees</option>
+                        {% for emp in employees %}
+                            <option value="{{ emp.id }}" {% if emp.id == selected_emp_id %}selected{% endif %}>
+                            {{ emp.user.get_full_name }} ({{ emp.employee_id }})
+                            </option>
+                        {% endfor %}
+                        </select>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Summary Cards (Light & Professional) -->
+    <div class="row mb-4">
+        <!-- Total Employees -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-sm" style="background-color: #f8f9fa;">
+                <div class="card-body d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <p class="text-muted mb-1">Total Employees</p>
+                        <h3 class="mb-0 text-dark">{{ total_employees }}</h3>
+                        <small class="text-secondary">Active</small>
+                    </div>
+                    <div class="ms-3 text-primary">
+                        <i class="fas fa-users fa-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Today's Records -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-sm" style="background-color: #f9f6ff;">
+                <div class="card-body d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <p class="text-muted mb-1">Today's Records</p>
+                        <h3 class="mb-0 text-dark">{{ today_attendance|length }}</h3>
+                        <small class="text-secondary">Today</small>
+                    </div>
+                    <div class="ms-3 text-info">
+                        <i class="fas fa-calendar-day fa-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weekly Records -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-sm" style="background-color: #f4fbf9;">
+                <div class="card-body d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <p class="text-muted mb-1">Weekly Records</p>
+                        <h3 class="mb-0 text-dark">{{ week_attendance|length }}</h3>
+                        <small class="text-secondary">This Week</small>
+                    </div>
+                    <div class="ms-3 text-success">
+                        <i class="fas fa-calendar-week fa-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monthly Records -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-sm" style="background-color: #fff9f4;">
+                <div class="card-body d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <p class="text-muted mb-1">Monthly Records</p>
+                        <h3 class="mb-0 text-dark">{{ month_attendance|length }}</h3>
+                        <small class="text-secondary">This Month</small>
+                    </div>
+                    <div class="ms-3 text-warning">
+                        <i class="fas fa-calendar-alt fa-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Avg. Confidence -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-0 shadow-sm" style="background-color: #f4f8ff;">
+                <div class="card-body d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <p class="text-muted mb-1">Average Confidence</p>
+                        <h3 class="mb-0 text-dark">{{ avg_confidence }}%</h3>
+                        <div class="progress mt-2" style="height: 6px;">
+                            <div class="progress-bar 
+                                {% if avg_confidence >= 90 %}bg-success
+                                {% elif avg_confidence >= 70 %}bg-warning
+                                {% else %}bg-danger{% endif %}" 
+                                style="width: {{ avg_confidence }}%;">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ms-3 text-primary">
+                        <i class="fas fa-chart-line fa-lg"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Admin Quick Actions -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card dashboard-card">
+                <div class="card-header bg-transparent border-bottom-0">
+                    <h5 class="card-title mb-0 text-dark">
+                        <i class="fas fa-bolt me-2 text-warning"></i>Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body pt-0">
+                    <div class="row g-3">
+                        <div class="col-xl-3 col-md-6">
+                            <div class="action-card">
+                                <a href="{% url 'reports' %}" class="action-link">
+                                    <div class="action-icon bg-primary">
+                                        <i class="fas fa-chart-bar"></i>
+                                    </div>
+                                    <div class="action-content">
+                                        <h6>View Reports</h6>
+                                        <p>Analytics & insights</p>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6">
+                            <div class="action-card">
+                                <a href="{% url 'register' %}" class="action-link">
+                                    <div class="action-icon bg-success">
+                                        <i class="fas fa-user-plus"></i>
+                                    </div>
+                                    <div class="action-content">
+                                        <h6>Add Employee</h6>
+                                        <p>Register new staff</p>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6">
+                            <div class="action-card">
+                                <a href="{% url 'attendance_history_all' %}" class="action-link">
+                                    <div class="action-icon bg-info">
+                                        <i class="fas fa-history"></i>
+                                    </div>
+                                    <div class="action-content">
+                                        <h6>All History</h6>
+                                        <p>Complete records</p>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-md-6">
+                            <div class="action-card">
+                                <a href="{% url 'attendance_settings' %}" class="action-link">
+                                    <div class="action-icon bg-warning">
+                                        <i class="fas fa-cog"></i>
+                                    </div>
+                                    <div class="action-content">
+                                        <h6>Settings</h6>
+                                        <p>System configuration</p>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Employee Dashboard Section -->
+    {% if not is_admin or request.GET.emp_id %}
+    <!-- Current Status & Quick Stats -->
+<div class="row mb-4">
+    <!-- Current Status Card -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h6 class="text-muted mb-0">Current Status</h6>
+                    <span class="badge {% if current_status == 'Checked In' %}bg-success
+                        {% elif current_status == 'Checked Out' %}bg-secondary
+                        {% else %}bg-light text-dark{% endif %}">
+                        {{ current_status }}
+                    </span>
+                </div>
+                <p class="text-secondary small mb-0">
+                    {% if last_checkin %}
+                        Last: {{ last_checkin.timestamp|time:"H:i A" }}
+                    {% else %}
+                        No activity today
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Today's Hours -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Today's Hours</h6>
+                <h3 class="fw-semibold mb-2">{{ total_hours }}h</h3>
+                <span class="badge {% if current_status == 'Checked In' %}bg-info text-dark{% else %}bg-light text-dark{% endif %}">
+                    {% if current_status == 'Checked In' %}
+                        In Progress
+                    {% else %}
+                        Completed
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Average Confidence -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Avg. Confidence</h6>
+                <h3 class="fw-semibold mb-2">{{ avg_confidence }}%</h3>
+                <div class="progress" style="height: 5px;">
+                    <div class="progress-bar
+                        {% if avg_confidence >= 90 %}bg-success
+                        {% elif avg_confidence >= 70 %}bg-warning
+                        {% else %}bg-danger{% endif %}"
+                        style="width: {{ avg_confidence }}%;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Total Records -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-2">Today's Records</h6>
+                <h3 class="fw-semibold mb-2">{{ today_attendance.count }}</h3>
+                <p class="text-secondary small mb-0">
+                    {% with checkins=today_attendance|filter_attendance_type:"check_in" %}
+                        {{ checkins.count }} check-ins
+                    {% endwith %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    <!-- Charts and Analytics Section -->
+    <div class="row mb-4">
+        <!-- Attendance Chart -->
+        <div class="col-lg-8 mb-4">
+            <div class="card dashboard-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center border-bottom-0 pb-0">
+                    <div>
+                        <h5 class="card-title mb-1">Attendance Overview</h5>
+                        <p class="text-muted small mb-0">Last 7 days performance</p>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-calendar me-1"></i> Last 7 Days
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" data-range="7">Last 7 Days</a></li>
+                            <li><a class="dropdown-item" href="#" data-range="30">Last 30 Days</a></li>
+                            <li><a class="dropdown-item" href="#" data-range="90">Last 90 Days</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card-body pt-3 position-relative" style="height: 280px;">
+                    <canvas id="attendanceChart"></canvas>
+                    <div class="chart-placeholder position-absolute top-50 start-50 translate-middle text-center">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Loading chart...</span>
+                        </div>
+                        <p class="text-muted">Loading attendance data...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions & Stats -->
+        <div class="col-lg-4 mb-4">
+            <div class="card dashboard-card h-100">
+                <div class="card-header border-bottom-0 pb-0">
+                    <h5 class="card-title mb-1">Quick Actions</h5>
+                    <p class="text-muted small mb-0">Manage your attendance</p>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3 mb-4">
+                        <a href="{% url 'attendance_page' %}" class="btn btn-primary btn-lg py-3">
+                            <i class="fas fa-camera me-2"></i>Mark Attendance
+                        </a>
+                        <a href="{% url 'attendance_history_all' %}" class="btn btn-outline-primary py-3">
+                            <i class="fas fa-history me-2"></i>View History
+                        </a>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <h6 class="section-title mb-3">Period Summary</h6>
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <div class="stat-item">
+                                    <div class="stat-value text-primary" id="weeklyCount">{{ week_attendance.count }}</div>
+                                    <div class="stat-label">This Week</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-item">
+                                    <div class="stat-value text-success" id="monthlyCount">{{ month_attendance.count }}</div>
+                                    <div class="stat-label">This Month</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-item">
+                                    <div class="stat-value text-info" id="yesterdayCount">-</div>
+                                    <div class="stat-label">Yesterday</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Today's Activity & Profile -->
+    <div class="row">
+        <!-- Today's Activity Timeline -->
+        <div class="col-lg-6 mb-4">
+            <div class="card dashboard-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center border-bottom-0 pb-0">
+                    <div>
+                        <h5 class="card-title mb-1">Today's Activity</h5>
+                        <p class="text-muted small mb-0">Your attendance timeline</p>
+                    </div>
+                    <span class="badge bg-primary rounded-pill">{{ today_attendance.count }} records</span>
+                </div>
+                <div class="card-body pt-3">
+                    {% if today_attendance %}
+                    <div class="activity-timeline">
+                        {% for record in today_attendance %}
+                        <div class="activity-item {% if record.attendance_type == 'check_in' %}check-in{% else %}check-out{% endif %}">
+                            <div class="activity-marker"></div>
+                            <div class="activity-content">
+                                <div class="activity-header">
+                                    <h6 class="activity-title">{{ record.get_attendance_type_display }}</h6>
+                                    <span class="activity-time">{{ record.timestamp|time:"H:i A" }}</span>
+                                </div>
+                                <div class="activity-details">
+                                    {% if record.confidence_score %}
+                                    <span class="confidence-badge">{{ record.confidence_score|floatformat:1 }}% confidence</span>
+                                    {% endif %}
+                                    {% if record.location %}
+                                    <span class="location-badge">{{ record.location }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-inbox"></i>
+                        </div>
+                        <h5>No activity today</h5>
+                        <p class="text-muted">Your attendance records for today will appear here</p>
+                        <a href="{% url 'attendance_page' %}" class="btn btn-primary">
+                            <i class="fas fa-camera me-2"></i>Mark First Attendance
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Employee Information -->
+        <div class="col-lg-6 mb-4">
+            <div class="card dashboard-card h-100">
+                <div class="card-header border-bottom-0 pb-0">
+                    <h5 class="card-title mb-1">Employee Profile</h5>
+                    <p class="text-muted small mb-0">Your information & stats</p>
+                </div>
+                <div class="card-body pt-3">
+                    <div class="profile-header mb-4">
+                        <div class="profile-avatar">
+                            <div class="avatar-circle">
+                                {{ employee.user.get_full_name|make_list|first|upper }}
+                            </div>
+                        </div>
+                        <div class="profile-info">
+                            <h4 class="profile-name">{{ employee.user.get_full_name }}</h4>
+                            <p class="profile-id text-muted">{{ employee.employee_id }}</p>
+                            <span class="department-badge">{{ employee.department }}</span>
+                        </div>
+                    </div>
+
+                    <div class="profile-stats">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="stat-box">
+                                    <div class="stat-number text-primary">{{ week_attendance.count }}</div>
+                                    <div class="stat-label">This Week</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-box">
+                                    <div class="stat-number text-success">{{ month_attendance.count }}</div>
+                                    <div class="stat-label">This Month</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-box">
+                                    <div class="stat-number text-info">
+                                        {% if week_attendance.count > 0 %}
+                                            {{ week_attendance.count }}
+                                        {% else %}
+                                            0
+                                        {% endif %}
+                                    </div>
+                                    <div class="stat-label">Records</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+
+<style>
+    :root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --info-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    --purple-gradient: linear-gradient(135deg, #a78bfa 0%, #7e22ce 100%);
+}
+
+/* Card Styles */
+.dashboard-card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.stats-card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+    color: white;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.card {
+    background: #fff;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+h6.text-muted {
+    font-size: 0.85rem;
+    letter-spacing: 0.3px;
+}
+
+h3 {
+    font-size: 1.6rem;
+}
+
+.progress-bar {
+    transition: width 0.4s ease;
+}
+
+
+.stats-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.stats-card.gradient-1 {
+    background: var(--primary-gradient);
+}
+
+.stats-card.gradient-2 {
+    background: var(--success-gradient);
+}
+
+.stats-card.gradient-3 {
+    background: var(--info-gradient);
+}
+
+.stats-card.gradient-4 {
+    background: var(--warning-gradient);
+}
+
+.stats-card.gradient-5 {
+    background: var(--purple-gradient);
+}
+
+.stats-card .card-text {
+    font-size: 0.875rem;
+    opacity: 0.9;
+    margin-bottom: 0.5rem;
+}
+
+.stats-card .card-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.stats-card .badge {
+    background: rgba(255, 255, 255, 0.2) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Icon Circles */
+.icon-circle {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Status Cards */
+.status-card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+}
+
+.status-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 6px;
+    height: 100%;
+}
+
+.status-card.status-active::before {
+    background: #28a745;
+}
+
+.status-card.status-completed::before {
+    background: #17a2b8;
+}
+
+.status-card.status-pending::before {
+    background: #ffc107;
+}
+
+.status-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.status-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.status-active .status-indicator {
+    background: #28a745;
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+}
+
+.status-completed .status-indicator {
+    background: #17a2b8;
+    box-shadow: 0 0 10px rgba(23, 162, 184, 0.5);
+}
+
+.status-pending .status-indicator {
+    background: #ffc107;
+    box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+}
+
+.status-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.status-details {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+/* Action Cards */
+.action-card {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+    height: 100%;
+}
+
+.action-card:hover {
+    background: white;
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.action-link {
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.action-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.action-content h6 {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.action-content p {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 0;
+}
+
+/* Activity Timeline */
+.activity-timeline {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.activity-timeline::before {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #667eea, #764ba2);
+}
+
+.activity-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.activity-marker {
+    position: absolute;
+    left: -2rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    border: 3px solid white;
+    z-index: 2;
+}
+
+.activity-item.check-in .activity-marker {
+    background: #28a745;
+    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.2);
+}
+
+.activity-item.check-out .activity-marker {
+    background: #17a2b8;
+    box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.2);
+}
+
+.activity-content {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 12px;
+    border-left: 3px solid #667eea;
+    transition: all 0.2s ease;
+}
+
+.activity-content:hover {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.activity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.activity-title {
+    font-weight: 600;
+    margin-bottom: 0;
+    flex: 1;
+}
+
+.activity-time {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.activity-details {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.confidence-badge, .location-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 20px;
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+/* Profile Styles */
+.profile-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.avatar-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--primary-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-right: 1.5rem;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.profile-name {
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.profile-id {
+    margin-bottom: 0.5rem;
+}
+
+.department-badge {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+/* Stats Grid */
+.stats-grid {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 12px;
+}
+
+.section-title {
+    font-weight: 600;
+    color: #495057;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 1rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+}
+
+.stat-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+}
+
+.empty-icon {
+    font-size: 4rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+}
+
+.empty-state h5 {
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+/* Progress Bars */
+.confidence-bar .progress {
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.confidence-bar .progress-bar {
+    border-radius: 10px;
+}
+
+/* Chart Placeholder */
+.chart-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6c757d;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .avatar-circle {
+        margin-right: 0;
+        margin-bottom: 1rem;
+    }
+    
+    .stats-card .card-title {
+        font-size: 1.5rem;
+    }
+    
+    .activity-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .activity-time {
+        margin-top: 0.25rem;
+    }
+}
+
+/* Animation for cards */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.stats-card, .status-card, .dashboard-card {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+/* Stagger animation for cards */
+.stats-card:nth-child(1) { animation-delay: 0.1s; }
+.stats-card:nth-child(2) { animation-delay: 0.2s; }
+.stats-card:nth-child(3) { animation-delay: 0.3s; }
+.stats-card:nth-child(4) { animation-delay: 0.4s; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const chartCanvas = document.getElementById("attendanceChart");
+    const placeholder = document.querySelector(".chart-placeholder");
+    let attendanceChart = null;
+
+    // Detect employee ID (if applicable)
+    const empId = new URLSearchParams(window.location.search).get("emp_id");
+
+    // Default API URL
+    let apiUrl = "{% url 'attendance_summary_api' %}";
+    if (empId) {
+        apiUrl += `?emp_id=${empId}`;
+    }
+
+    // Load chart data from API
+    function loadAttendanceData(range = 7) {
+        placeholder.style.display = "flex";
+
+        fetch(`${apiUrl}&range=${range}`)
+            .then(response => response.json())
+            .then(data => {
+                placeholder.style.display = "none";
+                renderAttendanceChart(data);
+            })
+            .catch(error => {
+                console.error("Error loading attendance data:", error);
+                placeholder.innerHTML = `<p class="text-danger">Failed to load data.</p>`;
+            });
+    }
+
+    // Render chart using Chart.js
+    function renderAttendanceChart(data) {
+        if (!data.labels || !data.present || !data.absent) {
+            placeholder.innerHTML = `<p class="text-danger">Invalid chart data.</p>`;
+            return;
+        }
+
+        if (attendanceChart) attendanceChart.destroy();
+
+        attendanceChart = new Chart(chartCanvas, {
+            type: "bar",
+            data: {
+                labels: data.labels,
+                datasets: [
+                    {
+                        label: "Present",
+                        data: data.present,
+                        backgroundColor: "rgba(13, 110, 253, 0.7)",
+                        borderRadius: 6,
+                    },
+                    {
+                        label: "Absent",
+                        data: data.absent,
+                        backgroundColor: "rgba(220, 53, 69, 0.7)",
+                        borderRadius: 6,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                plugins: {
+                    legend: { position: "bottom" },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}`
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Handle range selection
+    document.querySelectorAll(".dropdown-item[data-range]").forEach(item => {
+        item.addEventListener("click", function (e) {
+            e.preventDefault();
+            const range = this.getAttribute("data-range");
+            document.querySelector(".dropdown-toggle").innerHTML =
+                `<i class="fas fa-calendar me-1"></i> Last ${range} Days`;
+            loadAttendanceData(range);
+        });
+    });
+
+    // Hover effect for cards
+    document.querySelectorAll(".stats-card, .status-card, .dashboard-card").forEach(card => {
+        card.addEventListener("mouseenter", () => card.style.transform = "translateY(-5px)");
+        card.addEventListener("mouseleave", () => card.style.transform = "translateY(0)");
+    });
+
+    // Load chart initially
+    loadAttendanceData();
+
+    // Auto-refresh for active employee
+    {% if current_status == 'Checked In' %}
+    setInterval(loadAttendanceData, 30000);
+    {% endif %}
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,439 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Smart Face Attendance Kiosk{% endblock %}
+
+{% block content %}
+<!-- Fullscreen Toggle Button -->
+<div class="text-end mt-3 me-4">
+  <button id="fullscreenBtn" class="btn btn-outline-primary">
+    <i class="fas fa-expand me-2"></i>Enter Fullscreen Kiosk Mode
+  </button>
+</div>
+
+<!-- Normal Kiosk Content -->
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-light mt-3">
+      <div class="card-header bg-light text-center border-bottom">
+        <h4 class="text-primary"><i class="fas fa-camera me-2"></i>Automatic Facial Attendance Kiosk</h4>
+        <small class="text-muted">Admin Mode — Detect and mark attendance automatically</small>
+      </div>
+
+      <div class="card-body text-center">
+        <!-- Camera Section -->
+        <div class="camera-container mb-4">
+          <video id="camera" width="480" height="360" autoplay playsinline class="border rounded"></video>
+          <canvas id="canvas" style="display:none;"></canvas>
+          <div class="camera-status mt-2">
+            <span id="cameraStatus" class="badge bg-success">Camera Active</span>
+          </div>
+        </div>
+
+        <!-- Alerts Section -->
+        <div class="alert-container" id="alertContainer">
+          <div id="successBox" class="alert alert-success alert-kiosk" style="display:none;"></div>
+          <div id="errorBox" class="alert alert-danger alert-kiosk" style="display:none;"></div>
+        </div>
+
+        <!-- Recent Attendance -->
+        <div class="recent-attendance mt-4" id="recentRecords">
+          <h5 class="text-primary"><i class="fas fa-list me-2"></i>Recent Attendance</h5>
+          <div class="table-responsive">
+            <table class="table table-striped table-hover text-start" id="attendanceLog">
+              <thead class="table-light">
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Time</th>
+                  <th>Confidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="4" class="text-muted text-center">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="instructions-section mt-4" id="instructionsBox">
+          <div class="alert alert-info text-start">
+            <h6><i class="fas fa-info-circle me-2"></i>Instructions</h6>
+            <ul class="mb-0">
+              <li>Stand alone in front of the camera for 2–3 seconds.</li>
+              <li>Wait for the beep and green message before the next person approaches.</li>
+              <li>Ensure proper lighting and full face visibility.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Fullscreen Overlay (Hidden by default) -->
+<div id="fullscreenOverlay" class="fullscreen-overlay" style="display: none;">
+  <div class="fullscreen-content">
+    <!-- Camera Section -->
+    <div class="camera-container mb-4">
+      <video id="fullscreenCamera" width="640" height="480" autoplay playsinline class="border rounded"></video>
+      <canvas id="fullscreenCanvas" style="display:none;"></canvas>
+      <div class="camera-status mt-2">
+        <span id="fullscreenCameraStatus" class="badge bg-success">Camera Active</span>
+      </div>
+    </div>
+
+    <!-- Alerts Section -->
+    <div class="alert-container" id="fullscreenAlertContainer">
+      <div id="fullscreenSuccessBox" class="alert alert-success fullscreen-alert" style="display:none;"></div>
+      <div id="fullscreenErrorBox" class="alert alert-danger fullscreen-alert" style="display:none;"></div>
+    </div>
+
+    <!-- Recent Attendance -->
+    <div class="recent-attendance mt-4">
+      <h5 class="text-white"><i class="fas fa-list me-2"></i>Recent Attendance</h5>
+      <div class="table-responsive">
+        <table class="table table-dark table-striped table-hover text-start" id="fullscreenAttendanceLog">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Time</th>
+              <th>Confidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="4" class="text-muted text-center">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Exit Button -->
+    <button id="exitFullscreenBtn" class="btn btn-light exit-fullscreen-btn">
+      <i class="fas fa-times me-2"></i>Exit Fullscreen
+    </button>
+  </div>
+</div>
+
+<audio id="successBeep" src="{% static 'sounds/beep.wav' %}" preload="auto"></audio>
+
+<style>
+/* Fullscreen Overlay Styles */
+.fullscreen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #1a1a1a;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.fullscreen-content {
+  max-width: 1200px;
+  width: 100%;
+  text-align: center;
+}
+
+.fullscreen-overlay .camera-container {
+  margin-bottom: 2rem;
+}
+
+.fullscreen-overlay #fullscreenCamera {
+  border: 3px solid #333;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.fullscreen-overlay .fullscreen-alert {
+  font-size: 1.2rem;
+  padding: 1rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  max-width: 600px;
+  margin: 0 auto 1rem;
+}
+
+.fullscreen-overlay .alert-success {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+}
+
+.fullscreen-overlay .alert-danger {
+  background: linear-gradient(135deg, #dc3545, #e83e8c);
+  color: white;
+}
+
+.fullscreen-overlay .recent-attendance {
+  background: rgba(255,255,255,0.05);
+  border-radius: 12px;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.fullscreen-overlay .table-dark {
+  background: transparent;
+  color: #fff;
+}
+
+.fullscreen-overlay .table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(255,255,255,0.05);
+}
+
+.fullscreen-overlay .table-hover tbody tr:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+.exit-fullscreen-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  background: rgba(0,0,0,0.8);
+  border: 2px solid #fff;
+  color: #fff;
+  font-weight: bold;
+}
+
+.exit-fullscreen-btn:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease-in-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .fullscreen-overlay {
+    padding: 1rem;
+  }
+  
+  .fullscreen-overlay #fullscreenCamera {
+    width: 95vw;
+    max-width: 480px;
+    height: auto;
+  }
+  
+  .fullscreen-overlay .recent-attendance {
+    padding: 1rem;
+  }
+  
+  .fullscreen-overlay .fullscreen-alert {
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+  }
+}
+</style>
+
+<script>
+// === Element References ===
+const camera = document.getElementById('camera');
+const canvas = document.getElementById('canvas');
+const fullscreenOverlay = document.getElementById('fullscreenOverlay');
+const fullscreenCamera = document.getElementById('fullscreenCamera');
+const fullscreenCanvas = document.getElementById('fullscreenCanvas');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
+const successBeep = document.getElementById('successBeep');
+const successBox = document.getElementById('successBox');
+const errorBox = document.getElementById('errorBox');
+const fullscreenSuccessBox = document.getElementById('fullscreenSuccessBox');
+const fullscreenErrorBox = document.getElementById('fullscreenErrorBox');
+const logTable = document.querySelector('#attendanceLog tbody');
+const fullscreenLogTable = document.querySelector('#fullscreenAttendanceLog tbody');
+
+let processing = false;
+let lastSuccessTime = 0;
+let cameraStream = null;
+let isFullscreen = false;
+let captureInterval = null;
+
+// === Initialize Camera ===
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    cameraStream = stream;
+    camera.srcObject = stream;
+    fullscreenCamera.srcObject = stream;
+    startAutoCapture();
+    loadAttendanceLog();
+  } catch (err) {
+    showMessage('error', 'Camera access denied or unavailable.');
+    document.getElementById('cameraStatus').className = 'badge bg-danger';
+    document.getElementById('cameraStatus').textContent = 'Camera Offline';
+  }
+}
+
+// === Auto Capture Loop ===
+function startAutoCapture() {
+  if (captureInterval) clearInterval(captureInterval);
+  captureInterval = setInterval(() => {
+    if (processing || Date.now() - lastSuccessTime < 8000) return;
+    processing = true;
+    captureAndSend();
+  }, 4000);
+}
+
+// === Capture Frame & Send to Server ===
+function captureAndSend() {
+  const currentCamera = isFullscreen ? fullscreenCamera : camera;
+  const currentCanvas = isFullscreen ? fullscreenCanvas : canvas;
+
+  if (!currentCamera.srcObject) return;
+
+  currentCanvas.width = currentCamera.videoWidth;
+  currentCanvas.height = currentCamera.videoHeight;
+  currentCanvas.getContext('2d').drawImage(currentCamera, 0, 0);
+
+  currentCanvas.toBlob(blob => {
+    const formData = new FormData();
+    formData.append('capture', blob, 'frame.jpg');
+
+    fetch("{% url 'mark_attendance' %}", {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+      body: formData
+    })
+      .then(res => res.json())
+      .then(data => handleResponse(data))
+      .catch(() => showMessage('error', 'Error connecting to server.'))
+      .finally(() => (processing = false));
+  }, 'image/jpeg');
+}
+
+// === Handle Server Response ===
+function handleResponse(data) {
+  const showFunc = isFullscreen ? showFullscreenMessage : showMessage;
+  if (data.success) {
+    showFunc('success', `${data.message}<br><small>Confidence: ${data.confidence || 'N/A'}</small>`);
+    successBeep.play();
+    lastSuccessTime = Date.now();
+    isFullscreen ? loadFullscreenAttendanceLog() : loadAttendanceLog();
+  } else {
+    showFunc('error', data.message || 'Face not recognized.');
+  }
+}
+
+// === UI Helpers ===
+function showMessage(type, message) {
+  successBox.style.display = errorBox.style.display = 'none';
+  const box = type === 'success' ? successBox : errorBox;
+  box.innerHTML = message;
+  box.style.display = 'block';
+  setTimeout(() => (box.style.display = 'none'), 3000);
+}
+
+function showFullscreenMessage(type, message) {
+  fullscreenSuccessBox.style.display = fullscreenErrorBox.style.display = 'none';
+  const box = type === 'success' ? fullscreenSuccessBox : fullscreenErrorBox;
+  box.innerHTML = message;
+  box.style.display = 'block';
+  setTimeout(() => (box.style.display = 'none'), 3000);
+}
+
+// === Attendance Logs ===
+function loadAttendanceLog() {
+  fetch("{% url 'attendance_log_api' %}")
+    .then(res => res.json())
+    .then(data => updateLogTable(logTable, data))
+    .catch(() => (logTable.innerHTML = '<tr><td colspan="4" class="text-danger text-center">Error loading log.</td></tr>'));
+}
+
+function loadFullscreenAttendanceLog() {
+  fetch("{% url 'attendance_log_api' %}")
+    .then(res => res.json())
+    .then(data => updateLogTable(fullscreenLogTable, data))
+    .catch(() => (fullscreenLogTable.innerHTML = '<tr><td colspan="4" class="text-danger text-center">Error loading log.</td></tr>'));
+}
+
+function updateLogTable(tableElement, data) {
+  tableElement.innerHTML = '';
+  if (!data.length) {
+    tableElement.innerHTML = '<tr><td colspan="4" class="text-muted text-center">No records yet today.</td></tr>';
+    return;
+  }
+  data.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row.name}</td>
+      <td><span class="badge ${row.type === 'check_in' ? 'bg-success' : 'bg-info'}">${row.type}</span></td>
+      <td>${row.time}</td>
+      <td><span class="confidence-badge">${row.confidence}%</span></td>
+    `;
+    tableElement.appendChild(tr);
+  });
+}
+
+// === CSRF Helper ===
+function getCookie(name) {
+  const cookie = document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith(name + '='));
+  return cookie ? decodeURIComponent(cookie.split('=')[1]) : null;
+}
+
+// === Fullscreen Handling ===
+async function enterFullscreenMode() {
+  if (!document.fullscreenElement) {
+    await document.documentElement.requestFullscreen();
+  }
+  fullscreenOverlay.style.display = 'flex';
+  fullscreenOverlay.classList.add('fade-in');
+  isFullscreen = true;
+  fullscreenBtn.innerHTML = '<i class="fas fa-compress me-2"></i>Exit Fullscreen';
+  loadFullscreenAttendanceLog();
+}
+
+async function exitFullscreenMode() {
+  if (document.fullscreenElement) {
+    await document.exitFullscreen();
+  }
+  fullscreenOverlay.classList.remove('fade-in');
+  fullscreenOverlay.style.display = 'none';
+  isFullscreen = false;
+  fullscreenBtn.innerHTML = '<i class="fas fa-expand me-2"></i>Enter Fullscreen Kiosk Mode';
+}
+
+// === Listeners ===
+fullscreenBtn.addEventListener('click', () => {
+  isFullscreen ? exitFullscreenMode() : enterFullscreenMode();
+});
+exitFullscreenBtn.addEventListener('click', exitFullscreenMode);
+
+// Handle manual ESC exit
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && isFullscreen) exitFullscreenMode();
+});
+
+// Auto-refresh logs every second
+setInterval(() => {
+  isFullscreen ? loadFullscreenAttendanceLog() : loadAttendanceLog();
+}, 1000);
+
+// === Start System ===
+startCamera();
+</script>
+
+{% endblock %}
+
+<!-- | Feature / Function                   | Timing (ms) | Human Time | Purpose                             |
+| ------------------------------------ | ----------- | ---------- | ----------------------------------- |
+| Auto capture frame interval          | 4000        | 4 seconds  | Capture and send frame periodically |
+| Success cooldown between captures    | 8000        | 8 seconds  | Prevent duplicate recognition       |
+| Auto-hide alert messages             | 3000        | 3 seconds  | Remove messages after display       |
+| Attendance log auto-refresh interval | 1000        | 1 second   | Update recent log continuously      |
+ -->
+
+ 
