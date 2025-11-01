@@ -1,82 +1,89 @@
-🧠 Smart Face Recognition Attendance System
+# 🧠 Face Recognition Attendance System
 
-An AI-powered Face Recognition Attendance System built using Python, Django, and OpenCV, designed for real-time employee attendance tracking.
-It captures faces via webcam, verifies identities using trained embeddings, and automatically marks attendance with confidence levels.
+An intelligent **Face Recognition Attendance System** built using **Python**, **Django**, and **OpenCV**, designed to automate employee attendance through real-time face detection and recognition.  
+This system eliminates manual entry errors and ensures a secure, efficient, and contactless attendance process.
 
-📸 Key Features
+---
 
-✅ Real-time face detection and recognition using OpenCV + DeepFace
-✅ Automatic attendance marking (Check-In / Check-Out)
-✅ Admin dashboard for live monitoring and analytics
-✅ Fullscreen Kiosk Mode for public terminals
-✅ CSV/Excel export of attendance data
-✅ Secure authentication and role-based access (Admin / Employee)
-✅ Daily, weekly, and monthly summary reports
-✅ Audio and visual feedback for successful recognition
+## 🚀 Features
 
-🧩 Tech Stack
-Component	Technology
-Backend Framework	Django 4.x
-Frontend	Bootstrap 5, Font Awesome
-Face Recognition	OpenCV, DeepFace (or face_recognition library)
-Database	SQLite (can be upgraded to PostgreSQL/MySQL)
-Language	Python 3.10+
-Other Tools	JavaScript (fetch API), Chart.js (for analytics)
-⚙️ Setup Instructions
-1️⃣ Clone the repository
-git clone https://github.com/your-username/facial_attendance.git
+- 🧍‍♂️ **Employee Registration & Management**
+- 👁️ **Real-Time Face Detection & Recognition**
+- ⏰ **Automatic Attendance Marking**
+- 📊 **Admin Dashboard with Analytics**
+- 📅 **Daily, Weekly & Monthly Attendance Reports**
+- 🔒 **Role-Based Authentication (Admin / Employee)**
+- 💻 **Modern Web UI with Bootstrap**
+- 🌐 **Live Attendance Summary via API**
+
+---
+
+## 🛠️ Installation
+
+Follow the steps below to set up the project on your local machine:
+
+### 1️⃣ Clone the Repository
+```bash
+git clone https://github.com/<your-username>/facial_attendance.git
+
+```
+2️⃣ Navigate to the Project Directory
+```bash
 cd facial_attendance
-
-2️⃣ Create and activate a virtual environment
+```
+3️⃣ Create a Virtual Environment
+```bash
 python -m venv venv
-venv\Scripts\activate  # (Windows)
-# OR
-source venv/bin/activate  # (Mac/Linux)
-
-3️⃣ Install dependencies
+# activate venv
+venv\Scripts\activate
+```
+4️⃣ Install Dependencies
+```bash
 pip install -r requirements.txt
+```
+5️⃣ Apply Database Migrations
 
-4️⃣ Apply migrations
+```bash
 python manage.py makemigrations
 python manage.py migrate
-
-5️⃣ Create a superuser
+```
+6️⃣ Create a Superuser (Admin Account)
+```bash
 python manage.py createsuperuser
+```
 
-6️⃣ Run the development server
+7️⃣ Run the Development Server
+```bash
 python manage.py runserver
+```
+Now open your browser and go to:
+```bash
+http://127.0.0.1:8000/
+```
+8️⃣ Access the Admin Panel
+```bash
+http://127.0.0.1:8000/admin/
+```
+
+✅ Optional (Face Recognition Setup)
+
+Make sure the following libraries are installed:
+```bash
+pip install opencv-python face-recognition dlib numpy
+```
 
 
-Now visit 👉 http://127.0.0.1:8000/
+Also, ensure your system has a working camera.
 
-🧑‍💼 Admin Features
 
-Manage employees (add/update/delete)
+## 🧩 Project Structure
 
-View attendance logs and filter by date or employee
-
-Export attendance records (CSV/Excel)
-
-View average confidence levels and working hours
-
-Fullscreen kiosk mode for automatic recognition
-
-👨‍🏫 Employee Features
-
-Automatic attendance through webcam
-
-Live status (Checked In / Checked Out)
-
-View personal attendance history
-
-Weekly and monthly performance charts
-
-🧠 Folder Structure
+```bash
 facial_attendance/
 │
-├── attendance_app/          # Main app
-│   ├── models.py            # Employee & Attendance models
-│   ├── views.py             # Logic for attendance and dashboard
+├── attendance_app/         # Main app
+│   ├── models.py           # Employee & Attendance models
+│   ├── views.py            # Logic for attendance and dashboard
 │   ├── urls.py
 │   ├── templates/
 │   │   ├── dashboard.html
@@ -87,78 +94,73 @@ facial_attendance/
 │       ├── css/
 │       └── sounds/
 │
-├── facial_attendance/       # Project settings
+├── facial_attendance/      # Project settings
 │   ├── settings.py
 │   └── urls.py
 │
 ├── manage.py
 ├── requirements.txt
 └── README.md
-
-🔐 Authentication
-
-Admin: Access full dashboard and reports
-
-Employee: Limited access to their attendance and stats
-
-Login required for all dashboards and kiosk pages
-
-💾 Database Models
-
-Employee
-
-class Employee(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    employee_id = models.CharField(max_length=50)
-    department = models.CharField(max_length=100)
-    photo = models.ImageField(upload_to='employees/')
+```
 
 
-Attendance
 
-class Attendance(models.Model):
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    attendance_type = models.CharField(choices=[('check_in', 'Check In'), ('check_out', 'Check Out')])
-    confidence_score = models.FloatField(default=0)
+## 💡 Usage
 
-🧪 Example Usage
+- 👨‍💼 **Admin** can add employees, view attendance reports, and monitor real-time stats.  
+- 🧑‍💻 **Employees** can mark attendance automatically by standing in front of the camera.  
+- 🕒 The system records **check-in** and **check-out** times along with a **confidence score** for each recognition event.  
+- 📊 Attendance data is updated in real time and can be filtered by **date, week, or month**.
 
-Launch the Django server
+---
 
-Admin logs in and opens Kiosk Mode
+## 🧮 Tech Stack
 
-Employee stands in front of the camera
+| Component            | Technology                     |
+| -------------------- | ------------------------------ |
+| **Frontend**         | HTML5, CSS3, Bootstrap 5       |
+| **Backend**          | Django 4+, Python 3.10+        |
+| **Database**         | SQLite / PostgreSQL            |
+| **Face Recognition** | OpenCV, dlib, face_recognition |
+| **Authentication**   | Django Auth System             |
+| **APIs**             | Django REST Framework (Optional for Live Data) |
 
-System detects and verifies the face
+---
 
-Attendance is automatically logged in the database
+# 🧑‍💻 Contributing
+Contributions are always welcome! 💬
 
-Success beep sound plays
+**1.Fork this repository**
 
-🎨 Optional: Screenshots
-Screen	Description
-🏠 Dashboard	Overview of daily/weekly stats
-🧍 Employee Detail	Attendance history for one employee
-📸 Kiosk Mode	Fullscreen real-time recognition
-📊 Charts	Daily and monthly attendance graphs
-🧰 Future Enhancements
+**2.Create a new branch:**
+```bash
+git checkout -b feature/your-feature-name
+```
+**3.Commit your changes:**
+```bash
+git commit -m "Add your descriptive commit message"
+```
+**4.Push to your branch:**
+```bash
+git push origin feature/your-feature-name
+```
+**5.Create a Pull Request 🎉**
 
-Offline recognition with local face embeddings
 
-SMS/email notifications for late check-ins
-
-Integration with biometric or RFID systems
-
-Multi-camera kiosk setup for large premises
-
-👨‍💻 Contributors
-
-Avaneesh Pathak — Developer
-
-Open to contributions! Fork the repo and submit a pull request.
-
-📄 License
+# 📜 License
 
 This project is licensed under the MIT License — see the LICENSE
  file for details.
+
+
+
+# ✨ Author
+
+Avaneesh Pathak
+
+📧 avaneeshpathak900@gmail.com
+
+🔗 GitHub Profile
+
+
+
