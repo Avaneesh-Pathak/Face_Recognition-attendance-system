@@ -1,0 +1,129 @@
+# ================================================
+# 🧠 Django + Face Recognition Project .gitignore
+# ================================================
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+*.dll
+*.dylib
+
+# ---- Virtual Environment ----
+venv/
+env/
+ENV/
+.venv/
+venv.bak/
+Scripts/
+Lib/
+Include/
+
+# ---- Django Specific ----
+*.sqlite3
+db.sqlite3
+*.log
+*.pot
+*.pyc
+local_settings.py
+
+# Ignore static and media generated files
+/media/
+staticfiles/
+static/
+media/
+tmp/
+
+# ---- Django Cache / Migrations ----
+# (You can remove this section if you want to version migrations)
+**/migrations/
+!**/migrations/__init__.py
+**/__pycache__/
+**/cache/
+**/caches/
+
+# ---- Face Recognition Related ----
+# Ignore heavy model or embedding data
+*.dat
+*.bin
+*.pkl
+*.npy
+*.npz
+*.h5
+*.json
+*.csv
+*.mp4
+*.avi
+*.jpg
+*.jpeg
+*.png
+*.bmp
+
+# ---- Logs & Reports ----
+*.log
+logs/
+report/
+reports/
+*.bak
+*.swp
+*.tmp
+
+# ---- Jupyter / Notebooks ----
+*.ipynb
+.ipynb_checkpoints/
+
+# ---- OS Specific ----
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ---- IDEs & Editors ----
+# VSCode
+.vscode/
+.history/
+.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# ---- Environment / Config ----
+*.env
+.env.*
+secrets.json
+config.json
+.envrc
+
+# ---- Git Backup / Merge ----
+*.orig
+*.rej
+*.bak
+*.tmp
+*.swp
+*.swo
+
+# ---- Build / Packaging ----
+build/
+dist/
+*.egg-info/
+*.egg/
+.eggs/
+MANIFEST
+*.manifest
+*.spec
+*.manifest
+*.zip
+
+# ---- Node (if frontend integration exists) ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+coverage/
