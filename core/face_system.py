@@ -177,40 +177,49 @@ class FaceRecognitionSystem:
     def analyze_frame(self, frame_bgr):
         """
         Return list of detected faces with fields:
-         - bbox: [x1,y1,x2,y2] (int)
-         - kps: landmarks
-         - embedding: numpy array (normalized)
-         - det_score: float
+        - bbox: [x1,y1,x2,y2] (int)
+        - kps: landmarks
+        - embedding: numpy array (normalized)
+        - det_score: float
         """
         if getattr(self, "app", None) is None:
             logger.debug("analyze_frame called but insightface app is not initialized")
             return []
 
         try:
-            # insightface expects RGB
+            # Convert to RGB for InsightFace
             img = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-            faces = self.app.get(img)  # returns list-like face objects
+            faces = self.app.get(img)
             results = []
+
             for f in faces:
-                # f.bbox, f.kps, f.det_score, f.normed_embedding
                 try:
                     bbox = np.array(getattr(f, "bbox", [])).astype(int).tolist()
                 except Exception:
                     bbox = []
-                emb = getattr(f, "normed_embedding", None) or getattr(f, "embedding", None)
+
+                # ✅ Explicitly handle embedding retrieval
+                emb = getattr(f, "normed_embedding", None)
+                if emb is None:
+                    emb = getattr(f, "embedding", None)
+
                 if emb is None:
                     continue
+
                 res = {
-                    "bbox": bbox,                              # [x1,y1,x2,y2] (may be empty if unavailable)
+                    "bbox": bbox,
                     "kps": getattr(f, "kps", None),
                     "embedding": _normalize(emb),
                     "det_score": float(getattr(f, "det_score", 0.0))
                 }
                 results.append(res)
+
             return results
+
         except Exception as ex:
             logger.exception("analyze_frame error: %s", ex)
             return []
+
 
     # --------------------------
     # Recognize best match for single face embedding
