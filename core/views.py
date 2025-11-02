@@ -1,65 +1,45 @@
+import os
+import cv2
+import ast
+import json
+import base64
+import logging
+import tempfile
+import calendar
+import numpy as np
+from io import BytesIO
+from datetime import date, datetime, timedelta
+from calendar import monthrange, month_name
+from PIL import Image
+
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
+from django.views.decorators.http import require_GET
 from django.http import JsonResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.db.models import Count, Q, Avg
-import cv2
-from calendar import monthrange, month_name
-import base64
-from io import BytesIO
-from PIL import Image
-import json
-from core.face_recognition_utils import get_face_embedding 
-import os
-# import face_recognition
-import tempfile
-from datetime import datetime
-from datetime import timedelta
-import numpy as np
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 
-import logging
-from django.contrib import messages
 from .models import Employee, Attendance, AttendanceSettings, DailyReport
 from .forms import UserRegistrationForm, EmployeeRegistrationForm, AttendanceSettingsForm
 from .face_system import get_face_system
-import os, tempfile, ast, numpy as np
-from datetime import timedelta
-# import face_recognition
-from django.utils import timezone
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-from .models import Attendance, Employee, AttendanceSettings
-import logging
-import base64
-from django.core.files.base import ContentFile
-import ast
-from django.contrib.auth.decorators import login_required
-from django.utils import timezone
-from django.http import JsonResponse
-from core.models import Employee, Attendance
 from core.face_recognition_utils import get_face_embedding
-import numpy as np
-import cv2, json
-import cv2
-import numpy as np
-import json
-from django.http import StreamingHttpResponse
-from django.utils import timezone
-from core.models import Employee # adjust path if needed
-logger = logging.getLogger(__name__)
-face_system = get_face_system()
 
 # Setup logging
 logger = logging.getLogger(__name__)
-handler = logging.FileHandler('registration.log')  # logs will be saved here
+handler = logging.FileHandler('registration.log')
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 if not logger.hasHandlers():
     logger.addHandler(handler)
 logger.setLevel(logging.INFO)
+
+# Initialize face system
+face_system = get_face_system()
 
 
 
@@ -126,7 +106,6 @@ def register(request):
         'user_form': user_form,
         'employee_form': employee_form,
     })
-
 
 @login_required
 def dashboard(request):
@@ -264,15 +243,7 @@ def attendance_summary_api(request):
         "yesterday": yesterday,
     })
 
-
 # ------------------ MARK ATTENDANCE (ArcFace 512D) ------------------
-
-from datetime import timedelta
-from django.utils import timezone
-from django.http import JsonResponse
-import numpy as np
-import cv2, json
-
 @login_required
 def mark_attendance(request):
     if request.method == 'POST' and request.FILES.get('capture'):
@@ -363,7 +334,6 @@ def mark_attendance(request):
             return JsonResponse({'success': False, 'message': str(e)})
 
     return JsonResponse({'success': False, 'message': 'Invalid request.'})
-
 
 @login_required
 def attendance_log_api(request):
@@ -594,14 +564,6 @@ def attendance_history_page(request):
     }
     return render(request, 'attendance_history.html', context)
 
-
-
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_GET
-from django.shortcuts import get_object_or_404
-import calendar
-from datetime import date
-
 @login_required
 @require_GET
 def attendance_calendar_data(request, employee_id, year, month):
@@ -647,12 +609,6 @@ def attendance_calendar_data(request, employee_id, year, month):
         'data': month_data
     })
 
-from django.shortcuts import render, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from datetime import date, timedelta
-
-from .models import Employee, Attendance, AttendanceSettings
-import calendar
 
 @login_required
 def attendance_calendar(request, employee_id, year, month):
