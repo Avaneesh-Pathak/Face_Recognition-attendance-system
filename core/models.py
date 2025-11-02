@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 import os
 import json
+from django.core.exceptions import ValidationError
+
 
 class Employee(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -19,16 +21,22 @@ class Employee(models.Model):
         return f"{self.user.get_full_name()} ({self.employee_id})"
     
     def save_face_encoding(self, encoding):
-        """Save face encoding as JSON string"""
+        """Save face encoding as a JSON string (float32 list)."""
         if encoding is not None:
-            self.face_encoding = json.dumps(encoding.tolist())
-            self.save()
-    
+            # ensure Python list of floats
+            enc_list = [float(x) for x in (encoding.tolist() if hasattr(encoding, 'tolist') else encoding)]
+            self.face_encoding = json.dumps(enc_list)
+            self.save(update_fields=['face_encoding'])
+
     def get_face_encoding(self):
-        """Retrieve face encoding from JSON string"""
+        """Return normalized numpy float32 vector or None."""
         if self.face_encoding:
             import numpy as np
-            return np.array(json.loads(self.face_encoding))
+            arr = np.array(json.loads(self.face_encoding), dtype=np.float32)
+            norm = np.linalg.norm(arr)
+            if norm > 0:
+                return arr / norm
+            return arr
         return None
 
 class Attendance(models.Model):

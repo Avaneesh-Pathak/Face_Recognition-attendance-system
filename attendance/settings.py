@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='your-secret-key-here')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
 
 # -------------------------------------------------------------------
 # APPLICATIONS
@@ -72,7 +72,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'attendance.wsgi.application'
-ASGI_APPLICATION = 'attendance.wsgi.application'
+ASGI_APPLICATION = 'attendance.asgi.application'
 
 # -------------------------------------------------------------------
 # DATABASE
@@ -117,6 +117,24 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+STATIC_ROOT.mkdir(parents=True, exist_ok=True)
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+
+# -------------------------------------------------------------------
+# SECURITY (recommended for production)
+# -------------------------------------------------------------------
+# Set these via environment variables in production
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=not DEBUG, cast=bool)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=not DEBUG, cast=bool)
+SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=0, cast=int)  # set >0 in prod
+SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False, cast=bool)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
+
+
+
 # -------------------------------------------------------------------
 # DJANGO CRISPY FORMS
 # -------------------------------------------------------------------
@@ -137,9 +155,9 @@ CORS_ALLOW_ALL_ORIGINS = True
 # -------------------------------------------------------------------
 # FACE RECOGNITION SETTINGS
 # -------------------------------------------------------------------
-FACE_RECOGNITION_MODEL = 'cnn'  # or 'cnn' for more accuracy
+FACE_RECOGNITION_MODEL = config('FACE_RECOGNITION_MODEL', default='cnn')  # 'cnn' or 'hog'
 FACE_ENCODINGS_PATH = MEDIA_ROOT / 'face_encodings'
-os.makedirs(FACE_ENCODINGS_PATH, exist_ok=True)
+FACE_ENCODINGS_PATH.mkdir(parents=True, exist_ok=True)
 
 
 # -------------------------------------------------------------------
@@ -158,52 +176,32 @@ LIVENESS = {
 # LOGGING CONFIGURATION
 # -------------------------------------------------------------------
 LOG_DIR = BASE_DIR / 'logs'
-os.makedirs(LOG_DIR, exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
-
     'formatters': {
-        'verbose': {
-            'format': '[{asctime}] {levelname} {name}: {message}',
-            'style': '{',
-        },
-        'simple': {
-            'format': '{levelname}: {message}',
-            'style': '{',
-        },
+        'verbose': {'format': '[{asctime}] {levelname} {name}: {message}', 'style': '{'},
+        'simple': {'format': '{levelname}: {message}', 'style': '{'},
     },
-
     'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
-        },
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'simple'},
         'file': {
             'class': 'logging.FileHandler',
-            'filename': LOG_DIR / 'django.log',
+            'filename': str(LOG_DIR / 'django.log'),
             'formatter': 'verbose',
         },
         'error_file': {
             'class': 'logging.FileHandler',
-            'filename': LOG_DIR / 'errors.log',
+            'filename': str(LOG_DIR / 'errors.log'),
             'formatter': 'verbose',
             'level': 'ERROR',
         },
     },
-
     'loggers': {
-        'django': {
-            'handlers': ['console', 'file', 'error_file'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-        'core': {
-            'handlers': ['console', 'file', 'error_file'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
+        'django': {'handlers': ['console', 'file', 'error_file'], 'level': 'INFO', 'propagate': True},
+        'core': {'handlers': ['console', 'file', 'error_file'], 'level': 'DEBUG', 'propagate': False},
     },
 }
 
