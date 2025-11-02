@@ -29,4 +29,5 @@ class AttendanceSettingsForm(forms.ModelForm):
             'check_out_start': forms.TimeInput(attrs={'type': 'time'}),
             'check_out_end': forms.TimeInput(attrs={'type': 'time'}),
             'late_threshold': forms.TimeInput(attrs={'type': 'time'}),
+            'min_hours_before_checkout': forms.TimeInput(attrs={'type': 'time'}),
         }

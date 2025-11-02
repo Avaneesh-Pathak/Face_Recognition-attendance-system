@@ -6,24 +6,28 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.db.models import Count, Q, Avg
 import cv2
+from calendar import monthrange, month_name
 import base64
 from io import BytesIO
 from PIL import Image
 import json
+from core.face_recognition_utils import get_face_embedding 
 import os
-import face_recognition
+# import face_recognition
 import tempfile
+from datetime import datetime
 from datetime import timedelta
 import numpy as np
+from django.core.files.storage import default_storage
 
 import logging
 from django.contrib import messages
 from .models import Employee, Attendance, AttendanceSettings, DailyReport
 from .forms import UserRegistrationForm, EmployeeRegistrationForm, AttendanceSettingsForm
-from .face_recognition import get_face_system
+from .face_system import get_face_system
 import os, tempfile, ast, numpy as np
 from datetime import timedelta
-import face_recognition
+# import face_recognition
 from django.utils import timezone
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
@@ -32,7 +36,19 @@ import logging
 import base64
 from django.core.files.base import ContentFile
 import ast
-
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+from django.http import JsonResponse
+from core.models import Employee, Attendance
+from core.face_recognition_utils import get_face_embedding
+import numpy as np
+import cv2, json
+import cv2
+import numpy as np
+import json
+from django.http import StreamingHttpResponse
+from django.utils import timezone
+from core.models import Employee # adjust path if needed
 logger = logging.getLogger(__name__)
 face_system = get_face_system()
 
@@ -53,24 +69,22 @@ def home(request):
     return redirect('login')
 
 
-
+# ------------------ REGISTER VIEW (ArcFace 512D) ------------------
 def register(request):
-    from django.core.files.storage import default_storage
-    import face_recognition
+    face_sys = get_face_system()
 
     if request.method == 'POST':
         user_form = UserRegistrationForm(request.POST)
         employee_form = EmployeeRegistrationForm(request.POST, request.FILES)
 
-        # Check if image was captured from webcam
         captured_image = request.POST.get('captured_image')
         if captured_image:
             try:
-                format, imgstr = captured_image.split(';base64,')
-                ext = format.split('/')[-1]
+                fmt, imgstr = captured_image.split(';base64,')
+                ext = fmt.split('/')[-1]
                 data = ContentFile(base64.b64decode(imgstr), name=f"captured_face.{ext}")
                 employee_form.files['face_image'] = data
-                logger.info("Captured image attached successfully.")
+                logger.info("Captured webcam image successfully decoded.")
             except Exception as e:
                 logger.error(f"Error decoding captured image: {e}")
 
@@ -80,32 +94,30 @@ def register(request):
             employee.user = user
             employee.save()
 
-            # Generate and save face encoding
+            # Generate and save 512-D ArcFace embedding
             if employee.face_image:
                 try:
                     img_path = default_storage.path(employee.face_image.name)
-                    image = face_recognition.load_image_file(img_path)
-                    encodings = face_recognition.face_encodings(image)
-
-                    if encodings:
-                        employee.face_encoding = encodings[0].tolist()  # JSONField
+                    emb = face_sys.get_embedding(img_path)
+                    if emb is not None:
+                        employee.face_encoding = emb.tolist()
                         employee.save()
-                        logger.info(f"Face encoding saved for {employee.user.username}")
+                        logger.info(f"✅ ArcFace embedding saved for {employee.user.username}")
                     else:
-                        logger.warning(f"No face detected for {employee.user.username}'s uploaded image.")
                         messages.warning(request, "No face detected in uploaded image. Please re-upload your photo.")
                 except Exception as e:
-                    logger.error(f"Error generating encoding: {e}")
-                    messages.error(request, "Error generating face encoding.")
+                    logger.error(f"Error generating ArcFace embedding: {e}")
+                    messages.error(request, "Error generating face embedding.")
             else:
                 messages.warning(request, "No face image uploaded.")
 
             messages.success(request, "✅ Registration successful!")
             return redirect('dashboard')
         else:
-            logger.warning("Invalid form data.")
+            logger.warning("Invalid registration form data.")
             logger.debug(f"User form errors: {user_form.errors}")
             logger.debug(f"Employee form errors: {employee_form.errors}")
+
     else:
         user_form = UserRegistrationForm()
         employee_form = EmployeeRegistrationForm()
@@ -114,7 +126,6 @@ def register(request):
         'user_form': user_form,
         'employee_form': employee_form,
     })
-
 
 
 @login_required
@@ -136,7 +147,7 @@ def dashboard(request):
             attendance_qs = Attendance.objects.filter(employee=employee)
         else:
             employee = None
-            attendance_qs = Attendance.objects.all()  # ✅ All employees' records
+            attendance_qs = Attendance.objects.all()
     else:
         employee = Employee.objects.filter(user=user).first()
         attendance_qs = Attendance.objects.filter(employee=employee)
@@ -174,6 +185,8 @@ def dashboard(request):
             if co:
                 total_hours += (co.timestamp - ci.timestamp).total_seconds() / 3600
 
+    # --- Add current year and month for calendar button ---
+    now = timezone.now()
     context = {
         'is_admin': is_admin,
         'employees': employees,
@@ -187,12 +200,11 @@ def dashboard(request):
         'total_hours': round(total_hours, 2),
         'total_employees': total_employees,
         'selected_emp_id': int(emp_id) if emp_id else None,
+        'year': now.year,
+        'month': now.month,
     }
 
     return render(request, 'dashboard.html', context)
-
-
-
 
 @login_required
 def attendance_summary_api(request):
@@ -253,126 +265,106 @@ def attendance_summary_api(request):
     })
 
 
+# ------------------ MARK ATTENDANCE (ArcFace 512D) ------------------
+
+from datetime import timedelta
+from django.utils import timezone
+from django.http import JsonResponse
+import numpy as np
+import cv2, json
+
 @login_required
 def mark_attendance(request):
-    """
-    Face Recognition Attendance for:
-    - Normal users (mark self)
-    - Admin Kiosk (detects any employee)
-    Auto determines Check-In or Check-Out from AttendanceSettings.
-    """
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'message': 'Invalid request method.'})
+    if request.method == 'POST' and request.FILES.get('capture'):
+        try:
+            image_file = request.FILES['capture']
+            file_bytes = np.frombuffer(image_file.read(), np.uint8)
+            frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
-    capture = request.FILES.get('capture')
-    if not capture:
-        return JsonResponse({'success': False, 'message': 'No image received.'})
+            emb = get_face_embedding(frame)
+            if emb is None:
+                return JsonResponse({'success': False, 'message': 'No face detected in frame.'})
 
-    try:
-        # Load attendance settings
-        settings_obj = AttendanceSettings.objects.first()
-        now = timezone.localtime()
-        current_time = now.time()
+            best_match = None
+            best_score = 0.60
+            employees = Employee.objects.exclude(face_encoding=None)
 
-        # Save temporary image
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
-            for chunk in capture.chunks():
-                temp_file.write(chunk)
-            temp_path = temp_file.name
+            for emp in employees:
+                try:
+                    db_emb = np.array(json.loads(emp.face_encoding), dtype=np.float32)
+                    sim = float(np.dot(emb, db_emb))
+                    if sim > best_score:
+                        best_match = emp
+                        best_score = sim
+                except Exception:
+                    continue
 
-        # Extract face encodings
-        unknown_image = face_recognition.load_image_file(temp_path)
-        unknown_encodings = face_recognition.face_encodings(unknown_image)
+            if not best_match:
+                return JsonResponse({'success': False, 'message': 'Face not recognized.'})
 
-        if not unknown_encodings:
-            return JsonResponse({'success': False, 'message': 'No face detected in the image.'})
+            emp = best_match
+            now = timezone.now()
+            today = now.date()
 
-        # Load all known employee encodings
-        employees = Employee.objects.exclude(face_encoding__isnull=True)
-        known_encodings, employee_refs = [], []
+            # 🔧 Get settings (fallback if none)
+            settings = AttendanceSettings.objects.first()
+            lock_hours = settings.min_hours_before_checkout if settings else 3.0
 
-        for emp in employees:
-            try:
-                known_encodings.append(np.array(ast.literal_eval(emp.face_encoding)))
-                employee_refs.append(emp)
-            except Exception:
-                continue
+            latest_attendance = Attendance.objects.filter(employee=emp).order_by('-timestamp').first()
 
-        # Compare with all known faces
-        best_match = None
-        best_confidence = 0
-        tolerance = settings_obj.confidence_threshold if settings_obj else 0.45
+            if latest_attendance and timezone.localtime(latest_attendance.timestamp).date() == today:
+                if latest_attendance.attendance_type == 'check_in':
+                    time_since_checkin = now - latest_attendance.timestamp
+                    if time_since_checkin < timedelta(hours=lock_hours):
+                        remaining = timedelta(hours=lock_hours) - time_since_checkin
+                        remaining_minutes = int(remaining.total_seconds() // 60)
+                        return JsonResponse({
+                            'success': False,
+                            'message': f'You can check out only after {lock_hours:.0f} hours. Try again in {remaining_minutes} minutes.'
+                        })
 
-        for i, known_encoding in enumerate(known_encodings):
-            face_distances = [np.linalg.norm(known_encoding - enc) for enc in unknown_encodings]
-            best_distance = min(face_distances)
-            confidence = round((1 - best_distance) * 100, 2)
+                    Attendance.objects.create(
+                        employee=emp,
+                        attendance_type='check_out',
+                        confidence_score=best_score,
+                        timestamp=now
+                    )
+                    msg = f"Checked out successfully at {now.strftime('%H:%M:%S')}."
+                    return JsonResponse({
+                        'success': True,
+                        'name': emp.user.get_full_name(),
+                        'attendance_type': 'Check-Out',
+                        'confidence': round(best_score * 100, 2),
+                        'message': msg
+                    })
+                else:
+                    return JsonResponse({
+                        'success': False,
+                        'message': "Already checked out today."
+                    })
 
-            if best_distance <= tolerance and confidence > best_confidence:
-                best_confidence = confidence
-                best_match = employee_refs[i]
-
-        if not best_match:
-            return JsonResponse({'success': False, 'message': 'Face not recognized.'})
-
-        today = now.date()
-
-        # Determine attendance type dynamically
-        last_record = Attendance.objects.filter(employee=best_match).order_by('-timestamp').first()
-
-        if not last_record or last_record.attendance_type == 'check_out':
-            attendance_type = 'check_in'
-        else:
-            attendance_type = 'check_out'
-
-        # Prevent double check-in/check-out in same day
-        already_marked = Attendance.objects.filter(
-            employee=best_match,
-            attendance_type=attendance_type,
-            timestamp__date=today
-        ).exists()
-
-        if already_marked:
+            # ✅ First attendance — Check-In
+            Attendance.objects.create(
+                employee=emp,
+                attendance_type='check_in',
+                confidence_score=best_score,
+                timestamp=now
+            )
+            msg = f"Checked in successfully at {now.strftime('%H:%M:%S')}."
             return JsonResponse({
-                'success': False,
-                'message': f'{best_match} already marked {attendance_type.replace("_"," ")} for today.'
+                'success': True,
+                'name': emp.user.get_full_name(),
+                'attendance_type': 'Check-In',
+                'confidence': round(best_score * 100, 2),
+                'message': msg
             })
 
-        # Create record
-        new_record = Attendance.objects.create(
-            employee=best_match,
-            timestamp=now,
-            attendance_type=attendance_type,
-            confidence_score=best_confidence / 100.0
-        )
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
 
-        # Calculate working time on check-out
-        working_hours_msg = ""
-        if attendance_type == 'check_out' and last_record:
-            time_diff = now - last_record.timestamp
-            hours = int(time_diff.total_seconds() // 3600)
-            minutes = int((time_diff.total_seconds() % 3600) // 60)
-            working_hours_msg = f" Total working time: {hours}h {minutes}m"
-
-        return JsonResponse({
-            'success': True,
-            'message': f'{best_match} - {attendance_type.replace("_"," ").title()} marked successfully!'
-                       f'{working_hours_msg}',
-            'confidence': f"{best_confidence}%",
-        })
-
-    except Exception as e:
-        logger.exception(f"Error in kiosk attendance: {e}")
-        return JsonResponse({'success': False, 'message': 'Error processing attendance.'})
-
-    finally:
-        if 'temp_path' in locals() and os.path.exists(temp_path):
-            os.remove(temp_path)
+    return JsonResponse({'success': False, 'message': 'Invalid request.'})
 
 
-
-from django.http import JsonResponse
-from django.utils import timezone
 @login_required
 def attendance_log_api(request):
     today = timezone.now().date()
@@ -393,46 +385,58 @@ def attendance_log_api(request):
     return JsonResponse(data, safe=False)
 
 
-
 def video_feed():
-    """Generator for video streaming"""
+    """Live video stream with face detection + recognition overlay."""
     camera = cv2.VideoCapture(0)
-    
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
     while True:
         success, frame = camera.read()
         if not success:
             break
-        
-        # Resize frame for faster processing
-        small_frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
-        
-        # Recognize faces
-        employee_id, confidence, face_location = face_system.recognize_face_from_frame(small_frame)
-        
-        # Draw rectangle around face
-        if face_location:
-            top, right, bottom, left = face_location
-            # Scale back up face locations since the frame we detected in was scaled to 1/4 size
-            top *= 2
-            right *= 2
-            bottom *= 2
-            left *= 2
-            
-            color = (0, 255, 0) if employee_id else (0, 0, 255)
-            cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
-            
-            # Add label
-            label = f"{employee_id or 'Unknown'} ({confidence:.2f})" if employee_id else "Unknown"
-            cv2.putText(frame, label, (left, top - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        
-        # Encode frame as JPEG
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(100, 100))
+
+        for (x, y, w, h) in faces:
+            face_region = frame[y:y+h, x:x+w]
+            emb = get_face_embedding(face_region)
+            color = (0, 0, 255)  # Default red for unknown
+            label = "Unknown"
+
+            if emb is not None:
+                best_match = None
+                best_score = 0.60  # Threshold
+                employees = Employee.objects.exclude(face_encoding=None)
+
+                for emp in employees:
+                    try:
+                        db_emb = np.array(json.loads(emp.face_encoding), dtype=np.float32)
+                        sim = float(np.dot(emb, db_emb))
+                        if sim > best_score:
+                            best_match = emp
+                            best_score = sim
+                    except Exception as e:
+                        continue
+
+                if best_match:
+                    name = best_match.user.get_full_name() or best_match.user.username
+                    confidence = best_score * 100
+                    label = f"{name} ({confidence:.1f}%)"
+                    color = (0, 255, 0)  # Green for recognized faces
+
+            # Draw rectangle + label
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+            cv2.rectangle(frame, (x, y - 25), (x + len(label) * 10, y), color, -1)
+            cv2.putText(frame, label, (x + 5, y - 7), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+        # Encode and yield frame
         ret, buffer = cv2.imencode('.jpg', frame)
         frame = buffer.tobytes()
-        
+
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-    
+
     camera.release()
 
 @login_required
@@ -443,10 +447,7 @@ def attendance_page(request):
 def video_feed_view(request):
     return StreamingHttpResponse(video_feed(), content_type='multipart/x-mixed-replace; boundary=frame')
 
-from datetime import datetime
-from django.utils import timezone
-from django.http import HttpResponse
-import csv
+
 @staff_member_required
 def attendance_reports(request):
     from datetime import datetime, timedelta
@@ -516,8 +517,6 @@ def attendance_reports(request):
     return render(request, 'reports.html', context)
 
 
-
-# @staff_member_required
 def attendance_settings(request):
     settings_obj, created = AttendanceSettings.objects.get_or_create(pk=1)
     
@@ -530,7 +529,6 @@ def attendance_settings(request):
         form = AttendanceSettingsForm(instance=settings_obj)
     
     return render(request, 'settings.html', {'form': form})
-
 
 @login_required
 def get_attendance_history(request):
@@ -571,7 +569,6 @@ def get_attendance_history(request):
 
     return JsonResponse({'data': data})
 
-
 @login_required
 def attendance_history_page(request):
     """
@@ -596,5 +593,193 @@ def attendance_history_page(request):
         'days': days,
     }
     return render(request, 'attendance_history.html', context)
+
+
+
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_GET
+from django.shortcuts import get_object_or_404
+import calendar
+from datetime import date
+
+@login_required
+@require_GET
+def attendance_calendar_data(request, employee_id, year, month):
+    """Get attendance data for calendar display"""
+    # Validate employee access
+    emp = get_object_or_404(Employee, id=employee_id)
+    
+    # Optional: Add permission check if needed
+    # if not request.user.is_superuser and request.user != emp.user:
+    #     return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    # Get month range
+    start_date = date(year, month, 1)
+    end_day = calendar.monthrange(year, month)[1]
+    end_date = date(year, month, end_day)
+    
+    # Get present days in one query
+    present_days = Attendance.objects.filter(
+        employee=emp,
+        timestamp__date__range=(start_date, end_date),
+        attendance_type='check_in'
+    ).values_list('timestamp__date', flat=True)
+    
+    present_day_set = {d.day for d in present_days}
+    
+    # Build month data
+    month_data = []
+    for day in range(1, end_day + 1):
+        current_date = date(year, month, day)
+        month_data.append({
+            'day': day,
+            'date': current_date.isoformat(),
+            'present': day in present_day_set,
+            'is_weekend': current_date.weekday() >= 5,  # 5=Saturday, 6=Sunday
+            'is_future': current_date > timezone.now().date()
+        })
+    
+    return JsonResponse({
+        'employee': emp.user.get_full_name(),
+        'year': year,
+        'month': month,
+        'month_name': calendar.month_name[month],
+        'data': month_data
+    })
+
+from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from datetime import date, timedelta
+
+from .models import Employee, Attendance, AttendanceSettings
+import calendar
+
+@login_required
+def attendance_calendar(request, employee_id, year, month):
+    employee = get_object_or_404(Employee, id=employee_id)
+    year = int(year)
+    month = int(month)
+
+    start_date = date(year, month, 1)
+    end_day = monthrange(year, month)[1]
+    end_date = date(year, month, end_day)
+
+    # Fetch attendance data
+    attendance_records = Attendance.objects.filter(
+        employee=employee,
+        timestamp__date__range=(start_date, end_date)
+    ).order_by('timestamp')
+
+    # Get attendance settings
+    settings = AttendanceSettings.objects.first()
+    max_daily_hours = settings.max_daily_hours if settings else 8.0
+
+    # Organize check-in/out per day
+    daily_attendance = {}
+    for record in attendance_records:
+        day = record.timestamp.date()
+        if day not in daily_attendance:
+            daily_attendance[day] = {'check_in': None, 'check_out': None}
+        if record.attendance_type == 'check_in' and not daily_attendance[day]['check_in']:
+            daily_attendance[day]['check_in'] = record.timestamp
+        elif record.attendance_type == 'check_out':
+            daily_attendance[day]['check_out'] = record.timestamp
+
+    # Build calendar data
+    month_data = []
+    total_present = total_absent = total_holiday = 0
+    total_working_hours = timedelta()
+
+    for d in range(1, end_day + 1):
+        day_date = date(year, month, d)
+        weekday = calendar.day_name[day_date.weekday()]
+        is_holiday = weekday == "Sunday"
+
+        check_in = daily_attendance.get(day_date, {}).get('check_in')
+        check_out = daily_attendance.get(day_date, {}).get('check_out')
+        daily_hours = None
+
+        if check_in and check_out:
+            daily_hours = check_out - check_in
+            total_working_hours += daily_hours
+            total_present += 1
+        elif is_holiday:
+            total_holiday += 1
+        else:
+            total_absent += 1
+
+        month_data.append({
+            'day': d,
+            'day_name': weekday[:3],
+            'present': bool(check_in and check_out),
+            'holiday': is_holiday,
+            'daily_hours': str(daily_hours).split('.')[0] if daily_hours else None,
+        })
+
+    # Month navigation
+    next_month = month + 1 if month < 12 else 1
+    next_year = year if month < 12 else year + 1
+    previous_month = month - 1 if month > 1 else 12
+    previous_year = year if month > 1 else year - 1
+
+    first_day_offset = (calendar.weekday(year, month, 1) + 1) % 7
+
+    # Convert total working hours to readable format
+    total_hours = total_working_hours.total_seconds() / 3600
+    total_expected_hours = (total_present * max_daily_hours)
+
+    context = {
+        'employee': employee,
+        'year': year,
+        'month': month,
+        'month_name': month_name[month],
+        'data': month_data,
+        'next_month': next_month,
+        'next_year': next_year,
+        'previous_month': previous_month,
+        'previous_year': previous_year,
+        'day_names': list(calendar.day_name),
+        'first_day_offset': first_day_offset,
+        'total_present': total_present,
+        'total_absent': total_absent,
+        'total_holiday': total_holiday,
+        'all_employees': Employee.objects.all().order_by('user__first_name'),
+        'total_working_hours': round(total_hours, 2),
+        'total_expected_hours': round(total_expected_hours, 2),
+        
+    }
+
+    return render(request, 'attendance_calendar.html', context)
+
+
+def attendance_day_detail(request, emp_id, date):
+    """
+    Returns JSON with all attendance logs for a specific employee and date.
+    """
+    try:
+        date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({'error': 'Invalid date format'}, status=400)
+
+    logs = Attendance.objects.filter(
+        employee_id=emp_id,
+        timestamp__date=date_obj
+    ).order_by('timestamp')
+
+    data = {
+        'logs': [
+            {
+                'type': log.get_attendance_type_display(),
+                'timestamp': log.timestamp.strftime("%I:%M %p"),
+                'location': log.location or '—',
+                'confidence': f"{log.confidence_score:.2f}%" if log.confidence_score else '—',
+                'image': log.image_capture.url if log.image_capture else '',
+                'notes': log.notes or ''
+            }
+            for log in logs
+        ]
+    }
+
+    return JsonResponse(data)
 
 

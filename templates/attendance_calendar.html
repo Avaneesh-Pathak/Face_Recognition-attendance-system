@@ -1,0 +1,236 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load attendance_filters %}
+
+{% block title %}Attendance Calendar{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+
+    <!-- 🔹 Header -->
+    <div class="card-header bg-light py-3 border-0">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+        <h4 class="fw-bold text-primary mb-0">
+          <i class="fas fa-calendar-check me-2"></i>
+          Attendance Calendar – {{ employee.user.get_full_name }}
+        </h4>
+
+        <!-- Employee Search Dropdown -->
+        <div class="w-100 w-md-auto">
+          <select id="employeeSelect" class="form-select form-select-sm border-primary">
+            <option value="">🔍 Select Employee</option>
+            {% for emp in all_employees %}
+              <option value="{{ emp.id }}" {% if emp.id == employee.id %}selected{% endif %}>
+                {{ emp.user.get_full_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🔹 Month Navigation -->
+    <div class="bg-white border-bottom p-3">
+      <div class="d-flex justify-content-center align-items-center mb-2">
+        <a href="{% url 'attendance_calendar' employee.id previous_year previous_month %}" class="btn btn-outline-primary btn-sm me-2">
+          <i class="fas fa-chevron-left"></i>
+        </a>
+        <h5 class="mb-0 fw-bold text-dark">{{ month_name }} {{ year }}</h5>
+        <a href="{% url 'attendance_calendar' employee.id next_year next_month %}" class="btn btn-outline-primary btn-sm ms-2">
+          <i class="fas fa-chevron-right"></i>
+        </a>
+      </div>
+
+      <!-- Month Buttons -->
+      <div class="d-flex flex-wrap justify-content-center gap-2">
+        {% for m in 1|to:12 %}
+          <a href="{% url 'attendance_calendar' employee.id year m %}"
+             class="btn {% if m == month %}btn-primary text-white{% else %}btn-outline-primary{% endif %} btn-sm">
+            {{ m|get_month_name }}
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- 🔹 Summary Cards -->
+    <div class="row text-center mx-0 py-3 bg-light border-bottom">
+      <div class="col-6 col-md-3 mb-2">
+        <div class="card shadow-sm border-success border-2 rounded-3">
+          <div class="card-body py-2">
+            <h6 class="text-success fw-bold mb-1">Present</h6>
+            <h5 class="fw-bold">{{ total_present }}</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3 mb-2">
+        <div class="card shadow-sm border-danger border-2 rounded-3">
+          <div class="card-body py-2">
+            <h6 class="text-danger fw-bold mb-1">Absent</h6>
+            <h5 class="fw-bold">{{ total_absent }}</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3 mb-2">
+        <div class="card shadow-sm border-warning border-2 rounded-3">
+          <div class="card-body py-2">
+            <h6 class="text-warning fw-bold mb-1">Holidays</h6>
+            <h5 class="fw-bold">{{ total_holiday }}</h5>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3 mb-2">
+        <div class="card shadow-sm border-primary border-2 rounded-3">
+          <div class="card-body py-2">
+            <h6 class="text-primary fw-bold mb-1">Working Hours</h6>
+            <h6 class="mb-0">{{ total_working_hours }}h / {{ total_expected_hours }}h</h6>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🔹 Calendar Grid -->
+    <div class="card-body">
+      <div class="calendar-container">
+        <!-- Weekday header -->
+        <div class="calendar-header fw-bold text-center mb-2">
+          {% for day_name in day_names %}
+            <div class="calendar-cell header">{{ day_name|slice:":3" }}</div>
+          {% endfor %}
+        </div>
+
+        <!-- Calendar body -->
+        <div class="calendar-body">
+          {% for i in 1|to:first_day_offset %}
+            <div class="calendar-cell empty"></div>
+          {% endfor %}
+
+          {% for item in data %}
+            <div class="calendar-cell {% if item.holiday %}holiday{% elif item.present %}present{% else %}absent{% endif %}"
+                 data-day="{{ item.day }}"
+                 data-date="{{ year }}-{{ month }}-{{ item.day }}">
+              <div class="fw-bold">{{ item.day }}</div>
+              <div class="day-name small text-muted">{{ item.day_name }}</div>
+
+              {% if item.holiday %}
+                <div class="small text-muted mt-1">Holiday</div>
+              {% elif item.present %}
+                <div class="small text-success mt-1">Present ✅</div>
+                {% if item.daily_hours %}
+                  <div class="small text-dark mt-1 fw-semibold">{{ item.daily_hours }}</div>
+                {% endif %}
+              {% else %}
+                <div class="small text-danger mt-1">Absent ❌</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 🔹 Attendance Detail Modal -->
+<div class="modal fade" id="attendanceModal" tabindex="-1" aria-labelledby="attendanceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 rounded-4 shadow">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="attendanceModalLabel"><i class="fas fa-info-circle me-2"></i>Attendance Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="attendanceDetailContent" class="p-3 text-center text-muted">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 🔹 Styles -->
+<style>
+.calendar-container {
+  overflow-x: auto;
+  padding: 0.5rem;
+}
+.calendar-header, .calendar-body {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  text-align: center;
+}
+.calendar-cell {
+  border-radius: 8px;
+  padding: 8px 4px;
+  min-height: 75px;
+  transition: 0.2s ease;
+  border: 1px solid #e9ecef;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.calendar-cell.header {
+  background: #f8f9fa;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.calendar-cell.present { background: #d1f7d6; color: #0f5132; }
+.calendar-cell.absent { background: #f8d7da; color: #842029; }
+.calendar-cell.holiday { background: #fff3cd; color: #856404; }
+.calendar-cell.empty { border: none; background: transparent; }
+.calendar-cell:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+.small.fw-semibold { font-weight: 600 !important; }
+@media (max-width: 767.98px) {
+  .calendar-cell { min-height: 55px; font-size: 0.75rem; }
+}
+</style>
+
+<!-- 🔹 Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  // Searchable dropdown
+  const empSelect = document.getElementById("employeeSelect");
+  if (empSelect) {
+    const empChoices = new Choices(empSelect, { searchEnabled: true, itemSelectText: '' });
+    empSelect.addEventListener("change", function() {
+      const empId = this.value;
+      if (empId) {
+        window.location.href = `/attendance-calendar/${empId}/{{ year }}/{{ month }}/`;
+      }
+    });
+  }
+
+  // Day click → modal
+  document.querySelectorAll(".calendar-cell[data-date]").forEach(cell => {
+    cell.addEventListener("click", function() {
+      const date = this.dataset.date;
+      const empId = "{{ employee.id }}";
+      const modalBody = document.getElementById("attendanceDetailContent");
+      const modal = new bootstrap.Modal(document.getElementById("attendanceModal"));
+      modal.show();
+
+      modalBody.innerHTML = "<div class='text-center py-3'>Loading...</div>";
+
+      fetch(`/attendance-day-detail/${empId}/${date}/`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.logs && data.logs.length > 0) {
+            let html = `<div class="table-responsive"><table class="table table-bordered align-middle">
+                          <thead class="table-light"><tr><th>Type</th><th>Time</th></tr></thead><tbody>`;
+            data.logs.forEach(log => html += `<tr><td>${log.type}</td><td>${log.timestamp}</td></tr>`);
+            html += "</tbody></table></div>";
+            modalBody.innerHTML = html;
+          } else {
+            modalBody.innerHTML = "<p class='text-center text-muted py-3'>No attendance records for this day.</p>";
+          }
+        })
+        .catch(() => modalBody.innerHTML = "<p class='text-danger text-center py-3'>Error loading details.</p>");
+    });
+  });
+});
+</script>
+{% endblock %}

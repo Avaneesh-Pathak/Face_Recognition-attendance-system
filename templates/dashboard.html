@@ -422,57 +422,67 @@
         </div>
 
         <!-- Employee Information -->
-        <div class="col-lg-6 mb-4">
-            <div class="card dashboard-card h-100">
-                <div class="card-header border-bottom-0 pb-0">
-                    <h5 class="card-title mb-1">Employee Profile</h5>
-                    <p class="text-muted small mb-0">Your information & stats</p>
-                </div>
-                <div class="card-body pt-3">
-                    <div class="profile-header mb-4">
-                        <div class="profile-avatar">
-                            <div class="avatar-circle">
-                                {{ employee.user.get_full_name|make_list|first|upper }}
-                            </div>
-                        </div>
-                        <div class="profile-info">
-                            <h4 class="profile-name">{{ employee.user.get_full_name }}</h4>
-                            <p class="profile-id text-muted">{{ employee.employee_id }}</p>
-                            <span class="department-badge">{{ employee.department }}</span>
-                        </div>
-                    </div>
+<div class="col-lg-6 mb-4">
+  <div class="card dashboard-card h-100">
+    <div class="card-header border-bottom-0 pb-0">
+      <h5 class="card-title mb-1">Employee Profile</h5>
+      <p class="text-muted small mb-0">Your information & stats</p>
+    </div>
 
-                    <div class="profile-stats">
-                        <div class="row text-center">
-                            <div class="col-4">
-                                <div class="stat-box">
-                                    <div class="stat-number text-primary">{{ week_attendance.count }}</div>
-                                    <div class="stat-label">This Week</div>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="stat-box">
-                                    <div class="stat-number text-success">{{ month_attendance.count }}</div>
-                                    <div class="stat-label">This Month</div>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="stat-box">
-                                    <div class="stat-number text-info">
-                                        {% if week_attendance.count > 0 %}
-                                            {{ week_attendance.count }}
-                                        {% else %}
-                                            0
-                                        {% endif %}
-                                    </div>
-                                    <div class="stat-label">Records</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div class="card-body pt-3">
+      <div class="profile-header mb-4">
+        <div class="profile-avatar">
+          <div class="avatar-circle">
+            {{ employee.user.get_full_name|make_list|first|upper }}
+          </div>
         </div>
+        <div class="profile-info">
+          <h4 class="profile-name">{{ employee.user.get_full_name }}</h4>
+          <p class="profile-id text-muted">{{ employee.employee_id }}</p>
+          <span class="department-badge">{{ employee.department }}</span>
+        </div>
+      </div>
+
+      <div class="profile-stats mb-4">
+        <div class="row text-center">
+          <div class="col-4">
+            <div class="stat-box">
+              <div class="stat-number text-primary">{{ week_attendance.count }}</div>
+              <div class="stat-label">This Week</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="stat-box">
+              <div class="stat-number text-success">{{ month_attendance.count }}</div>
+              <div class="stat-label">This Month</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="stat-box">
+              <div class="stat-number text-info">
+                {% if week_attendance.count > 0 %}
+                  {{ week_attendance.count }}
+                {% else %}
+                  0
+                {% endif %}
+              </div>
+              <div class="stat-label">Records</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 📅 Calendar Button -->
+      <div class="text-center">
+        <a href="{% url 'attendance_calendar' employee.id year month %}" 
+           class="btn btn-outline-primary rounded-pill px-4">
+          <i class="fas fa-calendar-alt me-2"></i>View Attendance Calendar
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
     </div>
     {% endif %}
 </div>

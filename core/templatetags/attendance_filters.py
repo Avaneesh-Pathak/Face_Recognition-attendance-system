@@ -1,5 +1,5 @@
 from django import template
-
+import calendar
 register = template.Library()
 
 @register.filter
@@ -36,3 +36,15 @@ def filter_attendance_type(records, attendance_type):
             return [r for r in records if getattr(r, 'attendance_type', None) == attendance_type]
     except Exception:
         return []
+
+
+@register.filter
+def get_month_name(value):
+    """Return the month name from its number."""
+    return calendar.month_name[value]
+
+@register.filter
+def to(value, end):
+    """Generate range in template"""
+    return range(value, end + 1)
+

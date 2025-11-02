@@ -137,9 +137,22 @@ CORS_ALLOW_ALL_ORIGINS = True
 # -------------------------------------------------------------------
 # FACE RECOGNITION SETTINGS
 # -------------------------------------------------------------------
-FACE_RECOGNITION_MODEL = 'hog'  # or 'cnn' for more accuracy
+FACE_RECOGNITION_MODEL = 'cnn'  # or 'cnn' for more accuracy
 FACE_ENCODINGS_PATH = MEDIA_ROOT / 'face_encodings'
 os.makedirs(FACE_ENCODINGS_PATH, exist_ok=True)
+
+
+# -------------------------------------------------------------------
+# LIVENESS DETECTION SETTINGS
+# -------------------------------------------------------------------
+LIVENESS = {
+    "EAR_THRESHOLD": 0.22,         # Eye aspect ratio threshold (lower = more sensitive)
+    "CONSEC_FRAMES": 3,            # Number of frames below EAR threshold to count blink
+    "MOTION_THRESHOLD": 0.002,     # Head movement threshold
+    "COOLDOWN_SECONDS": 10,        # Skip repeated detections within cooldown
+    "DEBUG": False                 # Show debug prints
+}
+
 
 # -------------------------------------------------------------------
 # LOGGING CONFIGURATION

@@ -62,15 +62,19 @@ class AttendanceSettings(models.Model):
     late_threshold = models.TimeField(default='09:15:00')
     confidence_threshold = models.FloatField(default=0.6)
     max_daily_hours = models.FloatField(default=8.0)
-    
+
+    # 🕒 New field: minimum hours before checkout allowed
+    min_hours_before_checkout = models.FloatField(default=3.0, help_text="Minimum hours required between check-in and check-out")
+
     def __str__(self):
         return "Attendance Settings"
-    
+
     def save(self, *args, **kwargs):
         # Ensure only one instance exists
         if not self.pk and AttendanceSettings.objects.exists():
             raise ValidationError("There can be only one AttendanceSettings instance")
-        super().save(*args, kwargs)
+        super().save(*args, **kwargs)
+
 
 class DailyReport(models.Model):
     date = models.DateField(unique=True)
@@ -85,3 +89,6 @@ class DailyReport(models.Model):
     
     def __str__(self):
         return f"Report for {self.date}"
+    
+
+    
