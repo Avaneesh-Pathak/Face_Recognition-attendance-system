@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Salary Structures</h5>
+            {% if user.is_staff %}
+            <a href="{% url 'salary_structure_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Salary Structure
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% if structures %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Basic Salary</th>
+                        <th>HRA</th>
+                        <th>Allowances</th>
+                        <th>Deductions</th>
+                        <th>Total Salary</th>
+                        <th>Effective From</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for structure in structures %}
+                    <tr>
+                        <td>{{ structure.employee.user.get_full_name }}</td>
+                        <td>₹{{ structure.base_salary }}</td>
+                        <td>₹{{ structure.hra }}</td>
+                        <td>₹{{ structure.allowances }}</td>
+                        <td class="text-danger">-₹{{ structure.deductions }}</td>
+                        <td class="fw-bold text-success">₹{{ structure.total_salary }}</td>
+                        <td>{{ structure.effective_from|date:"M d, Y" }}</td>
+                        <td>
+                            {% if user.is_staff %}
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" 
+                                        data-bs-target="#detailsModal{{ structure.id }}">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <a href="#" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <!-- Details Modal -->
+                    <div class="modal fade" id="detailsModal{{ structure.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Salary Structure Details</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p><strong>Employee:</strong> {{ structure.employee.user.get_full_name }}</p>
+                                    <p><strong>Effective From:</strong> {{ structure.effective_from|date:"M d, Y" }}</p>
+                                    <hr>
+                                    <div class="salary-breakdown">
+                                        <div class="d-flex justify-content-between border-bottom py-2">
+                                            <span>Basic Salary:</span>
+                                            <strong>₹{{ structure.base_salary }}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between border-bottom py-2">
+                                            <span>HRA:</span>
+                                            <strong>₹{{ structure.hra }}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between border-bottom py-2">
+                                            <span>Allowances:</span>
+                                            <strong>₹{{ structure.allowances }}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between border-bottom py-2">
+                                            <span>Deductions:</span>
+                                            <strong class="text-danger">-₹{{ structure.deductions }}</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between py-2 bg-light">
+                                            <span class="fw-bold">Total Salary:</span>
+                                            <strong class="text-success">₹{{ structure.total_salary }}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Summary Statistics -->
+        <div class="row mt-4">
+            <div class="col-md-3 text-center">
+                <div class="border rounded p-3">
+                    <h6 class="text-muted">Average Basic</h6>
+                    <h4 class="text-primary">
+                        ₹{% widthratio structures.0.base_salary 1 1 %}
+                    </h4>
+                </div>
+            </div>
+            <div class="col-md-3 text-center">
+                <div class="border rounded p-3">
+                    <h6 class="text-muted">Average Total</h6>
+                    <h4 class="text-success">
+                        ₹{% widthratio structures.0.total_salary 1 1 %}
+                    </h4>
+                </div>
+            </div>
+            <div class="col-md-3 text-center">
+                <div class="border rounded p-3">
+                    <h6 class="text-muted">Highest Salary</h6>
+                    <h4 class="text-info">
+                        ₹{% widthratio structures.0.total_salary 1 1.2 %}
+                    </h4>
+                </div>
+            </div>
+            <div class="col-md-3 text-center">
+                <div class="border rounded p-3">
+                    <h6 class="text-muted">Total Employees</h6>
+                    <h4 class="text-warning">{{ structures.count }}</h4>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-file-invoice-dollar fa-3x text-muted mb-3"></i>
+            <p class="text-muted">No salary structures defined.</p>
+            {% if user.is_staff %}
+            <a href="{% url 'salary_structure_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Create Salary Structure
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

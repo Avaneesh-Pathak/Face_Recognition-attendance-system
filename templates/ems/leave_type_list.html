@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Leave Types</h5>
+            {% if user.is_staff %}
+            <a href="{% url 'leave_type_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Leave Type
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% if leave_types %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Max Days Per Year</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for leave_type in leave_types %}
+                    <tr>
+                        <td>{{ leave_type.name }}</td>
+                        <td>{{ leave_type.max_days_per_year }} days</td>
+                        <td>
+                            {% if user.is_staff %}
+                            <div class="btn-group">
+                                <a href="#" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'department_delete' leave_type.pk %}" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+            <p class="text-muted">No leave types defined.</p>
+            {% if user.is_staff %}
+            <a href="{% url 'leave_type_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Create Leave Type
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

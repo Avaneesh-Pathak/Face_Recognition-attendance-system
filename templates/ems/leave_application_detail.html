@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>{{ title }}</h3>
+<div class="mb-3">
+  <strong>Employee:</strong> {{ leave.employee.user.get_full_name }}<br>
+  <strong>Type:</strong> {{ leave.leave_type.name }}<br>
+  <strong>Dates:</strong> {{ leave.start_date }} → {{ leave.end_date }}<br>
+  <strong>Status:</strong> <span class="badge bg-{{ leave.status == 'approved'|yesno:'success,secondary' }}">{{ leave.status|title }}</span>
+</div>
+
+<h5>Approval History</h5>
+<ul class="list-group">
+  {% for a in history %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <div>
+        <div class="fw-semibold">Level {{ a.level }} — {{ a.approver.user.get_full_name }}</div>
+        <div>Status: {{ a.status|title }} {% if a.acted_at %} on {{ a.acted_at|date:"Y-m-d H:i" }}{% endif %}</div>
+        {% if a.remarks %}<div class="text-muted">Remarks: {{ a.remarks }}</div>{% endif %}
+      </div>
+      <span class="badge bg-{{ a.status == 'approved'|yesno:'success,warning' }} rounded-pill">{{ a.status|title }}</span>
+    </li>
+  {% empty %}
+    <li class="list-group-item text-muted">No approvals recorded yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,153 +1,405 @@
 {% extends 'base.html' %}
 {% load static %}
-
 {% block title %}Register - FaceAttend{% endblock %}
 
 {% block content %}
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
-            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
-                <div class="card-header bg-gradient text-white text-center" style="background: linear-gradient(90deg, #007bff, #6610f2);">
-                    <h3 class="mb-0 fw-bold"><i class="fas fa-user-plus me-2"></i>Employee Registration</h3>
-                </div>
-
-                <div class="card-body p-4">
-                    {% if error %}
-                    <div class="alert alert-danger shadow-sm">
-                        <i class="fas fa-exclamation-triangle me-2"></i>{{ error }}
-                    </div>
-                    {% endif %}
-
-                    <form method="post" enctype="multipart/form-data" id="registerForm">
-                        {% csrf_token %}
-
-                        <!-- Account Info -->
-                        <div class="mb-4">
-                            <h5 class="border-bottom pb-2"><i class="fas fa-user-circle me-2 text-primary"></i>Account Information</h5>
-                            {% for field in user_form %}
-                            <div class="mb-3">
-                                <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}</label>
-                                {{ field }}
-                                {% if field.errors %}
-                                <div class="text-danger small">{{ field.errors }}</div>
-                                {% endif %}
-                            </div>
-                            {% endfor %}
-                        </div>
-
-                        <!-- Employee Info -->
-                        <div class="mb-4">
-                            <h5 class="border-bottom pb-2"><i class="fas fa-id-badge me-2 text-success"></i>Employee Information</h5>
-                            {% for field in employee_form %}
-                                {% if field.name != 'face_image' %}
-                                <div class="mb-3">
-                                    <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}</label>
-                                    {{ field }}
-                                    {% if field.errors %}
-                                    <div class="text-danger small">{{ field.errors }}</div>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
-                            {% endfor %}
-                        </div>
-
-                        <!-- Face Capture Section -->
-                        <div class="alert alert-info d-flex align-items-start shadow-sm">
-                            <i class="fas fa-camera fa-lg me-3 mt-1"></i>
-                            <div>
-                                <h6 class="fw-bold mb-1">Face Image Options</h6>
-                                <p class="mb-0 small">You can upload a photo or capture one directly using your webcam.</p>
-                            </div>
-                        </div>
-
-                        <div class="text-center mb-3">
-                            <div class="camera-box mx-auto p-2 border rounded-3 bg-light">
-                                <video id="camera" width="320" height="240" autoplay muted class="rounded-3 shadow-sm"></video>
-                                <canvas id="snapshot" width="320" height="240" class="d-none"></canvas>
-                            </div>
-                            <button type="button" id="capture-btn" class="btn btn-outline-primary mt-3 px-4">
-                                <i class="fas fa-camera me-2"></i> Capture from Camera
-                            </button>
-                        </div>
-
-                        <div class="mb-4">
-                            <label for="id_face_image" class="form-label fw-semibold">Or Upload Face Image</label>
-                            <input type="file" name="face_image" accept="image/*" id="id_face_image" class="form-control">
-                        </div>
-
-                        <input type="hidden" name="captured_image" id="captured_image">
-
-                        <!-- Buttons -->
-                        <div class="d-grid gap-3 mt-4">
-                            <button type="submit" class="btn btn-primary btn-lg shadow-sm">
-                                <i class="fas fa-user-plus me-2"></i>Register
-                            </button>
-                            <a href="{% url 'login' %}" class="btn btn-outline-secondary">
-                                Already have an account? <span class="fw-semibold">Login here</span>
-                            </a>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+<div class="container">
+  <div class="registration-card card border-0 shadow-lg my-4">
+    <div class="card-header text-center">
+      <h2 class="mb-0"><i class="fas fa-user-plus me-2"></i>Employee Registration</h2>
+      <p class="mb-0 mt-2 opacity-75">Complete the form below to register a new employee</p>
     </div>
+
+    <div class="card-body">
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      <!-- Expose reg_success payload for SweetAlert (if any) -->
+      {% if reg_success %}
+        <script id="reg-success-payload" type="application/json">
+          {{ reg_success|safe }}
+        </script>
+      {% endif %}
+
+      <!-- ✅ FIX: Make sure enctype is set for file uploads -->
+      <form method="POST" enctype="multipart/form-data" id="registrationForm" novalidate>
+        {% csrf_token %}
+
+        <!-- USER DETAILS -->
+        <div class="form-section">
+          <div class="section-title"><i class="fas fa-user-circle"></i> User Login Information</div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="{{ form.username.id_for_label }}" class="form-label required-field">{{ form.username.label }}</label>
+              <div class="input-group">
+                {{ form.username }}
+                <span class="input-group-text" id="username-status" title="Status">
+                  <i class="fa-regular fa-circle"></i>
+                </span>
+              </div>
+              <div class="form-text" id="username-hint">We'll check availability automatically.</div>
+              <div class="invalid-feedback d-block" id="username-error"></div>
+            </div>
+
+            <div class="col-md-6">
+              <label for="{{ form.email.id_for_label }}" class="form-label required-field">{{ form.email.label }}</label>
+              <div class="input-group">
+                {{ form.email }}
+                <span class="input-group-text" id="email-status" title="Status">
+                  <i class="fa-regular fa-circle"></i>
+                </span>
+              </div>
+              {% if form.email.errors %}
+                <div class="text-danger small">{{ form.email.errors.0 }}</div>
+              {% endif %}
+              <div class="form-text" id="email-hint">We'll check if this email is already used.</div>
+              <div class="invalid-feedback d-block" id="email-error"></div>
+            </div>
+
+            <div class="col-md-6">
+              <label for="{{ form.password1.id_for_label }}" class="form-label required-field">{{ form.password1.label }}</label>
+              {{ form.password1 }}
+            </div>
+
+            <div class="col-md-6">
+              <label for="{{ form.password2.id_for_label }}" class="form-label required-field">{{ form.password2.label }}</label>
+              {{ form.password2 }}
+            </div>
+
+            <div class="col-md-6">
+              <label for="{{ form.first_name.id_for_label }}" class="form-label">{{ form.first_name.label }}</label>
+              {{ form.first_name }}
+            </div>
+
+            <div class="col-md-6">
+              <label for="{{ form.last_name.id_for_label }}" class="form-label">{{ form.last_name.label }}</label>
+              {{ form.last_name }}
+            </div>
+          </div>
+        </div>
+
+        <!-- EMPLOYEE DETAILS -->
+        <div class="form-section">
+          <div class="section-title"><i class="fas fa-id-badge"></i> Employee Information</div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label for="{{ form.position.id_for_label }}" class="form-label">{{ form.position.label }}</label>
+              {{ form.position }}
+            </div>
+            <div class="col-md-4">
+              <label for="{{ form.phone_number.id_for_label }}" class="form-label">{{ form.phone_number.label }}</label>
+              {{ form.phone_number }}
+            </div>
+            <div class="col-md-6">
+              <label for="{{ form.department.id_for_label }}" class="form-label">{{ form.department.label }}</label>
+              {{ form.department }}
+            </div>
+            <div class="col-md-6">
+              <label for="{{ form.manager.id_for_label }}" class="form-label">{{ form.manager.label }}</label>
+              {{ form.manager }}
+            </div>
+          </div>
+        </div>
+
+        <!-- FACE IMAGE / WEBCAM -->
+        <div class="form-section">
+          <div class="section-title"><i class="fas fa-camera"></i> Face Image (Upload or Capture)</div>
+          <div class="row align-items-start g-3">
+            <div class="col-md-6">
+              <label for="{{ form.face_image.id_for_label }}" class="form-label">{{ form.face_image.label }}</label>
+              {{ form.face_image }}
+              <div class="form-text">Upload a clear frontal face image for facial recognition</div>
+              <div class="small text-muted mt-2">Tip: Good lighting, no mask/cap, face centered.</div>
+              {% if form.face_image.errors %}
+                <div class="text-danger small">{{ form.face_image.errors.0 }}</div>
+              {% endif %}
+            </div>
+
+            <div class="col-md-6">
+              <div class="face-preview-container">
+                <div class="face-preview" id="previewArea">
+                  <span class="preview-text">Image Preview</span>
+                  <img id="previewImage" style="display:none;" alt="Face preview" />
+                </div>
+                <div class="camera-controls">
+                  <button type="button" class="btn btn-outline-primary" id="openCamBtn">
+                    <i class="fas fa-camera me-2"></i>Open Camera
+                  </button>
+                  <button type="button" class="btn btn-success" id="captureBtn" style="display:none;">
+                    <i class="fas fa-camera me-2"></i>Capture
+                  </button>
+                </div>
+                <div class="webcam-container mt-3">
+                  <video id="webcam" width="260" height="200" autoplay playsinline style="display:none;"></video>
+                </div>
+                <input type="hidden" name="captured_image" id="captured_image">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SALARY SECTION -->
+        <div class="form-section">
+          <div class="section-title"><i class="fas fa-money-bill-wave"></i> Salary Details (Optional)</div>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label for="{{ form.base_salary.id_for_label }}" class="form-label">{{ form.base_salary.label }}</label>
+              {{ form.base_salary }}
+            </div>
+            <div class="col-md-3">
+              <label for="{{ form.hra.id_for_label }}" class="form-label">{{ form.hra.label }}</label>
+              {{ form.hra }}
+            </div>
+            <div class="col-md-3">
+              <label for="{{ form.allowances.id_for_label }}" class="form-label">{{ form.allowances.label }}</label>
+              {{ form.allowances }}
+            </div>
+            <div class="col-md-3">
+              <label for="{{ form.deductions.id_for_label }}" class="form-label">{{ form.deductions.label }}</label>
+              {{ form.deductions }}
+            </div>
+          </div>
+        </div>
+
+        <!-- JOINING DETAILS -->
+        <div class="form-section">
+          <div class="section-title"><i class="fas fa-briefcase"></i> Joining Details</div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label for="{{ form.date_of_joining.id_for_label }}" class="form-label required-field">{{ form.date_of_joining.label }}</label>
+              {{ form.date_of_joining }}
+            </div>
+            <div class="col-md-4">
+              <label for="{{ form.probation_period_months.id_for_label }}" class="form-label">{{ form.probation_period_months.label }}</label>
+              {{ form.probation_period_months }}
+            </div>
+            <div class="col-md-4">
+              <label for="{{ form.confirmation_date.id_for_label }}" class="form-label">{{ form.confirmation_date.label }}</label>
+              {{ form.confirmation_date }}
+              <div class="form-text">Auto-calculated when you pick joining date & probation.</div>
+            </div>
+            <div class="col-md-12">
+              <!-- ✅ FIX: Add documents field directly without form binding -->
+              <label for="documents" class="form-label">Joining Documents</label>
+              <input type="file" name="documents" id="documents" class="form-control" multiple 
+                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt">
+              <div class="form-text">Upload multiple documents (PDF, JPG, PNG, DOCX etc.)</div>
+              <ul class="small mt-2" id="selected-docs"></ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="form-actions d-flex align-items-center justify-content-center gap-3">
+          <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+            <span class="spinner-border spinner-border-sm me-2 d-none" id="submitSpinner" role="status" aria-hidden="true"></span>
+            <i class="fas fa-user-plus me-2"></i>Register Employee
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
-<!-- Camera Script -->
-<script>
-const video = document.getElementById('camera');
-const canvas = document.getElementById('snapshot');
-const captureBtn = document.getElementById('capture-btn');
-const capturedImageInput = document.getElementById('captured_image');
 
-// Access webcam
-navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream => video.srcObject = stream)
-    .catch(err => console.error("Camera access denied:", err));
-
-// Capture image
-captureBtn.addEventListener('click', () => {
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = canvas.toDataURL('image/png');
-    capturedImageInput.value = imageData;
-
-    captureBtn.classList.replace('btn-outline-primary', 'btn-success');
-    captureBtn.innerHTML = '<i class="fas fa-check-circle me-2"></i>Captured!';
-    setTimeout(() => captureBtn.classList.replace('btn-success', 'btn-outline-primary'), 2000);
-});
-</script>
-
-<!-- Custom Style -->
+<!-- Styles -->
 <style>
-.card {
-    transition: transform 0.2s ease-in-out;
-}
-.card:hover {
-    transform: translateY(-4px);
-}
-
-input, select {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    transition: all 0.3s ease;
-}
-input:focus, select:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 0.25rem rgba(13,110,253,.25);
-}
-.camera-box {
-    display: inline-block;
-    position: relative;
-}
-#camera {
-    border: 2px solid #dee2e6;
-}
-.btn-lg {
-    border-radius: 8px;
-}
+  :root {
+    --primary:#4361ee; --primary-light:#4895ef; --secondary:#3f37c9;
+    --gray-light:#e9ecef; --border-radius:12px; --transition:all .3s ease;
+  }
+  .card-header{background:linear-gradient(135deg, var(--primary), var(--secondary)); color:#fff;}
+  .form-section{margin-bottom:2rem;}
+  .section-title{font-weight:600; font-size:1.1rem; color:var(--primary); margin:25px 0 15px; padding-bottom:8px; border-bottom:1px solid var(--gray-light); display:flex; align-items:center;}
+  .section-title i{margin-right:10px;}
+  .face-preview{width:100%; max-width:280px; height:220px; border:2px dashed #ccc; border-radius:12px; display:flex; justify-content:center; align-items:center; overflow:hidden; background:#fafafa;}
+  .required-field::after{content:" *"; color:#e74c3c;}
 </style>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    // Document selection preview
+    const docsInput = document.getElementById('documents');
+    const docsList = document.getElementById('selected-docs');
+    if (docsInput && docsList) {
+        docsInput.addEventListener('change', () => {
+        docsList.innerHTML = '';
+        Array.from(docsInput.files || []).forEach(f => {
+            const li = document.createElement('li');
+            li.textContent = f.name;
+            docsList.appendChild(li);
+        });
+        });
+    }
+
+  // Image preview
+  const fileInput = document.querySelector('input[name="face_image"]');
+  const previewImage = document.getElementById("previewImage");
+  const previewArea = document.getElementById("previewArea");
+  if (fileInput) {
+    fileInput.addEventListener("change", function () {
+      const file = this.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          previewImage.src = e.target.result;
+          previewImage.style.display = "block";
+          const span = previewArea.querySelector("span");
+          if (span) span.style.display = "none";
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  // Webcam
+  const openCamBtn = document.getElementById("openCamBtn");
+  const captureBtn = document.getElementById("captureBtn");
+  const webcam = document.getElementById("webcam");
+  const capturedInput = document.getElementById("captured_image");
+  let stream = null;
+
+  if (openCamBtn) {
+    openCamBtn.addEventListener("click", async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        webcam.srcObject = stream;
+        webcam.style.display = "block";
+        captureBtn.style.display = "inline-block";
+        openCamBtn.textContent = "Switch Camera";
+      } catch (err) {
+        console.error("Error accessing camera: ", err);
+        alert("Could not access the camera. Please check permissions.");
+      }
+    });
+  }
+
+  if (captureBtn) {
+    captureBtn.addEventListener("click", () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = webcam.videoWidth;
+      canvas.height = webcam.videoHeight;
+      canvas.getContext("2d").drawImage(webcam, 0, 0);
+      const imageData = canvas.toDataURL("image/png");
+      capturedInput.value = imageData;
+
+      previewImage.src = imageData;
+      previewImage.style.display = "block";
+      const span = previewArea.querySelector("span");
+      if (span) span.style.display = "none";
+
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      webcam.style.display = "none";
+      captureBtn.style.display = "none";
+      openCamBtn.textContent = "Open Camera";
+    });
+  }
+
+  // Auto confirmation date
+  const dojInput = document.getElementById("id_date_of_joining");
+  const probationInput = document.getElementById("id_probation_period_months");
+  const confirmationInput = document.getElementById("id_confirmation_date");
+  function updateConfirmationDate() {
+    if (dojInput?.value && probationInput?.value) {
+      const d = new Date(dojInput.value);
+      d.setMonth(d.getMonth() + parseInt(probationInput.value || 0));
+      confirmationInput.value = d.toISOString().split('T')[0];
+    }
+  }
+  dojInput?.addEventListener('change', updateConfirmationDate);
+  probationInput?.addEventListener('input', updateConfirmationDate);
+
+  // Submit spinner
+  const submitBtn = document.getElementById('submitBtn');
+  const submitSpinner = document.getElementById('submitSpinner');
+  document.getElementById('registrationForm').addEventListener('submit', () => {
+    submitSpinner.classList.remove('d-none');
+    submitBtn.setAttribute('disabled', 'disabled');
+  });
+
+  // --- Real-time AJAX validation for username & email ---
+  const usernameInput = document.getElementById('id_username');
+  const emailInput = document.getElementById('id_email');
+  const uStatus = document.getElementById('username-status');
+  const eStatus = document.getElementById('email-status');
+  const uErr = document.getElementById('username-error');
+  const eErr = document.getElementById('email-error');
+
+  async function checkAvailability(field, value) {
+    const url = field === 'username' ? '{% url "check_username" %}' : '{% url "check_email" %}';
+    const params = new URLSearchParams({ [field]: value });
+    const res = await fetch(`${url}?${params}`, { headers: { 'X-Requested-With':'XMLHttpRequest' }});
+    return res.json();
+  }
+
+  function paintStatus(elSpan, ok) {
+    const icon = elSpan.querySelector('i');
+    if (!icon) return;
+    icon.className = ok ? 'fa-solid fa-circle-check text-success' : 'fa-solid fa-circle-xmark text-danger';
+  }
+
+  let uTimer, eTimer;
+  usernameInput?.addEventListener('input', () => {
+    clearTimeout(uTimer);
+    paintStatus(uStatus, false);
+    uErr.textContent = '';
+    if (usernameInput.value.trim().length < 3) return;
+    uTimer = setTimeout(async () => {
+      const data = await checkAvailability('username', usernameInput.value.trim());
+      paintStatus(uStatus, data.ok);
+      uErr.textContent = data.exists ? 'This username is already taken.' : '';
+    }, 400);
+  });
+
+  emailInput?.addEventListener('input', () => {
+    clearTimeout(eTimer);
+    paintStatus(eStatus, false);
+    eErr.textContent = '';
+    const v = emailInput.value.trim();
+    if (!v.includes('@')) return;
+    eTimer = setTimeout(async () => {
+      const data = await checkAvailability('email', v);
+      paintStatus(eStatus, data.ok);
+      eErr.textContent = data.exists ? 'This email is already registered.' : '';
+    }, 400);
+  });
+
+  // SweetAlert2 popup after successful registration (session payload)
+  const payloadScript = document.getElementById('reg-success-payload');
+  if (payloadScript) {
+    try {
+      const payload = JSON.parse(payloadScript.textContent);
+      const docs = (payload.docs || [])
+        .map(d => `<li><a href="${d.url}" target="_blank" rel="noopener">${d.name}</a></li>`)
+        .join('') || '<li class="text-muted">No documents uploaded.</li>';
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Employee Registered',
+        html: `
+          <div class="text-start">
+            <p class="mb-1"><strong>Name:</strong> ${payload.name || ''}</p>
+            <p class="mb-1"><strong>Employee ID:</strong> ${payload.employee_id}</p>
+            <hr/>
+            <p class="mb-2"><strong>Joining Documents:</strong></p>
+            <ul class="mb-0">${docs}</ul>
+          </div>
+        `,
+        confirmButtonText: 'Done',
+        confirmButtonColor: '#4361ee'
+      });
+    } catch (e) {
+      console.warn('Could not parse reg_success payload.', e);
+    }
+  }
+</script>
 {% endblock %}

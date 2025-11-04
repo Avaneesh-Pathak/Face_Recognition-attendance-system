@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3>{{ title }}</h3>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Employee</th><th>Type</th><th>Dates</th><th>Applied</th><th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ap in approvals %}
+      <tr>
+        <td>{{ ap.leave.employee.user.get_full_name }}</td>
+        <td>{{ ap.leave.leave_type.name }}</td>
+        <td>{{ ap.leave.start_date }} → {{ ap.leave.end_date }}</td>
+        <td>{{ ap.leave.applied_on|date:"Y-m-d H:i" }}</td>
+        <td><a class="btn btn-sm btn-primary" href="{% url 'leave_approval_action' ap.leave.pk %}">Review</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-muted">Nothing pending 🎉</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

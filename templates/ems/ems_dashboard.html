@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% if not employee_exists %}
+<div class="alert alert-warning">
+    <h4 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Profile Incomplete!</h4>
+    <p>Your employee profile is not set up. Please contact HR.</p>
+</div>
+{% else %}
+<!-- Quick Access Cards -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0"><i class="fas fa-rocket me-2"></i>Quick Access</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <!-- Leave Management -->
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <a href="{% url 'leave_application_create' %}" class="btn btn-primary btn-lg w-100 h-100 d-flex flex-column justify-content-center">
+                            <i class="fas fa-calendar-plus fa-2x mb-2"></i>
+                            <span>Apply Leave</span>
+                        </a>
+                    </div>
+                    
+                    <!-- My Salary -->
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <a href="{% url 'my_salary' %}" class="btn btn-success btn-lg w-100 h-100 d-flex flex-column justify-content-center">
+                            <i class="fas fa-file-invoice-dollar fa-2x mb-2"></i>
+                            <span>My Salary</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Leave Applications -->
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <a href="{% url 'leave_application_list' %}" class="btn btn-info btn-lg w-100 h-100 d-flex flex-column justify-content-center">
+                            <i class="fas fa-list fa-2x mb-2"></i>
+                            <span>My Leaves</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Notifications -->
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <a href="{% url 'notification_list' %}" class="btn btn-warning btn-lg w-100 h-100 d-flex flex-column justify-content-center position-relative">
+                            <i class="fas fa-bell fa-2x mb-2"></i>
+                            <span>Notifications</span>
+                            {% if unread_count > 0 %}
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                                {{ unread_count }}
+                            </span>
+                            {% endif %}
+                        </a>
+                    </div>
+                    
+                    <!-- Resignation -->
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <a href="{% url 'resignation_create' %}" class="btn btn-danger btn-lg w-100 h-100 d-flex flex-column justify-content-center">
+                            <i class="fas fa-user-minus fa-2x mb-2"></i>
+                            <span>Resignation</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Departments -->
+                    <div class="col-xl-2 col-md-4 col-sm-6 mb-3">
+                        <a href="{% url 'department_list' %}" class="btn btn-secondary btn-lg w-100 h-100 d-flex flex-column justify-content-center">
+                            <i class="fas fa-sitemap fa-2x mb-2"></i>
+                            <span>Departments</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Stats Cards -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card border-left-primary h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Department
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ employee.department }}
+                        </div>
+                        <div class="mt-2">
+                            <a href="{% url 'department_list' %}" class="btn btn-sm btn-outline-primary">
+                                View All
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-building fa-2x text-primary"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card border-left-success h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Position
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ employee.position }}
+                        </div>
+                        <div class="mt-2">
+                            <a href="{% url 'my_salary' %}" class="btn btn-sm btn-outline-success">
+                                View Salary
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-briefcase fa-2x text-success"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card border-left-info h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            This Month Attendance
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ attendance_count }} days
+                        </div>
+                        <div class="mt-2">
+                            <a href="#" class="btn btn-sm btn-outline-info">
+                                View Attendance
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-calendar-check fa-2x text-info"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card border-left-warning h-100">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Pending Approvals
+                        </div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">
+                            {{ pending_approvals }}
+                        </div>
+                        <div class="mt-2">
+                            <a href="{% url 'leave_application_list' %}" class="btn btn-sm btn-outline-warning">
+                                Review
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-tasks fa-2x text-warning"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card shadow-sm mb-3">
+  <div class="card-body d-flex justify-content-between align-items-center">
+    <div>
+      <div class="fw-bold">Leaves awaiting your approval</div>
+      <div class="display-6">{{ pending_approvals }}</div>
+    </div>
+    <a href="{% url 'my_pending_approvals' %}" class="btn btn-outline-primary">Open</a>
+  </div>
+</div>
+
+</div>
+
+<div class="row">
+    <!-- Admin Quick Actions -->
+    {% if user.is_staff %}
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0"><i class="fas fa-cogs me-2"></i>Admin Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <a href="{% url 'generate_payroll' %}" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-cogs me-2"></i> Generate Payroll
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="{% url 'salary_structure_create' %}" class="btn btn-outline-success w-100">
+                            <i class="fas fa-plus me-2"></i> Add Salary Structure
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="{% url 'department_create' %}" class="btn btn-outline-info w-100">
+                            <i class="fas fa-sitemap me-2"></i> Add Department
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="{% url 'leave_workflow_list' %}" class="btn btn-outline-warning w-100">
+                            <i class="fas fa-project-diagram me-2"></i> Manage Workflow
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="{% url 'joining_detail_create' %}" class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-user-plus me-2"></i> Add Joining Details
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="{% url 'leave_type_create' %}" class="btn btn-outline-dark w-100">
+                            <i class="fas fa-plus me-2"></i> Add Leave Type
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0"><i class="fas fa-user me-2"></i>Employee Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <a href="{% url 'resignation_create' %}" class="btn btn-outline-danger w-100">
+                            <i class="fas fa-user-minus me-2"></i> Submit Resignation
+                        </a>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <a href="{% url 'leave_application_list' %}" class="btn btn-outline-info w-100">
+                            <i class="fas fa-history me-2"></i> Leave History
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Notifications -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0"><i class="fas fa-bell me-2"></i>Recent Notifications</h6>
+                <a href="{% url 'notification_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_notifications %}
+                <div class="list-group list-group-flush">
+                    {% for notification in recent_notifications %}
+                    <div class="list-group-item {% if not notification.is_read %}bg-light{% endif %}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <p class="mb-1">{{ notification.message }}</p>
+                            <small>{{ notification.created_at|timesince }} ago</small>
+                        </div>
+                        {% if notification.link %}
+                        <a href="{{ notification.link }}" class="btn btn-sm btn-outline-primary mt-1">View</a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">No recent notifications.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

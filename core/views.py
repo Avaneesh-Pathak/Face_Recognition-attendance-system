@@ -1,7 +1,10 @@
 import os
+from urllib import request
 import cv2
 import ast
 import json
+import io
+import zipfile
 import base64
 import logging
 import tempfile
@@ -11,7 +14,10 @@ from io import BytesIO
 from datetime import date, datetime, timedelta
 from calendar import monthrange, month_name
 from PIL import Image
-
+from django.utils import timezone
+from datetime import datetime, date
+import calendar
+from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth import login, authenticate
@@ -24,9 +30,22 @@ from django.db.models import Count, Q, Avg
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.utils.datastructures import MultiValueDict
+from django.db.models import Q, Sum, Count, Avg
+from django.db.models import Sum, F, ExpressionWrapper, fields
+from datetime import date
+from django.core.mail import send_mail
+from django.conf import settings
+from django.urls import reverse
+from dateutil.relativedelta import relativedelta 
+from django.contrib.auth.models import User
+from .models import (Employee, Attendance, AttendanceSettings, DailyReport,Department, SalaryStructure, Payroll, LeaveType, 
+    LeaveApplication, LeaveWorkflowStage, LeaveApproval,
+    JoiningDetail, Resignation, Notification,JoiningDocument)
 
-from .models import Employee, Attendance, AttendanceSettings, DailyReport
-from .forms import UserRegistrationForm, EmployeeRegistrationForm, AttendanceSettingsForm
+from .forms import ( UserRegistrationForm, EmployeeRegistrationForm, AttendanceSettingsForm,DepartmentForm, SalaryStructureForm, PayrollFilterForm,
+    LeaveTypeForm, LeaveApplicationForm, LeaveApprovalForm, LeaveWorkflowStageForm,
+    JoiningDetailForm, ResignationForm, NotificationForm
+    )
 from .face_system import get_face_system
 from core.face_recognition_utils import get_face_embedding
 
@@ -50,91 +69,141 @@ def home(request):
     return redirect('login')
 
 
+
 def register(request):
-    """
-    Register user + employee. Supports sending a base64 'captured_image' in POST.
-    """
-    # lazy init face system instance
     face_sys = get_face_system()
+    reg_success = request.session.pop('reg_success', None)
 
-    if request.method == 'POST':
-        user_form = UserRegistrationForm(request.POST)
+    if request.method == "POST":
+        # ✅ FIX: Only pass request.POST to the form, handle FILES separately
+        form = EmployeeRegistrationForm(request.POST)
 
-        # Prepare a files-like MultiValueDict so form processing works whether file came via request.FILES
-        files = request.FILES.copy() if hasattr(request, 'FILES') else MultiValueDict()
+        if form.is_valid():
+            # ------------------ 1. Create User ------------------
+            user = User.objects.create_user(
+                username=form.cleaned_data['username'],
+                email=form.cleaned_data['email'],
+                password=form.cleaned_data['password1'],
+                first_name=form.cleaned_data['first_name'],
+                last_name=form.cleaned_data['last_name']
+            )
 
-        # Inject captured base64 image (if any) into files under 'face_image' key
-        captured_image = request.POST.get('captured_image')
-        if captured_image:
-            try:
-                fmt, imgstr = captured_image.split(';base64,')
-                ext = fmt.split('/')[-1] if '/' in fmt else 'jpg'
-                data = ContentFile(base64.b64decode(imgstr), name=f"captured_face.{ext}")
-                files.setlist('face_image', [data])  # MultiValueDict-friendly
-                logger.info("Captured webcam image successfully decoded and injected into files.")
-            except Exception as e:
-                logger.exception("Error decoding captured image: %s", e)
+            # ------------------ 2. Create Employee (Auto-ID) ----
+            employee = Employee.objects.create(
+                user=user,
+                department=form.cleaned_data['department'],
+                position=form.cleaned_data['position'],
+                manager=form.cleaned_data['manager'],
+                phone_number=form.cleaned_data['phone_number'],
+            )
 
-        employee_form = EmployeeRegistrationForm(request.POST, files)
+            # ------------------ 3. Handle Face Image Upload -----
+            face_image = request.FILES.get('face_image')
+            if face_image:
+                employee.face_image = face_image
+                employee.save(update_fields=['face_image'])
 
-        if user_form.is_valid() and employee_form.is_valid():
-            user = user_form.save()
-            employee = employee_form.save(commit=False)
-            employee.user = user
-            employee.save()
+            # Webcam Image (Base64)
+            if request.POST.get('captured_image'):
+                try:
+                    fmt, imgstr = request.POST['captured_image'].split(';base64,')
+                    ext = fmt.split('/')[-1]
+                    employee.face_image = ContentFile(
+                        base64.b64decode(imgstr),
+                        name=f"face_{employee.employee_id}.{ext}"
+                    )
+                    employee.save(update_fields=['face_image'])
+                except Exception as e:
+                    messages.warning(request, f"Webcam image could not be saved: {e}")
 
-            # Generate and save embedding if face image exists
+            # ------------------ 4. Salary Info -------------------
+            if form.cleaned_data.get('base_salary'):
+                SalaryStructure.objects.create(
+                    employee=employee,
+                    base_salary=form.cleaned_data['base_salary'],
+                    hra=form.cleaned_data.get('hra') or 0,
+                    allowances=form.cleaned_data.get('allowances') or 0,
+                    deductions=form.cleaned_data.get('deductions') or 0,
+                )
+
+            # ------------------ 5. Joining Details --------------
+            doj = form.cleaned_data['date_of_joining']
+            probation = form.cleaned_data['probation_period_months']
+            confirmation_date = doj + relativedelta(months=probation)
+
+            joining = JoiningDetail.objects.create(
+                employee=employee,
+                date_of_joining=doj,
+                probation_period_months=probation,
+                confirmation_date=confirmation_date
+            )
+
+            # ✅ FIX: Handle Multiple Documents Properly
+            documents = request.FILES.getlist('documents')
+            uploaded_docs = []
+            if documents:
+                for file in documents:
+                    # Validate file type and size if needed
+                    if file.size > 10 * 1024 * 1024:  # 10MB limit
+                        messages.warning(request, f"File {file.name} is too large. Max 10MB allowed.")
+                        continue
+                    
+                    # Create document record
+                    doc = JoiningDocument.objects.create(joining=joining, file=file)
+                    uploaded_docs.append({
+                        'name': file.name,
+                        'url': doc.file.url
+                    })
+            else:
+                print("⚠ No documents uploaded")
+
+            # ------------------ 6. Face Encoding -----------------
             if employee.face_image:
                 try:
-                    # Try to get a server-accessible path for the uploaded file
-                    img_path = None
-                    try:
-                        img_path = default_storage.path(employee.face_image.name)
-                    except Exception:
-                        img_path = getattr(employee.face_image, 'path', None)
-
-                    if img_path and os.path.exists(img_path):
-                        emb = face_sys.get_embedding(img_path)
-                    else:
-                        # If backend doesn't expose path, open file and decode image from storage
-                        try:
-                            f = employee.face_image.open('rb')
-                            file_bytes = f.read()
-                            f.close()
-                            arr = np.frombuffer(file_bytes, np.uint8)
-                            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-                            emb = face_sys.get_embedding(img)
-                        except Exception:
-                            emb = None
-
+                    img_path = getattr(employee.face_image, 'path', None) or default_storage.path(employee.face_image.name)
+                    emb = face_sys.get_embedding(img_path)
                     if emb is not None:
-                        employee.face_encoding = emb.tolist()
+                        employee.face_encoding = json.dumps(emb.tolist())
                         employee.save(update_fields=['face_encoding'])
-                        logger.info("Embedding saved for user %s", user.username)
                     else:
-                        messages.warning(request, "No face detected in the uploaded image. Please try again.")
-                except Exception:
-                    logger.exception("Error generating/saving embedding for %s", user.username)
-                    messages.error(request, "Error generating face embedding.")
-            else:
-                messages.warning(request, "No face image uploaded.")
+                        messages.warning(request, "⚠ No face detected from the image.")
+                except Exception as e:
+                    messages.warning(request, f"Face encoding failed: {e}")
 
-            messages.success(request, "Registration successful!")
-            return redirect('dashboard')
+            # ------------------ 7. Success Response -------------
+            request.session['reg_success'] = {
+                "employee_id": employee.employee_id,
+                "name": user.get_full_name() or user.username,
+                "docs": uploaded_docs,
+            }
+            return redirect('register')
+
         else:
-            logger.warning("Invalid registration form data.")
-            logger.debug("User form errors: %s", user_form.errors)
-            logger.debug("Employee form errors: %s", employee_form.errors)
-
+            messages.error(request, "❌ Please fix the errors in the form.")
     else:
-        user_form = UserRegistrationForm()
-        employee_form = EmployeeRegistrationForm()
+        form = EmployeeRegistrationForm()
 
     return render(request, 'register.html', {
-        'user_form': user_form,
-        'employee_form': employee_form,
+        'form': form,
+        'reg_success': reg_success,
     })
 
+
+# --- Real-time AJAX validators ---
+def check_username(request):
+    username = request.GET.get('username', '').strip()
+    exists = User.objects.filter(username__iexact=username).exists()
+    return JsonResponse({"ok": bool(username and not exists), "exists": exists})
+
+def check_email(request):
+    email = request.GET.get('email', '').strip()
+    exists = User.objects.filter(email__iexact=email).exists()
+    return JsonResponse({"ok": bool(email and not exists), "exists": exists})
+
+def get_managers_by_department(request, dept_id):
+    managers = Employee.objects.filter(department_id=dept_id, employment_status='active')
+    data = [{'id': m.id, 'name': m.user.get_full_name()} for m in managers]
+    return JsonResponse({'managers': data})
 
 @login_required
 def dashboard(request):
@@ -890,5 +959,730 @@ def attendance_day_detail(request, emp_id, date):
     }
 
     return JsonResponse(data)
+
+
+
+
+# ============================================================
+# 🏢 ORGANISATION STRUCTURE VIEWS
+# ============================================================
+
+@login_required
+def department_list(request):
+    departments = Department.objects.select_related('head__user', 'parent_department').all()
+    
+    # Calculate stats for the template
+    departments_with_heads = departments.filter(head__isnull=False).count()
+    parent_departments = departments.filter(parent_department__isnull=True).count()
+    sub_departments = departments.filter(parent_department__isnull=False).count()
+    
+    return render(request, 'ems/department_list.html', {
+        'departments': departments,
+        'departments_with_heads': departments_with_heads,
+        'parent_departments': parent_departments,
+        'sub_departments': sub_departments,
+        'title': 'Departments'
+    })
+
+@login_required
+def department_create(request):
+    if request.method == 'POST':
+        form = DepartmentForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Department created successfully!')
+            return redirect('department_list')
+    else:
+        form = DepartmentForm()
+    
+    return render(request, 'ems/department_form.html', {
+        'form': form,
+        'title': 'Create Department'
+    })
+
+@login_required
+def department_edit(request, pk):
+    department = get_object_or_404(Department, pk=pk)
+    if request.method == 'POST':
+        form = DepartmentForm(request.POST, instance=department)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Department updated successfully!')
+            return redirect('department_list')
+    else:
+        form = DepartmentForm(instance=department)
+    
+    return render(request, 'ems/department_form.html', {
+        'form': form,
+        'title': 'Edit Department',
+        'department': department
+    })
+
+@login_required
+def department_delete(request, pk):
+    department = get_object_or_404(Department, pk=pk)
+    if request.method == 'POST':
+        department.delete()
+        messages.success(request, 'Department deleted successfully!')
+        return redirect('department_list')
+    
+    return render(request, 'ems/confirm_delete.html', {
+        'object': department,
+        'title': 'Delete Department'
+    })
+
+# ============================================================
+# 💰 SALARY & PAYROLL VIEWS
+# ============================================================
+
+@login_required
+def salary_structure_list(request):
+    structures = SalaryStructure.objects.select_related('employee__user').all()
+    return render(request, 'ems/salary_structure_list.html', {
+        'structures': structures,
+        'title': 'Salary Structures'
+    })
+
+@login_required
+def salary_structure_create(request):
+    if request.method == 'POST':
+        form = SalaryStructureForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Salary structure created successfully!')
+            return redirect('salary_structure_list')
+    else:
+        form = SalaryStructureForm()
+    
+    return render(request, 'ems/salary_structure_form.html', {
+        'form': form,
+        'title': 'Create Salary Structure'
+    })
+
+@login_required
+def payroll_list(request):
+    form = PayrollFilterForm(request.GET or None)
+    payrolls = Payroll.objects.select_related('employee__user').all()
+    
+    if form.is_valid():
+        month = form.cleaned_data.get('month')
+        year = form.cleaned_data.get('year')
+        status = form.cleaned_data.get('status')
+        
+        if month:
+            payrolls = payrolls.filter(month__month=month)
+        if year:
+            payrolls = payrolls.filter(month__year=year)
+        if status:
+            payrolls = payrolls.filter(status=status)
+    
+    # Calculate totals
+    total_basic = payrolls.aggregate(Sum('basic_pay'))['basic_pay__sum'] or 0
+    total_allowances = payrolls.aggregate(Sum('allowances'))['allowances__sum'] or 0
+    total_deductions = payrolls.aggregate(Sum('deductions'))['deductions__sum'] or 0
+    total_net = payrolls.aggregate(Sum('net_salary'))['net_salary__sum'] or 0
+    
+    return render(request, 'ems/payroll_list.html', {
+        'payrolls': payrolls,
+        'form': form,
+        'total_basic': total_basic,
+        'total_allowances': total_allowances,
+        'total_deductions': total_deductions,
+        'total_net': total_net,
+        'title': 'Payroll'
+    })
+
+@login_required
+def generate_payroll(request):
+    if request.method == 'POST':
+        month = int(request.POST.get('month'))
+        year = int(request.POST.get('year'))
+        
+        try:
+            Payroll.objects.generate_monthly_salary(month, year)
+            messages.success(request, f'Payroll generated successfully for {calendar.month_name[month]} {year}!')
+        except Exception as e:
+            messages.error(request, f'Error generating payroll: {str(e)}')
+        
+        return redirect('payroll_list')
+    
+    # Get statistics for the template
+    active_employees_count = Employee.objects.filter(employment_status='active').count()
+    recent_payroll_count = Payroll.objects.filter(month__year=date.today().year).count()
+    
+    return render(request, 'ems/generate_payroll.html', {
+        'title': 'Generate Payroll',
+        'active_employees_count': active_employees_count,
+        'recent_payroll_count': recent_payroll_count
+    })
+
+@login_required
+def my_salary(request):
+    try:
+        employee = request.user.employee
+        payrolls = Payroll.objects.filter(employee=employee).order_by('-month')
+        salary_structure = SalaryStructure.objects.filter(employee=employee).first()
+    except Employee.DoesNotExist:
+        payrolls = []
+        salary_structure = None
+        messages.error(request, 'Employee profile not found!')
+    
+    return render(request, 'ems/my_salary.html', {
+        'payrolls': payrolls,
+        'salary_structure': salary_structure,
+        'title': 'My Salary'
+    })
+
+# ============================================================
+# 📝 LEAVE MANAGEMENT VIEWS
+# ============================================================
+
+@login_required
+def leave_type_list(request):
+    leave_types = LeaveType.objects.all()
+    return render(request, 'ems/leave_type_list.html', {
+        'leave_types': leave_types,
+        'title': 'Leave Types'
+    })
+
+@login_required
+def leave_type_create(request):
+    if request.method == 'POST':
+        form = LeaveTypeForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Leave type created successfully!')
+            return redirect('leave_type_list')
+    else:
+        form = LeaveTypeForm()
+    
+    return render(request, 'ems/leave_type_form.html', {
+        'form': form,
+        'title': 'Create Leave Type'
+    })
+
+@login_required
+def leave_application_list(request):
+    try:
+        employee = request.user.employee
+        my_leaves = LeaveApplication.objects.filter(employee=employee).select_related('leave_type').order_by('-applied_on')
+        
+        # Leaves pending approval (for managers)
+        pending_approvals = LeaveApplication.objects.filter(
+            approvals__approver=employee,
+            approvals__status='pending'
+        ).select_related('employee__user', 'leave_type').distinct()
+    except Employee.DoesNotExist:
+        my_leaves = []
+        pending_approvals = []
+        messages.error(request, 'Employee profile not found!')
+    
+    return render(request, 'ems/leave_application_list.html', {
+        'my_leaves': my_leaves,
+        'pending_approvals': pending_approvals,
+        'title': 'Leave Applications'
+    })
+
+@login_required
+def leave_application_create(request):
+    try:
+        employee = request.user.employee
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found!')
+        return redirect('leave_application_list')
+
+    # Stats (unchanged)
+    total_allowed = sum(LeaveType.objects.values_list('max_days_per_year', flat=True))
+    used_leave_days = sum(l.total_days() for l in LeaveApplication.objects.filter(employee=employee, status='approved'))
+    pending_applications = LeaveApplication.objects.filter(employee=employee, status='pending').count()
+    available_leave_days = max(total_allowed - used_leave_days, 0)
+
+    if request.method == 'POST':
+        form = LeaveApplicationForm(request.POST)
+        if form.is_valid():
+            leave_app = form.save(commit=False)
+            leave_app.employee = employee
+            leave_app.save()
+
+            # 1) choose approver: manager → HR → superuser
+            approver = employee.manager
+            if not approver:
+                approver = Employee.objects.filter(position__icontains="HR", employment_status='active').first()
+            if not approver:
+                approver = Employee.objects.filter(user__is_superuser=True).first()
+
+            if approver:
+                LeaveApproval.objects.create(
+                    leave=leave_app,
+                    approver=approver,
+                    level=1,
+                    status='pending'
+                )
+                # Notify approver
+                link = reverse('leave_approval_action', args=[leave_app.pk])
+                notify_user(approver.user, f"New leave request from {employee.user.get_full_name()} awaiting your approval.", link)
+
+            # Notify applicant
+            notify_user(request.user, "Your leave application has been submitted.", reverse('leave_application_list'))
+
+            messages.success(request, 'Leave submitted and sent to your approver.')
+            return redirect('leave_application_list')
+    else:
+        form = LeaveApplicationForm()
+
+    return render(request, 'ems/leave_application_form.html', {
+        'form': form,
+        'title': 'Apply for Leave',
+        'available_leave_days': available_leave_days,
+        'used_leave_days': used_leave_days,
+        'pending_applications': pending_applications,
+    })
+
+
+
+@login_required
+def leave_approval_action(request, pk):
+    leave_app = get_object_or_404(LeaveApplication, pk=pk)
+    try:
+        approver = request.user.employee
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found!')
+        return redirect('leave_application_list')
+
+    approval = LeaveApproval.objects.filter(
+        leave=leave_app,
+        approver=approver,
+        status='pending'
+    ).first()
+    if not approval:
+        messages.error(request, 'You are not authorized to approve this leave!')
+        return redirect('leave_application_list')
+
+    if request.method == 'POST':
+        form = LeaveApprovalForm(request.POST, instance=approval)
+        if form.is_valid():
+            approval_obj = form.save(commit=False)
+            approval_obj.acted_at = timezone.now()
+            approval_obj.save()
+
+            if approval_obj.status == 'approved':
+                # Is there a next level?
+                next_stage = LeaveWorkflowStage.objects.filter(level=approval.level + 1).first()
+                if next_stage:
+                    # Pick next approver by role name in position (simple strategy)
+                    next_approver = Employee.objects.filter(
+                        employment_status='active',
+                        position__icontains=next_stage.role_name
+                    ).first()
+
+                    if next_approver:
+                        LeaveApproval.objects.create(
+                            leave=leave_app,
+                            approver=next_approver,
+                            level=next_stage.level,
+                            status='pending'
+                        )
+                        # notify next approver
+                        link = reverse('leave_approval_action', args=[leave_app.pk])
+                        notify_user(next_approver.user, f"Leave request for {leave_app.employee.user.get_full_name()} moved to you for approval.", link)
+                else:
+                    # Finalize
+                    leave_app.status = 'approved'
+                    leave_app.approved_by = approver
+                    leave_app.save()
+                    # notify applicant
+                    notify_user(leave_app.employee.user, "Your leave has been approved.", reverse('leave_application_list'))
+
+            elif approval_obj.status == 'rejected':
+                leave_app.status = 'rejected'
+                leave_app.save()
+                # notify applicant
+                notify_user(leave_app.employee.user, "Your leave has been rejected.", reverse('leave_application_list'))
+
+            messages.success(request, f'Leave {approval_obj.status} successfully!')
+            return redirect('leave_application_list')
+    else:
+        form = LeaveApprovalForm(instance=approval)
+
+    return render(request, 'ems/leave_approval_form.html', {
+        'form': form,
+        'leave_app': leave_app,
+        'title': 'Approve Leave'
+    })
+
+
+@login_required
+def leave_workflow_list(request):
+    stages = LeaveWorkflowStage.objects.all().order_by('level')
+    return render(request, 'ems/leave_workflow_list.html', {
+        'stages': stages,
+        'title': 'Leave Workflow Stages'
+    })
+
+@login_required
+def leave_workflow_create(request):
+    if request.method == 'POST':
+        form = LeaveWorkflowStageForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Workflow stage created successfully!')
+            return redirect('leave_workflow_list')
+    else:
+        form = LeaveWorkflowStageForm()
+    
+    return render(request, 'ems/leave_workflow_form.html', {
+        'form': form,
+        'title': 'Create Workflow Stage'
+    })
+
+@login_required
+def leave_application_update(request, pk):
+    leave_app = get_object_or_404(LeaveApplication, pk=pk, employee=request.user.employee)
+
+    if request.method == 'POST':
+        form = LeaveApplicationForm(request.POST, instance=leave_app)
+        if form.is_valid():
+            leave = form.save(commit=False)
+
+            # ✅ Reset status to pending on update
+            leave.status = 'pending'
+            leave.approved_by = None
+            leave.save()
+
+            # ✅ Remove old workflow approvals
+            LeaveApproval.objects.filter(leave=leave).delete()
+
+            # ✅ Reassign to manager/HR
+            approver = leave.employee.manager or \
+                       Employee.objects.filter(position__icontains="HR").first() or \
+                       Employee.objects.filter(user__is_superuser=True).first()
+
+            if approver:
+                LeaveApproval.objects.create(
+                    leave=leave,
+                    approver=approver,
+                    level=1,
+                    status='pending'
+                )
+
+            messages.success(request, "Leave updated and sent for approval again.")
+            return redirect('leave_application_list')
+
+    else:
+        form = LeaveApplicationForm(instance=leave_app)
+
+    return render(request, 'ems/leave_application_form.html', {
+        'form': form,
+        'title': 'Update Leave Application'
+    })
+
+
+
+@login_required
+def my_pending_approvals(request):
+    try:
+        me = request.user.employee
+    except Employee.DoesNotExist:
+        messages.error(request, "Employee profile not found.")
+        return redirect('leave_application_list')
+
+    approvals = LeaveApproval.objects.filter(
+        approver=me,
+        status='pending'
+    ).select_related('leave__employee__user', 'leave__leave_type').order_by('-leave__applied_on')
+
+    return render(request, 'ems/my_pending_approvals.html', {
+        'approvals': approvals,
+        'title': 'My Approvals'
+    })
+
+@login_required
+def leave_application_detail(request, pk):
+    leave_app = get_object_or_404(
+        LeaveApplication.objects.select_related('employee__user', 'leave_type'),
+        pk=pk
+    )
+    history = leave_app.approvals.select_related('approver__user').order_by('level', 'acted_at', 'id')
+    return render(request, 'ems/leave_application_detail.html', {
+        'leave': leave_app,
+        'history': history,
+        'title': 'Leave Details'
+    })
+# ============================================================
+# 📄 JOINING & RESIGNATION VIEWS
+# ============================================================
+
+@login_required
+def joining_detail_list(request):
+    joining_details = JoiningDetail.objects.select_related('employee__user').prefetch_related('joining_documents')
+    return render(request, 'ems/joining_detail_list.html', {
+        'joining_details': joining_details,
+        'title': 'Joining Details'
+    })
+
+
+# ✅ Download Individual Document
+@login_required
+def download_document(request, doc_id):
+    doc = get_object_or_404(JoiningDocument, id=doc_id)
+    file_path = doc.file.path
+
+    if os.path.exists(file_path):
+        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=os.path.basename(file_path))
+    else:
+        messages.error(request, "File not found.")
+        return redirect('joining_detail_list')
+
+# ✅ Delete a Document
+@login_required
+def delete_document(request, doc_id):
+    doc = get_object_or_404(JoiningDocument, id=doc_id)
+
+    if request.user.is_staff:  # Only admin or HR can delete
+        file_path = doc.file.path
+        doc.delete()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        messages.success(request, "Document deleted successfully.")
+    else:
+        messages.error(request, "Permission denied.")
+
+    return redirect('joining_detail_list')
+
+# ✅ Download all documents as a ZIP
+@login_required
+def download_all_documents(request, detail_id):
+    detail = get_object_or_404(JoiningDetail, id=detail_id)
+    docs = detail.joining_documents.all()
+
+    if not docs:
+        messages.warning(request, "No documents to download.")
+        return redirect('joining_detail_list')
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zip_file:
+        for doc in docs:
+            file_path = doc.file.path
+            zip_file.write(file_path, os.path.basename(file_path))
+
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/zip')
+    response['Content-Disposition'] = f'attachment; filename=documents_{detail.employee.employee_id}.zip'
+    return response
+
+
+@login_required
+def joining_detail_create(request):
+    if request.method == 'POST':
+        form = JoiningDetailForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Joining details added successfully!')
+            return redirect('joining_detail_list')
+    else:
+        form = JoiningDetailForm()
+    
+    return render(request, 'ems/joining_detail_form.html', {
+        'form': form,
+        'title': 'Add Joining Details'
+    })
+
+@login_required
+def resignation_list(request):
+    try:
+        employee = request.user.employee
+        my_resignations = Resignation.objects.filter(employee=employee)
+        
+        # Resignations pending approval (for managers)
+        if request.user.is_staff:
+            pending_resignations = Resignation.objects.filter(
+                approval_status='pending'
+            ).select_related('employee__user')
+        else:
+            pending_resignations = []
+    except Employee.DoesNotExist:
+        my_resignations = []
+        pending_resignations = []
+        messages.error(request, 'Employee profile not found!')
+    
+    return render(request, 'ems/resignation_list.html', {
+        'my_resignations': my_resignations,
+        'pending_resignations': pending_resignations,
+        'title': 'Resignations'
+    })
+
+@login_required
+def resignation_create(request):
+    try:
+        employee = request.user.employee
+    except Employee.DoesNotExist:
+        messages.error(request, 'Employee profile not found!')
+        return redirect('resignation_list')
+    
+    if request.method == 'POST':
+        form = ResignationForm(request.POST)
+        if form.is_valid():
+            resignation = form.save(commit=False)
+            resignation.employee = employee
+            resignation.save()
+            messages.success(request, 'Resignation submitted successfully!')
+            return redirect('resignation_list')
+    else:
+        form = ResignationForm(initial={'employee': employee})
+    
+    return render(request, 'ems/resignation_form.html', {
+        'form': form,
+        'title': 'Submit Resignation'
+    })
+
+@login_required
+def resignation_approve(request, pk):
+    resignation = get_object_or_404(Resignation, pk=pk)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action in ['approved', 'rejected']:
+            resignation.approval_status = action
+            resignation.approved_by = request.user.employee
+            resignation.save()
+            
+            # Update employee status if approved
+            if action == 'approved':
+                employee = resignation.employee
+                employee.employment_status = 'resigned'
+                employee.date_of_resignation = resignation.resignation_date
+                employee.is_active = False
+                employee.save()
+            
+            messages.success(request, f'Resignation {action} successfully!')
+    
+    return redirect('resignation_list')
+
+# ============================================================
+# 🔔 NOTIFICATION VIEWS
+# ============================================================
+
+@login_required
+def notification_list(request):
+    notifications = Notification.objects.filter(recipient=request.user).order_by('-created_at')
+    unread_count = notifications.filter(is_read=False).count()
+    
+    return render(request, 'ems/notification_list.html', {
+        'notifications': notifications,
+        'unread_count': unread_count,
+        'title': 'Notifications'
+    })
+
+@login_required
+def mark_notification_read(request, pk):
+    notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
+    notification.is_read = True
+    notification.save()
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True})
+    
+    return redirect('notification_list')
+
+@login_required
+def mark_all_notifications_read(request):
+    Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True})
+    
+    return redirect('notification_list')
+
+# ============================================================
+# 📊 DASHBOARD & REPORTS
+# ============================================================
+
+@login_required
+def ems_dashboard(request):
+    """EMS-specific dashboard"""
+    try:
+        employee = request.user.employee
+    except Employee.DoesNotExist:
+        return render(request, 'ems/ems_dashboard.html', {
+            'employee_exists': False,
+            'title': 'EMS Dashboard'
+        })
+    
+    # Employee stats
+    today = date.today()
+    current_month = today.month
+    current_year = today.year
+    
+    # Leave stats
+    leave_stats = LeaveApplication.objects.filter(
+        employee=employee,
+        start_date__year=current_year
+    ).values('status').annotate(count=Count('id'))
+    
+    # Attendance stats for current month
+    attendance_count = Attendance.objects.filter(
+        employee=employee,
+        timestamp__month=current_month,
+        timestamp__year=current_year,
+        attendance_type='check_in'
+    ).count()
+    
+    # Pending approvals (for managers)
+    pending_approvals = LeaveApplication.objects.filter(
+        approvals__approver=employee,
+        approvals__status='pending'
+    ).count()
+    
+    # Recent notifications
+    recent_notifications = Notification.objects.filter(
+        recipient=request.user
+    ).order_by('-created_at')[:5]
+    
+    # Department stats
+    department_stats = Department.objects.annotate(
+        employee_count=Count('employees')  # or 'employee_set' if no related_name
+    ).values('name', 'employee_count')
+
+    
+    # Payroll stats
+    recent_payroll = Payroll.objects.filter(
+        employee=employee
+    ).order_by('-month').first()
+    
+    return render(request, 'ems/ems_dashboard.html', {
+        'employee_exists': True,
+        'employee': employee,
+        'leave_stats': leave_stats,
+        'attendance_count': attendance_count,
+        'pending_approvals': pending_approvals,
+        'recent_notifications': recent_notifications,
+        'department_stats': department_stats,
+        'recent_payroll': recent_payroll,
+        'title': 'EMS Dashboard'
+    })
+
+
+
+
+def notify_user(user: User, message: str, link_path: str = ""):
+    # In-app notification
+    Notification.objects.create(
+        recipient=user,
+        message=message,
+        link=link_path or None
+    )
+    # Email (best-effort)
+    if getattr(settings, "EMAIL_HOST", None) and user.email:
+        try:
+            send_mail(
+                subject="EMS Notification",
+                message=message + (f"\n\nOpen: {link_path}" if link_path else ""),
+                from_email=getattr(settings,"avaneeshpathak900@gmail.com"),
+                recipient_list=[user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+
 
 

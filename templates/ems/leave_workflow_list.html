@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Leave Approval Workflow</h5>
+            {% if user.is_staff %}
+            <a href="{% url 'leave_workflow_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Workflow Stage
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+        {% if stages %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Level</th>
+                        <th>Role Name</th>
+                        <th>Next Level</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stage in stages %}
+                    <tr>
+                        <td>{{ stage.level }}</td>
+                        <td>{{ stage.role_name }}</td>
+                        <td>
+                            {% if stage.next_level %}
+                                Level {{ stage.next_level }}
+                            {% else %}
+                                <span class="text-muted">Final Level</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.is_staff %}
+                            <div class="btn-group">
+                                <a href="#" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'department_delete' stage.pk %}" class="btn btn-sm btn-outline-danger">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4">
+            <h6>Workflow Visualization:</h6>
+            <div class="d-flex align-items-center justify-content-center flex-wrap gap-3 mt-3">
+                {% for stage in stages %}
+                <div class="text-center">
+                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mx-auto" 
+                         style="width: 60px; height: 60px;">
+                        <strong>L{{ stage.level }}</strong>
+                    </div>
+                    <small class="d-block mt-1">{{ stage.role_name }}</small>
+                </div>
+                {% if not forloop.last %}
+                <div class="text-muted">
+                    <i class="fas fa-arrow-right fa-lg"></i>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-4">
+            <i class="fas fa-project-diagram fa-3x text-muted mb-3"></i>
+            <p class="text-muted">No workflow stages defined.</p>
+            {% if user.is_staff %}
+            <a href="{% url 'leave_workflow_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Create First Workflow Stage
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
