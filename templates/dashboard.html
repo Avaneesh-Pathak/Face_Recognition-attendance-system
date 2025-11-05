@@ -1026,194 +1026,171 @@ body {
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Data from Django context
-const REAL_DATA = {
+// Utility Functions
+function getCSRFToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// Chart Data Configuration
+const CHART_DATA = {
     attendance: {
-        labels: {{ attendance_labels_json|safe }},
-        values: {{ attendance_values_json|safe }}
+        labels: {{ attendance_labels_json|default:"[]"|safe }},
+        values: {{ attendance_values_json|default:"[]"|safe }}
     },
     departments: {
-        names: {{ department_names_json|safe }},
-        counts: {{ department_employee_counts_json|safe }}
-    },
-    leaves: {
-        labels: {{ leave_labels_json|safe }},
-        values: {{ leave_values_json|safe }}
+        names: {{ department_names_json|default:"[]"|safe }},
+        counts: {{ department_employee_counts_json|default:"[]"|safe }}
     }
 };
 
-document.addEventListener("DOMContentLoaded", function () {
-    // Initialize all charts with real data
-        // Global Chart Instances
-    let attendanceChartInstance = null;
-    let trendChartInstance = null;
-    initializeAttendanceChart();
-    {% if is_admin %}
-    initializeTrendChart();
-    initializeDepartmentChart();
-    {% endif %}
+// Chart Instances
+let attendanceChart = null;
+let trendChart = null;
+let departmentChart = null;
 
-    // Range selector functionality
-    document.querySelectorAll(".dropdown-item[data-range]").forEach(item => {
-        item.addEventListener("click", function (e) {
-            e.preventDefault();
-            const range = this.getAttribute("data-range");
-            const button = this.closest('.dropdown').querySelector('.dropdown-toggle');
-            button.innerHTML = `<i class="fas fa-calendar me-1"></i> Last ${range} Days`;
-            updateCharts(range);
-        });
-    });
-
-    // Hover effects
-    document.querySelectorAll(".stats-card, .status-card, .dashboard-card").forEach(card => {
-        card.addEventListener("mouseenter", () => {
-            if (!card.classList.contains('stats-card')) {
-                card.style.transform = "translateY(-5px)";
-            }
-        });
-        card.addEventListener("mouseleave", () => {
-            if (!card.classList.contains('stats-card')) {
-                card.style.transform = "translateY(0)";
-            }
-        });
-    });
-
-    // Auto-refresh for active employees
-    {% if current_status == 'Checked In' %}
-    setInterval(() => {
-        location.reload(); // Simple refresh for real-time updates
-    }, 30000);
-    {% endif %}
-});
-
+// Chart Initialization Functions
 function initializeAttendanceChart() {
     const ctx = document.getElementById('attendanceChart');
     if (!ctx) return;
-    
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: REAL_DATA.attendance.labels,
-            datasets: [{
-                label: 'Daily Check-ins',
-                data: REAL_DATA.attendance.values,
-                borderColor: '#667eea',
-                backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                tension: 0.4,
-                fill: true,
-                pointBackgroundColor: '#667eea',
-                pointBorderColor: '#ffffff',
-                pointBorderWidth: 2,
-                pointRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false
-                }
+
+    if (attendanceChart) {
+        attendanceChart.destroy();
+    }
+
+    try {
+        attendanceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: CHART_DATA.attendance.labels,
+                datasets: [{
+                    label: 'Daily Check-ins',
+                    data: CHART_DATA.attendance.values,
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#667eea',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointRadius: 4
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Number of Check-ins'
-                    }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: { mode: 'index', intersect: false }
                 },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Date'
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Check-ins' }
+                    },
+                    x: {
+                        title: { display: true, text: 'Date' }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Attendance Chart initialization failed:', error);
+        ctx.parentElement.innerHTML = '<div class="alert alert-danger">Chart loading failed. Please refresh.</div>';
+    }
 }
 
 function initializeTrendChart() {
     const ctx = document.getElementById('attendanceTrendChart');
     if (!ctx) return;
-    
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: REAL_DATA.attendance.labels,
-            datasets: [{
-                label: 'Daily Attendance',
-                data: REAL_DATA.attendance.values,
-                backgroundColor: 'rgba(102, 126, 234, 0.8)',
-                borderRadius: 6,
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                }
+
+    if (trendChart) {
+        trendChart.destroy();
+    }
+
+    try {
+        trendChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: CHART_DATA.attendance.labels,
+                datasets: [{
+                    label: 'Daily Attendance',
+                    data: CHART_DATA.attendance.values,
+                    backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                    borderRadius: 6
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Number of Records'
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Records' }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Trend Chart initialization failed:', error);
+        ctx.parentElement.innerHTML = '<div class="alert alert-danger">Chart loading failed. Please refresh.</div>';
+    }
 }
 
 function initializeDepartmentChart() {
     const ctx = document.getElementById('departmentChart');
     if (!ctx) return;
-    
-    // Generate colors based on number of departments
-    const colors = generateColors(REAL_DATA.departments.names.length);
-    
-    new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: REAL_DATA.departments.names,
-            datasets: [{
-                data: REAL_DATA.departments.counts,
-                backgroundColor: colors,
-                borderWidth: 2,
-                borderColor: '#ffffff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.raw || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = Math.round((value / total) * 100);
-                            return `${label}: ${value} employees (${percentage}%)`;
+
+    if (departmentChart) {
+        departmentChart.destroy();
+    }
+
+    try {
+        const colors = generateColors(CHART_DATA.departments.names.length);
+        
+        departmentChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: CHART_DATA.departments.names,
+                datasets: [{
+                    data: CHART_DATA.departments.counts,
+                    backgroundColor: colors,
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${context.label}: ${value} (${percentage}%)`;
+                            }
                         }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Department Chart initialization failed:', error);
+        ctx.parentElement.innerHTML = '<div class="alert alert-danger">Chart loading failed. Please refresh.</div>';
+    }
 }
 
 function generateColors(count) {
@@ -1221,74 +1198,142 @@ function generateColors(count) {
         '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe',
         '#43e97b', '#38f9d7', '#fa709a', '#fee140', '#a78bfa'
     ];
-    
-    const colors = [];
-    for (let i = 0; i < count; i++) {
-        colors.push(baseColors[i % baseColors.length]);
-    }
-    return colors;
+    return Array.from({length: count}, (_, i) => baseColors[i % baseColors.length]);
 }
 
-function updateCharts(range) {
-    // In a real application, you would fetch new data based on the range
-    console.log(`Updating charts for ${range} days`);
-    // This would typically involve API calls to get new data
-    // For now, we'll reload the page with the new range parameter
+// Notification Functions
+function handleNotifications() {
+    const markReadButtons = document.querySelectorAll(".mark-read-btn");
+    const markAllReadButton = document.getElementById("markAllRead");
+
+    markReadButtons.forEach(button => {
+        button.addEventListener("click", async function(e) {
+            e.preventDefault();
+            const id = this.dataset.id;
+            await markNotificationRead(id);
+        });
+    });
+
+    markAllReadButton?.addEventListener("click", async function(e) {
+        e.preventDefault();
+        await markAllNotificationsRead();
+    });
+}
+
+async function markNotificationRead(id) {
+    try {
+        const response = await fetch(`/notifications/mark-read/${id}/`, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": getCSRFToken(),
+                "Content-Type": "application/json"
+            },
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) throw new Error('Network response failed');
+        
+        const data = await response.json();
+        if (data.success) {
+            const notif = document.getElementById(`notif-${id}`);
+            notif?.classList.remove("unread");
+            notif?.querySelector(".mark-read-btn")?.remove();
+            updateNotificationCount();
+        }
+    } catch (error) {
+        console.error('Error marking notification as read:', error);
+    }
+}
+
+async function markAllNotificationsRead() {
+    try {
+        const response = await fetch('/notifications/mark-all-read/', {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": getCSRFToken(),
+                "Content-Type": "application/json"
+            },
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) throw new Error('Network response failed');
+        
+        const data = await response.json();
+        if (data.success) {
+            document.querySelectorAll(".notification-item.unread").forEach(item => {
+                item.classList.remove("unread");
+                item.querySelector(".mark-read-btn")?.remove();
+            });
+            updateNotificationCount();
+        }
+    } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+    }
+}
+
+function updateNotificationCount() {
+    const count = document.querySelectorAll(".notification-item.unread").length;
+    const countElement = document.getElementById("notifCount");
+    if (countElement) {
+        countElement.textContent = count;
+        countElement.style.display = count > 0 ? 'inline-block' : 'none';
+    }
+}
+
+// Event Listeners
+document.addEventListener("DOMContentLoaded", function() {
+    // Initialize Charts
+    initializeAttendanceChart();
+    if (document.getElementById('attendanceTrendChart')) {
+        initializeTrendChart();
+    }
+    if (document.getElementById('departmentChart')) {
+        initializeDepartmentChart();
+    }
+
+    // Handle Notifications
+    handleNotifications();
+
+    // Range Selector
+    document.querySelectorAll(".dropdown-item[data-range]").forEach(item => {
+        item.addEventListener("click", function(e) {
+            e.preventDefault();
+            const range = this.dataset.range;
+            const button = this.closest('.dropdown').querySelector('.dropdown-toggle');
+            button.innerHTML = `<i class="fas fa-calendar me-1"></i> Last ${range} Days`;
+            updateDateRange(range);
+        });
+    });
+
+    // Chart Resize Handler
+    window.addEventListener('resize', debounce(() => {
+        if (attendanceChart) attendanceChart.resize();
+        if (trendChart) trendChart.resize();
+        if (departmentChart) departmentChart.resize();
+    }, 250));
+
+    // Auto-refresh for active employees
+    if (document.querySelector('[data-status="checked-in"]')) {
+        const refreshInterval = setInterval(() => {
+            fetch('/check-status/')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.needsRefresh) location.reload();
+                })
+                .catch(console.error);
+        }, 30000);
+
+        // Cleanup on page unload
+        window.addEventListener('unload', () => clearInterval(refreshInterval));
+    }
+});
+
+// Date Range Update Function
+function updateDateRange(range) {
     const url = new URL(window.location.href);
     url.searchParams.set('range', range);
     window.location.href = url.toString();
 }
-
-document.addEventListener("DOMContentLoaded", function() {
-    // Mark Single Notification as Read
-    document.querySelectorAll(".mark-read-btn").forEach(button => {
-        button.addEventListener("click", function() {
-            let id = this.getAttribute("data-id");
-            fetch(`/notifications/mark-read/${id}/`, {
-                method: "POST",
-                headers: {
-                    "X-CSRFToken": "{{ csrf_token }}",
-                    "X-Requested-With": "XMLHttpRequest",
-                },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById(`notif-${id}`).classList.remove("unread");
-                    this.remove();
-                    updateNotifCount();
-                }
-            });
-        });
-    });
-
-    // Mark All as Read
-    document.getElementById("markAllRead").addEventListener("click", function() {
-        fetch(`/notifications/mark-all-read/`, {
-            method: "POST",
-            headers: {
-                "X-CSRFToken": "{{ csrf_token }}",
-                "X-Requested-With": "XMLHttpRequest",
-            },
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.querySelectorAll(".notification-item.unread").forEach(item => {
-                    item.classList.remove("unread");
-                    let btn = item.querySelector(".mark-read-btn");
-                    if (btn) btn.remove();
-                });
-                updateNotifCount();
-            }
-        });
-    });
-
-    function updateNotifCount() {
-        let unread = document.querySelectorAll(".notification-item.unread").length;
-        document.getElementById("notifCount").innerHTML = unread;
-    }
-});
 </script>
 
 {% endblock %}
