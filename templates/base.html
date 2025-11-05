@@ -536,13 +536,6 @@
                         </a>
                     </li>
                     
-                    <li class="nav-item">
-                        <a href="{% url 'ems_dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'ems_dashboard' %}active{% endif %}">
-                            <i class="fas fa-chart-line me-2"></i>
-                            EMS Dashboard
-                        </a>
-                    </li>
-                    
                     <!-- Employee Management -->
                     <li class="nav-section">
                         <small>Employee Management</small>
@@ -716,7 +709,7 @@
                     </div>
                 </div>
                 <div class="user-actions">
-                    <a href="#" class="btn btn-sm btn-outline-light" data-bs-toggle="tooltip" title="Profile">
+                    <a href="{% url 'my_profile' %}" class="btn btn-sm btn-outline-light" data-bs-toggle="tooltip" title="Profile">
                         <i class="fas fa-user"></i>
                         <span class="d-none d-md-inline">Profile</span>
                     </a>

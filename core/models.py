@@ -2,10 +2,11 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from dateutil.relativedelta import relativedelta
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from decimal import Decimal
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import calendar
 import json
 
@@ -15,12 +16,20 @@ import json
 # ============================================================
 
 class Employee(models.Model):
+    ROLE_CHOICES = [
+        ('Admin', 'Admin'),
+        ('HR', 'HR Manager'),
+        ('Finance', 'Accounts / Finance'),
+        ('Manager', 'Manager'),
+        ('Employee', 'Employee'),
+    ]
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     employee_id = models.CharField(max_length=20, unique=True)
     
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
     position = models.CharField(max_length=100)
     manager = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="subordinates")
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='Employee')  # ✅ NEW
     phone_number = models.CharField(max_length=15)
     date_of_joining = models.DateField(default=timezone.now)
     date_of_resignation = models.DateField(blank=True, null=True)
@@ -58,6 +67,15 @@ class Employee(models.Model):
             return arr
         return None
     
+    def get_reporting_chain(self):
+        """Return list of employees from CEO to this employee."""
+        chain = []
+        employee = self
+        while employee:
+            chain.append(employee)
+            employee = employee.manager  # move to senior
+        return chain[::-1]  # reverse to show from CEO to employee
+        
     def save(self, *args, **kwargs):
         if not self.employee_id:
             last_emp = Employee.objects.order_by('-id').first()
@@ -75,12 +93,22 @@ class Employee(models.Model):
 # ============================================================
 
 class Department(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    head = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, related_name='headed_departments')
+    DEPT_CHOICES = [
+        ('Management', 'Management / CEO Office'),
+        ('HR', 'Human Resources'),
+        ('Finance', 'Finance / Accounts'),
+        ('IT', 'IT / Technical'),
+        ('Operations', 'Operations'),
+        ('Sales', 'Sales & Marketing'),
+        ('Other', 'Other'),
+    ]
+    name = models.CharField(max_length=100, choices=DEPT_CHOICES, unique=True)
+    head = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='headed_departments')
     parent_department = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='sub_departments')
 
     def __str__(self):
-        return self.name
+        return self.get_name_display()
+
 
 
 # ============================================================
@@ -156,6 +184,8 @@ class PayrollManager(models.Manager):
         return True
 
 
+from dateutil.relativedelta import relativedelta
+
 class Payroll(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     month = models.DateField(help_text="First day of the salary month")
@@ -170,11 +200,33 @@ class Payroll(models.Model):
     )
     processed_at = models.DateTimeField(blank=True, null=True)
 
+    # ✅ NEW FIELDS:
+    paid_date = models.DateField(null=True, blank=True)  # actual pay date
+    next_pay_date = models.DateField(null=True, blank=True)  # salary due next month
+
     objects = PayrollManager()
 
-    def __str__(self):
-        return f"{self.employee} - {self.month.strftime('%B %Y')}"
+    def save(self, *args, **kwargs):
+        if isinstance(self.paid_date, str):  # ← Prevent string issue
+            self.paid_date = datetime.strptime(self.paid_date, "%Y-%m-%d").date()
 
+        if self.status == 'paid' and self.paid_date and not self.next_pay_date:
+            next_month = self.paid_date + relativedelta(months=1)
+            self.next_pay_date = next_month.replace(day=1)
+
+        super().save(*args, **kwargs)
+
+
+class PayrollSettings(models.Model):
+    professional_tax = models.DecimalField(max_digits=10, decimal_places=2, default=200.00)
+    esi_limit = models.DecimalField(max_digits=10, decimal_places=2, default=21000)  # if using ESI later
+
+    def __str__(self):
+        return "Payroll Settings"
+
+    class Meta:
+        verbose_name = "Payroll Setting"
+        verbose_name_plural = "Payroll Settings"
 
 # ============================================================
 # 📝 LEAVE MANAGEMENT
@@ -236,6 +288,12 @@ class LeaveApproval(models.Model):
     def __str__(self):
         return f"Approval L{self.level} - {self.leave.employee}"
 
+class Holiday(models.Model):
+    name = models.CharField(max_length=100)
+    date = models.DateField(unique=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.date})"
 
 # ============================================================
 # 📄 JOINING & RESIGNATION

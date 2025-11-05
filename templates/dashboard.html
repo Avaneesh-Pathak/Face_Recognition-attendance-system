@@ -25,7 +25,7 @@
     <!-- Admin Overview Section -->
     {% if is_admin %}
     <!-- Admin Employee Selector -->
-    <div class="card dashboard-card mb-4">
+    <div class="card dashboard-card glass-card mb-4">
         <div class="card-body py-3">
             <div class="row align-items-center">
                 <div class="col-md-8">
@@ -51,101 +51,172 @@
         </div>
     </div>
 
-    <!-- Admin Summary Cards (Light & Professional) -->
+    <!-- Admin Summary Cards (Futuristic) -->
     <div class="row mb-4">
         <!-- Total Employees -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-0 shadow-sm" style="background-color: #f8f9fa;">
-                <div class="card-body d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <p class="text-muted mb-1">Total Employees</p>
-                        <h3 class="mb-0 text-dark">{{ total_employees }}</h3>
-                        <small class="text-secondary">Active</small>
-                    </div>
-                    <div class="ms-3 text-primary">
-                        <i class="fas fa-users fa-lg"></i>
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-4">
+            <div class="stats-card gradient-1">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="card-text">Total Employees</p>
+                            <h3 class="card-title">{{ total_employees }}</h3>
+                            <span class="badge bg-light text-dark">Active</span>
+                        </div>
+                        <div class="icon-circle">
+                            <i class="fas fa-users"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Today's Records -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-0 shadow-sm" style="background-color: #f9f6ff;">
-                <div class="card-body d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <p class="text-muted mb-1">Today's Records</p>
-                        <h3 class="mb-0 text-dark">{{ today_attendance|length }}</h3>
-                        <small class="text-secondary">Today</small>
-                    </div>
-                    <div class="ms-3 text-info">
-                        <i class="fas fa-calendar-day fa-lg"></i>
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-4">
+            <div class="stats-card gradient-2">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="card-text">Today's Records</p>
+                            <h3 class="card-title">{{ today_attendance|length }}</h3>
+                            <span class="badge bg-light text-dark">Today</span>
+                        </div>
+                        <div class="icon-circle">
+                            <i class="fas fa-calendar-day"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Weekly Records -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-0 shadow-sm" style="background-color: #f4fbf9;">
-                <div class="card-body d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <p class="text-muted mb-1">Weekly Records</p>
-                        <h3 class="mb-0 text-dark">{{ week_attendance|length }}</h3>
-                        <small class="text-secondary">This Week</small>
-                    </div>
-                    <div class="ms-3 text-success">
-                        <i class="fas fa-calendar-week fa-lg"></i>
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-4">
+            <div class="stats-card gradient-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="card-text">Weekly Records</p>
+                            <h3 class="card-title">{{ week_attendance|length }}</h3>
+                            <span class="badge bg-light text-dark">This Week</span>
+                        </div>
+                        <div class="icon-circle">
+                            <i class="fas fa-calendar-week"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Monthly Records -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-0 shadow-sm" style="background-color: #fff9f4;">
-                <div class="card-body d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <p class="text-muted mb-1">Monthly Records</p>
-                        <h3 class="mb-0 text-dark">{{ month_attendance|length }}</h3>
-                        <small class="text-secondary">This Month</small>
-                    </div>
-                    <div class="ms-3 text-warning">
-                        <i class="fas fa-calendar-alt fa-lg"></i>
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-4">
+            <div class="stats-card gradient-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="card-text">Monthly Records</p>
+                            <h3 class="card-title">{{ month_attendance|length }}</h3>
+                            <span class="badge bg-light text-dark">This Month</span>
+                        </div>
+                        <div class="icon-circle">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Avg. Confidence -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-0 shadow-sm" style="background-color: #f4f8ff;">
-                <div class="card-body d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <p class="text-muted mb-1">Average Confidence</p>
-                        <h3 class="mb-0 text-dark">{{ avg_confidence }}%</h3>
-                        <div class="progress mt-2" style="height: 6px;">
-                            <div class="progress-bar 
-                                {% if avg_confidence >= 90 %}bg-success
-                                {% elif avg_confidence >= 70 %}bg-warning
-                                {% else %}bg-danger{% endif %}" 
-                                style="width: {{ avg_confidence }}%;">
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-4">
+            <div class="stats-card gradient-5">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="card-text">Avg. Confidence</p>
+                            <h3 class="card-title">{{ avg_confidence }}%</h3>
+                            <div class="confidence-bar">
+                                <div class="progress mt-2" style="height: 6px;">
+                                    <div class="progress-bar 
+                                        {% if avg_confidence >= 90 %}bg-success
+                                        {% elif avg_confidence >= 70 %}bg-warning
+                                        {% else %}bg-danger{% endif %}" 
+                                        style="width: {{ avg_confidence }}%;">
+                                    </div>
+                                </div>
                             </div>
                         </div>
+                        <div class="icon-circle">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
                     </div>
-                    <div class="ms-3 text-primary">
-                        <i class="fas fa-chart-line fa-lg"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Approvals -->
+        <div class="col-xl-2 col-md-4 col-sm-6 mb-4">
+            <div class="stats-card gradient-1">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="card-text">Pending Approvals</p>
+                            <h3 class="card-title">{{ pending_approvals|default:0 }}</h3>
+                            <span class="badge bg-light text-dark">Action Required</span>
+                        </div>
+                        <div class="icon-circle">
+                            <i class="fas fa-clock"></i>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-
-    <!-- Admin Quick Actions -->
+    <!-- Charts Section -->
     <div class="row mb-4">
-        <div class="col-12">
-            <div class="card dashboard-card">
+        <!-- Attendance Trend Chart -->
+        <div class="col-lg-8 mb-4">
+            <div class="card dashboard-card glass-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center border-bottom-0 pb-0">
+                    <div>
+                        <h5 class="card-title mb-1">Attendance Trend</h5>
+                        <p class="text-muted small mb-0">Last 30 days overview</p>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-calendar me-1"></i> Last 30 Days
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" data-range="7">Last 7 Days</a></li>
+                            <li><a class="dropdown-item" href="#" data-range="30">Last 30 Days</a></li>
+                            <li><a class="dropdown-item" href="#" data-range="90">Last 90 Days</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body pt-3">
+                    <canvas id="attendanceTrendChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Department Distribution -->
+        <div class="col-lg-4 mb-4">
+            <div class="card dashboard-card glass-card h-100">
+                <div class="card-header border-bottom-0 pb-0">
+                    <h5 class="card-title mb-1">Department Distribution</h5>
+                    <p class="text-muted small mb-0">Employee count by department</p>
+                </div>
+                <div class="card-body pt-3">
+                    <canvas id="departmentChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions & Recent Activity -->
+    <div class="row mb-4">
+        <!-- Quick Actions -->
+        <div class="col-lg-6 mb-4">
+            <div class="card dashboard-card glass-card h-100">
                 <div class="card-header bg-transparent border-bottom-0">
                     <h5 class="card-title mb-0 text-dark">
                         <i class="fas fa-bolt me-2 text-warning"></i>Quick Actions
@@ -153,7 +224,7 @@
                 </div>
                 <div class="card-body pt-0">
                     <div class="row g-3">
-                        <div class="col-xl-3 col-md-6">
+                        <div class="col-xl-6 col-md-6">
                             <div class="action-card">
                                 <a href="{% url 'reports' %}" class="action-link">
                                     <div class="action-icon bg-primary">
@@ -166,7 +237,7 @@
                                 </a>
                             </div>
                         </div>
-                        <div class="col-xl-3 col-md-6">
+                        <div class="col-xl-6 col-md-6">
                             <div class="action-card">
                                 <a href="{% url 'register' %}" class="action-link">
                                     <div class="action-icon bg-success">
@@ -179,7 +250,7 @@
                                 </a>
                             </div>
                         </div>
-                        <div class="col-xl-3 col-md-6">
+                        <div class="col-xl-6 col-md-6">
                             <div class="action-card">
                                 <a href="{% url 'attendance_history_all' %}" class="action-link">
                                     <div class="action-icon bg-info">
@@ -192,7 +263,7 @@
                                 </a>
                             </div>
                         </div>
-                        <div class="col-xl-3 col-md-6">
+                        <div class="col-xl-6 col-md-6">
                             <div class="action-card">
                                 <a href="{% url 'attendance_settings' %}" class="action-link">
                                     <div class="action-icon bg-warning">
@@ -209,101 +280,164 @@
                 </div>
             </div>
         </div>
+
+        <!-- Recent Notifications -->
+        <div class="col-lg-6 mb-4">
+            <div class="card dashboard-card glass-card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center border-bottom-0 pb-0">
+                    <div>
+                        <h5 class="card-title mb-1">Recent Notifications</h5>
+                        <p class="text-muted small mb-0">Latest system updates</p>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary me-2" id="markAllRead">Mark All Read</button>
+                        <span class="badge bg-primary rounded-pill" id="notifCount">{{ recent_notifications|length }}</span>
+                    </div>
+                </div>
+
+                <div class="card-body pt-3">
+                    {% if recent_notifications %}
+                    <div class="notification-list">
+                        {% for notification in recent_notifications %}
+                        <div class="notification-item {% if not notification.is_read %}unread{% endif %}" id="notif-{{ notification.id }}">
+                            <div class="notification-icon">
+                                <i class="fas fa-bell text-primary"></i>
+                            </div>
+                            <div class="notification-content">
+                                <p class="notification-text mb-1">{{ notification.message }}</p>
+                                <small class="text-muted">{{ notification.created_at|timesince }} ago</small>
+                            </div>
+                            {% if not notification.is_read %}
+                            <button class="btn btn-sm btn-link text-success mark-read-btn" data-id="{{ notification.id }}">
+                                Mark Read
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-bell-slash"></i>
+                        </div>
+                        <h5>No notifications</h5>
+                        <p class="text-muted">You're all caught up!</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
     </div>
     {% endif %}
 
     <!-- Employee Dashboard Section -->
     {% if not is_admin or request.GET.emp_id %}
-    <!-- Current Status & Quick Stats -->
-<div class="row mb-4">
-    <!-- Current Status Card -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <h6 class="text-muted mb-0">Current Status</h6>
-                    <span class="badge {% if current_status == 'Checked In' %}bg-success
-                        {% elif current_status == 'Checked Out' %}bg-secondary
-                        {% else %}bg-light text-dark{% endif %}">
-                        {{ current_status }}
-                    </span>
+    <!-- Current Status Cards -->
+    <div class="row mb-4">
+        <!-- Current Status -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="status-card status-{% if current_status == 'Checked In' %}active{% elif current_status == 'Checked Out' %}completed{% else %}pending{% endif %} h-100">
+                <div class="card-body">
+                    <div class="status-header">
+                        <div class="status-indicator"></div>
+                        <h6 class="text-muted mb-0">Current Status</h6>
+                    </div>
+                    <div class="status-value">{{ current_status }}</div>
+                    <div class="status-details">
+                        {% if last_checkin %}
+                            Last: {{ last_checkin.timestamp|time:"H:i A" }}
+                        {% else %}
+                            No activity today
+                        {% endif %}
+                    </div>
                 </div>
-                <p class="text-secondary small mb-0">
-                    {% if last_checkin %}
-                        Last: {{ last_checkin.timestamp|time:"H:i A" }}
-                    {% else %}
-                        No activity today
-                    {% endif %}
-                </p>
             </div>
         </div>
-    </div>
 
-    <!-- Today's Hours -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <h6 class="text-muted mb-2">Today's Hours</h6>
-                <h3 class="fw-semibold mb-2">{{ total_hours }}h</h3>
-                <span class="badge {% if current_status == 'Checked In' %}bg-info text-dark{% else %}bg-light text-dark{% endif %}">
-                    {% if current_status == 'Checked In' %}
-                        In Progress
-                    {% else %}
-                        Completed
-                    {% endif %}
-                </span>
+        <!-- Today's Hours -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="status-card status-{% if current_status == 'Checked In' %}active{% else %}completed{% endif %} h-100">
+                <div class="card-body">
+                    <div class="status-header">
+                        <div class="status-indicator"></div>
+                        <h6 class="text-muted mb-0">Today's Hours</h6>
+                    </div>
+                    <div class="status-value">{{ total_hours }}h</div>
+                    <div class="status-details">
+                        {% if current_status == 'Checked In' %}
+                            In Progress
+                        {% else %}
+                            Completed
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Average Confidence -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <h6 class="text-muted mb-2">Avg. Confidence</h6>
-                <h3 class="fw-semibold mb-2">{{ avg_confidence }}%</h3>
-                <div class="progress" style="height: 5px;">
-                    <div class="progress-bar
-                        {% if avg_confidence >= 90 %}bg-success
-                        {% elif avg_confidence >= 70 %}bg-warning
-                        {% else %}bg-danger{% endif %}"
-                        style="width: {{ avg_confidence }}%;">
+        <!-- Average Confidence -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="status-card status-{% if avg_confidence >= 90 %}active{% elif avg_confidence >= 70 %}pending{% else %}completed{% endif %} h-100">
+                <div class="card-body">
+                    <div class="status-header">
+                        <div class="status-indicator"></div>
+                        <h6 class="text-muted mb-0">Avg. Confidence</h6>
+                    </div>
+                    <div class="status-value">{{ avg_confidence }}%</div>
+                    <div class="status-details">
+                        <div class="progress" style="height: 5px;">
+                            <div class="progress-bar
+                                {% if avg_confidence >= 90 %}bg-success
+                                {% elif avg_confidence >= 70 %}bg-warning
+                                {% else %}bg-danger{% endif %}"
+                                style="width: {{ avg_confidence }}%;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leave Status -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="status-card status-pending h-100">
+                <div class="card-body">
+                    <div class="status-header">
+                        <div class="status-indicator"></div>
+                        <h6 class="text-muted mb-0">Leave Balance</h6>
+                    </div>
+                    <div class="status-value">
+                        {% if leave_stats %}
+                            {% for stat in leave_stats %}
+                                {% if stat.status == 'approved' %}
+                                    {{ stat.count }}
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                            0
+                        {% endif %}
+                    </div>
+                    <div class="status-details">
+                        Days available
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Total Records -->
-    <div class="col-xl-3 col-md-6 mb-4">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <h6 class="text-muted mb-2">Today's Records</h6>
-                <h3 class="fw-semibold mb-2">{{ today_attendance.count }}</h3>
-                <p class="text-secondary small mb-0">
-                    {% with checkins=today_attendance|filter_attendance_type:"check_in" %}
-                        {{ checkins.count }} check-ins
-                    {% endwith %}
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
-
 
     <!-- Charts and Analytics Section -->
     <div class="row mb-4">
         <!-- Attendance Chart -->
         <div class="col-lg-8 mb-4">
-            <div class="card dashboard-card h-100">
+            <div class="card dashboard-card glass-card h-100">
                 <div class="card-header d-flex justify-content-between align-items-center border-bottom-0 pb-0">
                     <div>
                         <h5 class="card-title mb-1">Attendance Overview</h5>
-                        <p class="text-muted small mb-0">Last 7 days performance</p>
+                        <p class="text-muted small mb-0">Last 30 days performance</p>
                     </div>
                     <div class="dropdown">
                         <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-calendar me-1"></i> Last 7 Days
+                            <i class="fas fa-calendar me-1"></i> Last 30 Days
                         </button>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="#" data-range="7">Last 7 Days</a></li>
@@ -312,56 +446,66 @@
                         </ul>
                     </div>
                 </div>
-
-                <div class="card-body pt-3 position-relative" style="height: 280px;">
-                    <canvas id="attendanceChart"></canvas>
-                    <div class="chart-placeholder position-absolute top-50 start-50 translate-middle text-center">
-                        <div class="spinner-border text-primary mb-3" role="status">
-                            <span class="visually-hidden">Loading chart...</span>
-                        </div>
-                        <p class="text-muted">Loading attendance data...</p>
-                    </div>
+                <div class="card-body pt-3">
+                    <canvas id="attendanceChart" height="280"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- Quick Actions & Stats -->
+        <!-- ✅ Card 1 - Quick Actions -->
         <div class="col-lg-4 mb-4">
-            <div class="card dashboard-card h-100">
+            <div class="card dashboard-card glass-card h-100">
                 <div class="card-header border-bottom-0 pb-0">
-                    <h5 class="card-title mb-1">Quick Actions</h5>
-                    <p class="text-muted small mb-0">Manage your attendance</p>
+                    <h5 class="card-title mb-1" style="font-weight:600;">
+                        <i class="fas fa-bolt text-warning me-2"></i>Quick Actions
+                    </h5>
+                    <p class="text-muted small mb-0">Manage your attendance efficiently</p>
                 </div>
+
                 <div class="card-body">
                     <div class="d-grid gap-3 mb-4">
-                        <a href="{% url 'attendance_page' %}" class="btn btn-primary btn-lg py-3">
+                        <a href="{% url 'attendance_page' %}" class="btn btn-primary btn-lg py-3 glass-btn" 
+                        style="border-radius:12px; font-weight:500; display:flex; align-items:center; justify-content:center;">
                             <i class="fas fa-camera me-2"></i>Mark Attendance
                         </a>
-                        <a href="{% url 'attendance_history_all' %}" class="btn btn-outline-primary py-3">
+                        <a href="{% url 'attendance_history_all' %}" class="btn btn-outline-light py-3 glass-btn" 
+                        style="border-radius:12px; font-weight:500; display:flex; align-items:center; justify-content:center;">
                             <i class="fas fa-history me-2"></i>View History
                         </a>
                     </div>
-                    
-                    <div class="stats-grid">
-                        <h6 class="section-title mb-3">Period Summary</h6>
-                        <div class="row g-2">
-                            <div class="col-4">
-                                <div class="stat-item">
-                                    <div class="stat-value text-primary" id="weeklyCount">{{ week_attendance.count }}</div>
-                                    <div class="stat-label">This Week</div>
+
+                    <!-- Period Summary -->
+                    <h6 class="section-title mb-3">
+                        <i class="fas fa-chart-line me-2 text-info"></i>Period Summary
+                    </h6>
+                    <div class="row g-3 text-center">
+                        <div class="col-4">
+                            <div class="stat-item">
+                                <i class="fas fa-calendar-week text-primary mb-1"></i>
+                                <div class="stat-value text-primary" style="font-weight:700;">
+                                    {{ week_attendance.count }}
                                 </div>
+                                <div class="stat-label small">Week</div>
                             </div>
-                            <div class="col-4">
-                                <div class="stat-item">
-                                    <div class="stat-value text-success" id="monthlyCount">{{ month_attendance.count }}</div>
-                                    <div class="stat-label">This Month</div>
+                        </div>
+
+                        <div class="col-4">
+                            <div class="stat-item">
+                                <i class="fas fa-calendar-alt text-success mb-1"></i>
+                                <div class="stat-value text-success" style="font-weight:700;">
+                                    {{ month_attendance.count }}
                                 </div>
+                                <div class="stat-label small">Month</div>
                             </div>
-                            <div class="col-4">
-                                <div class="stat-item">
-                                    <div class="stat-value text-info" id="yesterdayCount">-</div>
-                                    <div class="stat-label">Yesterday</div>
+                        </div>
+
+                        <div class="col-4">
+                            <div class="stat-item">
+                                <i class="fas fa-clock text-info mb-1"></i>
+                                <div class="stat-value text-info" style="font-weight:700;">
+                                    {% if yesterday_count %} {{ yesterday_count }} {% else %} 0 {% endif %}
                                 </div>
+                                <div class="stat-label small">Yesterday</div>
                             </div>
                         </div>
                     </div>
@@ -372,184 +516,172 @@
 
     <!-- Today's Activity & Profile -->
     <div class="row">
-        <!-- Today's Activity Timeline -->
-        <div class="col-lg-6 mb-4">
-            <div class="card dashboard-card h-100">
-                <div class="card-header d-flex justify-content-between align-items-center border-bottom-0 pb-0">
-                    <div>
-                        <h5 class="card-title mb-1">Today's Activity</h5>
-                        <p class="text-muted small mb-0">Your attendance timeline</p>
-                    </div>
-                    <span class="badge bg-primary rounded-pill">{{ today_attendance.count }} records</span>
+    <!-- ✅ Card 2 - Today's Activity -->
+    <div class="col-lg-6 mb-4">
+        <div class="card dashboard-card glass-card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center border-bottom-0 pb-0">
+                <div>
+                    <h5 class="card-title mb-1">Today's Activity</h5>
+                    <p class="text-muted small mb-0">Your attendance timeline</p>
                 </div>
+                <span class="badge bg-primary rounded-pill">{{ today_attendance.count }} records</span>
+            </div>
+
+            <div class="card-body pt-3">
+                {% if today_attendance %}
+                <div class="activity-timeline">
+                    {% for record in today_attendance %}
+                    <div class="activity-item">
+                        <div class="activity-header d-flex justify-content-between">
+                            <h6>{{ record.get_attendance_type_display }}</h6>
+                            <span class="text-muted">{{ record.timestamp|time:"h:i A" }}</span>
+                        </div>
+                        <div class="activity-details small">
+                            {% if record.confidence_score %}
+                            <span>{{ record.confidence_score|floatformat:1 }}% Confidence</span>
+                            {% endif %}
+                            {% if record.location %}
+                            <span class="ms-2">{{ record.location }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center">
+                    <i class="fas fa-inbox fa-2x mb-2"></i>
+                    <p class="text-muted">No activity yet today</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+        <!-- Employee Information -->
+        <div class="col-lg-6 mb-4">
+            <div class="card dashboard-card glass-card h-100">
+                <div class="card-header border-bottom-0 pb-0">
+                    <h5 class="card-title mb-1">Employee Profile</h5>
+                    <p class="text-muted small mb-0">Your information & stats</p>
+                </div>
+
                 <div class="card-body pt-3">
-                    {% if today_attendance %}
-                    <div class="activity-timeline">
-                        {% for record in today_attendance %}
-                        <div class="activity-item {% if record.attendance_type == 'check_in' %}check-in{% else %}check-out{% endif %}">
-                            <div class="activity-marker"></div>
-                            <div class="activity-content">
-                                <div class="activity-header">
-                                    <h6 class="activity-title">{{ record.get_attendance_type_display }}</h6>
-                                    <span class="activity-time">{{ record.timestamp|time:"H:i A" }}</span>
+                    <div class="profile-header mb-4">
+                        <div class="profile-avatar">
+                            <div class="avatar-circle">
+                                {{ employee.user.get_full_name|make_list|first|upper }}
+                            </div>
+                        </div>
+                        <div class="profile-info">
+                            <h4 class="profile-name">{{ employee.user.get_full_name }}</h4>
+                            <p class="profile-id text-muted">{{ employee.employee_id }}</p>
+                            <span class="department-badge">{{ employee.department }}</span>
+                        </div>
+                    </div>
+
+                    <div class="profile-stats mb-4">
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <div class="stat-box">
+                                    <div class="stat-number text-primary">{{ week_attendance.count }}</div>
+                                    <div class="stat-label">This Week</div>
                                 </div>
-                                <div class="activity-details">
-                                    {% if record.confidence_score %}
-                                    <span class="confidence-badge">{{ record.confidence_score|floatformat:1 }}% confidence</span>
-                                    {% endif %}
-                                    {% if record.location %}
-                                    <span class="location-badge">{{ record.location }}</span>
-                                    {% endif %}
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-box">
+                                    <div class="stat-number text-success">{{ month_attendance.count }}</div>
+                                    <div class="stat-label">This Month</div>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="stat-box">
+                                    <div class="stat-number text-info">
+                                        {% if recent_payroll %}
+                                            {{ recent_payroll.net_salary }}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </div>
+                                    <div class="stat-label">Last Salary</div>
                                 </div>
                             </div>
                         </div>
-                        {% endfor %}
                     </div>
-                    {% else %}
-                    <div class="empty-state">
-                        <div class="empty-icon">
-                            <i class="fas fa-inbox"></i>
-                        </div>
-                        <h5>No activity today</h5>
-                        <p class="text-muted">Your attendance records for today will appear here</p>
-                        <a href="{% url 'attendance_page' %}" class="btn btn-primary">
-                            <i class="fas fa-camera me-2"></i>Mark First Attendance
+
+                    <!-- Calendar Button -->
+                    <div class="text-center">
+                        <a href="{% url 'attendance_calendar' employee.id year month %}" 
+                           class="btn btn-outline-primary rounded-pill px-4">
+                            <i class="fas fa-calendar-alt me-2"></i>View Attendance Calendar
                         </a>
                     </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
-
-        <!-- Employee Information -->
-<div class="col-lg-6 mb-4">
-  <div class="card dashboard-card h-100">
-    <div class="card-header border-bottom-0 pb-0">
-      <h5 class="card-title mb-1">Employee Profile</h5>
-      <p class="text-muted small mb-0">Your information & stats</p>
-    </div>
-
-    <div class="card-body pt-3">
-      <div class="profile-header mb-4">
-        <div class="profile-avatar">
-          <div class="avatar-circle">
-            {{ employee.user.get_full_name|make_list|first|upper }}
-          </div>
-        </div>
-        <div class="profile-info">
-          <h4 class="profile-name">{{ employee.user.get_full_name }}</h4>
-          <p class="profile-id text-muted">{{ employee.employee_id }}</p>
-          <span class="department-badge">{{ employee.department }}</span>
-        </div>
-      </div>
-
-      <div class="profile-stats mb-4">
-        <div class="row text-center">
-          <div class="col-4">
-            <div class="stat-box">
-              <div class="stat-number text-primary">{{ week_attendance.count }}</div>
-              <div class="stat-label">This Week</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="stat-box">
-              <div class="stat-number text-success">{{ month_attendance.count }}</div>
-              <div class="stat-label">This Month</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="stat-box">
-              <div class="stat-number text-info">
-                {% if week_attendance.count > 0 %}
-                  {{ week_attendance.count }}
-                {% else %}
-                  0
-                {% endif %}
-              </div>
-              <div class="stat-label">Records</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 📅 Calendar Button -->
-      <div class="text-center">
-        <a href="{% url 'attendance_calendar' employee.id year month %}" 
-           class="btn btn-outline-primary rounded-pill px-4">
-          <i class="fas fa-calendar-alt me-2"></i>View Attendance Calendar
-        </a>
-      </div>
-    </div>
-  </div>
-</div>
-
     </div>
     {% endif %}
 </div>
 
-
 <style>
-    :root {
+:root {
     --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
     --info-gradient: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
     --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
     --purple-gradient: linear-gradient(135deg, #a78bfa 0%, #7e22ce 100%);
+    --glass-bg: rgba(255, 255, 255, 0.15);
+    --glass-border: rgba(255, 255, 255, 0.25);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
 }
 
-/* Card Styles */
-.dashboard-card {
-    border: none;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+/* Enhanced Background Colors */
+body {
+    background: linear-gradient(135deg, #f3f3f3 0%, #fcfcfc 100%);
+    min-height: 100vh;
+    color: #123778;
+}
+
+/* Improved Glass Morphism Effects */
+.glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    box-shadow: var(--glass-shadow);
+    background-color: rgba(255, 255, 255, 0.25);
+}
+
+.glass-btn {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
     transition: all 0.3s ease;
-    overflow: hidden;
 }
 
-.dashboard-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+.stat-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 }
-
-.stats-card {
-    border: none;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
-    overflow: hidden;
-    position: relative;
+.glass-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
     color: white;
 }
 
-.stats-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+/* Enhanced Stats Cards with Gradients */
+.stats-card {
+    border: none;
+    border-radius: 20px;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 }
-
-.card {
-    background: #fff;
-    border-radius: 10px;
-    transition: all 0.2s ease;
-}
-
-.card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
-}
-
-h6.text-muted {
-    font-size: 0.85rem;
-    letter-spacing: 0.3px;
-}
-
-h3 {
-    font-size: 1.6rem;
-}
-
-.progress-bar {
-    transition: width 0.4s ease;
-}
-
 
 .stats-card::before {
     content: '';
@@ -561,66 +693,41 @@ h3 {
     background: rgba(255, 255, 255, 0.5);
 }
 
-.stats-card.gradient-1 {
-    background: var(--primary-gradient);
+.stats-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
-.stats-card.gradient-2 {
-    background: var(--success-gradient);
-}
+.stats-card.gradient-1 { background: var(--primary-gradient); }
+.stats-card.gradient-2 { background: var(--success-gradient); }
+.stats-card.gradient-3 { background: var(--info-gradient); }
+.stats-card.gradient-4 { background: var(--warning-gradient); }
+.stats-card.gradient-5 { background: var(--purple-gradient); }
 
-.stats-card.gradient-3 {
-    background: var(--info-gradient);
-}
-
-.stats-card.gradient-4 {
-    background: var(--warning-gradient);
-}
-
-.stats-card.gradient-5 {
-    background: var(--purple-gradient);
-}
-
-.stats-card .card-text {
-    font-size: 0.875rem;
-    opacity: 0.9;
-    margin-bottom: 0.5rem;
-}
-
-.stats-card .card-title {
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 1rem;
-}
-
-.stats-card .badge {
-    background: rgba(255, 255, 255, 0.2) !important;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-/* Icon Circles */
+/* Enhanced Icon Circles */
 .icon-circle {
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.25);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.5rem;
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: white;
 }
 
-/* Status Cards */
+/* Enhanced Status Cards */
 .status-card {
     border: none;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border-radius: 20px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
     transition: all 0.3s ease;
     overflow: hidden;
     position: relative;
+    background: rgba(255, 255, 255, 0.9);
 }
 
 .status-card::before {
@@ -632,21 +739,29 @@ h3 {
     height: 100%;
 }
 
-.status-card.status-active::before {
-    background: #28a745;
+.notification-item.unread {
+    border-left: 4px solid #007bff;
+    background: rgba(255,255,255,0.15);
+}
+.notification-item {
+    position: relative;
+    background: rgba(255,255,255,0.1);
+}
+.mark-read-btn {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    font-size: 0.8rem;
 }
 
-.status-card.status-completed::before {
-    background: #17a2b8;
-}
-
-.status-card.status-pending::before {
-    background: #ffc107;
-}
+.status-card.status-active::before { background: #28a745; }
+.status-card.status-completed::before { background: #17a2b8; }
+.status-card.status-pending::before { background: #ffc107; }
 
 .status-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    transform: translateY(-5px);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.95);
 }
 
 .status-header {
@@ -681,6 +796,7 @@ h3 {
     font-size: 1.75rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
+    color: #2d3748;
 }
 
 .status-details {
@@ -688,256 +804,81 @@ h3 {
     color: #6c757d;
 }
 
-/* Action Cards */
-.action-card {
-    background: #f8f9fa;
-    border-radius: 12px;
-    padding: 1.5rem;
-    transition: all 0.3s ease;
-    border: 1px solid #e9ecef;
-    height: 100%;
-}
-
-.action-card:hover {
-    background: white;
-    transform: translateY(-3px);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-
-.action-link {
-    text-decoration: none;
-    color: inherit;
+/* Enhanced Notification Styles */
+.notification-item {
     display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-
-.action-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 1.25rem;
-    margin-bottom: 1rem;
-}
-
-.action-content h6 {
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-}
-
-.action-content p {
-    font-size: 0.875rem;
-    color: #6c757d;
-    margin-bottom: 0;
-}
-
-/* Activity Timeline */
-.activity-timeline {
-    position: relative;
-    padding-left: 2rem;
-}
-
-.activity-timeline::before {
-    content: '';
-    position: absolute;
-    left: 1rem;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: linear-gradient(to bottom, #667eea, #764ba2);
-}
-
-.activity-item {
-    position: relative;
-    margin-bottom: 1.5rem;
-}
-
-.activity-marker {
-    position: absolute;
-    left: -2rem;
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 50%;
-    border: 3px solid white;
-    z-index: 2;
-}
-
-.activity-item.check-in .activity-marker {
-    background: #28a745;
-    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.2);
-}
-
-.activity-item.check-out .activity-marker {
-    background: #17a2b8;
-    box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.2);
-}
-
-.activity-content {
-    background: #f8f9fa;
+    align-items: flex-start;
     padding: 1rem;
     border-radius: 12px;
-    border-left: 3px solid #667eea;
+    margin-bottom: 0.5rem;
+    background: rgba(255, 255, 255, 0.15);
     transition: all 0.2s ease;
 }
 
-.activity-content:hover {
-    background: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+.notification-item:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateX(5px);
 }
 
-.activity-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
+.notification-icon {
+    margin-right: 1rem;
+    font-size: 1.2rem;
 }
 
-.activity-title {
-    font-weight: 600;
-    margin-bottom: 0;
-    flex: 1;
-}
-
-.activity-time {
-    font-size: 0.875rem;
-    color: #6c757d;
-}
-
-.activity-details {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
-.confidence-badge, .location-badge {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 20px;
-    background: rgba(102, 126, 234, 0.1);
-    color: #667eea;
-    border: 1px solid rgba(102, 126, 234, 0.2);
-}
-
-/* Profile Styles */
-.profile-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 2rem;
-}
-
-.avatar-circle {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: var(--primary-gradient);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 2rem;
-    font-weight: 700;
-    margin-right: 1.5rem;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-}
-
-.profile-name {
-    font-weight: 700;
+.notification-text {
     margin-bottom: 0.25rem;
+    font-weight: 500;
+    color: #2d3748;
 }
 
-.profile-id {
-    margin-bottom: 0.5rem;
-}
-
-.department-badge {
-    background: rgba(102, 126, 234, 0.1);
-    color: #667eea;
-    padding: 0.25rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.875rem;
-    border: 1px solid rgba(102, 126, 234, 0.2);
-}
-
-/* Stats Grid */
-.stats-grid {
-    background: #f8f9fa;
-    padding: 1.5rem;
-    border-radius: 12px;
-}
-
-.section-title {
-    font-weight: 600;
-    color: #495057;
-}
-
-.stat-item {
-    text-align: center;
-    padding: 1rem;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    transition: all 0.2s ease;
-}
-
-.stat-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.stat-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin-bottom: 0.25rem;
-}
-
-.stat-label {
-    font-size: 0.875rem;
-    color: #6c757d;
-}
-
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: 3rem 2rem;
-}
-
-.empty-icon {
-    font-size: 4rem;
-    color: #dee2e6;
-    margin-bottom: 1rem;
-}
-
-.empty-state h5 {
-    color: #6c757d;
-    margin-bottom: 0.5rem;
-}
-
-/* Progress Bars */
+/* Enhanced Progress Bars */
 .confidence-bar .progress {
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.3);
+    height: 8px;
 }
 
 .confidence-bar .progress-bar {
     border-radius: 10px;
+    transition: width 0.6s ease;
 }
 
-/* Chart Placeholder */
-.chart-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: #6c757d;
+/* Enhanced Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-/* Responsive */
+.stats-card, .status-card, .dashboard-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+/* Stagger animation for cards */
+.stats-card:nth-child(1) { animation-delay: 0.1s; }
+.stats-card:nth-child(2) { animation-delay: 0.2s; }
+.stats-card:nth-child(3) { animation-delay: 0.3s; }
+.stats-card:nth-child(4) { animation-delay: 0.4s; }
+.stats-card:nth-child(5) { animation-delay: 0.5s; }
+.stats-card:nth-child(6) { animation-delay: 0.6s; }
+
+/* Enhanced Responsive Design */
 @media (max-width: 768px) {
+    .stats-card .card-title {
+        font-size: 1.5rem;
+    }
+    
+    .icon-circle {
+        width: 50px;
+        height: 50px;
+        font-size: 1.25rem;
+    }
+    
     .profile-header {
         flex-direction: column;
         text-align: center;
@@ -947,144 +888,406 @@ h3 {
         margin-right: 0;
         margin-bottom: 1rem;
     }
-    
-    .stats-card .card-title {
-        font-size: 1.5rem;
-    }
-    
-    .activity-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    
-    .activity-time {
-        margin-top: 0.25rem;
-    }
 }
 
-/* Animation for cards */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+/* Enhanced Chart Container */
+.card-body canvas {
+    border-radius: 12px;
 }
 
-.stats-card, .status-card, .dashboard-card {
-    animation: fadeInUp 0.5s ease-out;
+/* Enhanced Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
 }
 
-/* Stagger animation for cards */
-.stats-card:nth-child(1) { animation-delay: 0.1s; }
-.stats-card:nth-child(2) { animation-delay: 0.2s; }
-.stats-card:nth-child(3) { animation-delay: 0.3s; }
-.stats-card:nth-child(4) { animation-delay: 0.4s; }
+::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--primary-gradient);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a479c 100%);
+}
+
+/* Enhanced Glass Card Effects */
+.dashboard-card.glass-card {
+    background: rgb(255, 255, 255);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    box-shadow: 0 10px 35px rgba(0,0,0,0.25);
+}
+
+/* Enhanced Header separation */
+.dashboard-card .card-header {
+    background: rgb(244, 244, 244) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.2) !important;
+    border-radius: 20px 20px 0 0;
+}
+
+/* Enhanced Buttons */
+.glass-btn {
+    background: rgba(149, 161, 199, 0.2);
+    color: #0a1a93;
+    border: 1px solid rgb(11, 1, 1);
+    transition: all 0.3s ease;
+}
+.glass-btn:hover {
+    background: rgba(107, 89, 240, 0.96);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    color: white;
+}
+
+/* Enhanced Stats Items */
+.stat-item {
+    padding: 14px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 15px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+    transition: all 0.3s ease;
+}
+.stat-item:hover {
+    transform: translateY(-5px) scale(1.03);
+    background: rgba(255,255,255,0.35);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+/* Enhanced Activity Timeline */
+.activity-item {
+    background: rgba(224, 224, 224, 0.995);
+    padding: 12px;
+    border-radius: 15px;
+    box-shadow: inset 0 2px 5px rgba(9, 9, 9, 0.941), 0 2px 15px rgba(0,0,0,0.15);
+    margin-bottom: 12px;
+    transition: 0.3s;
+}
+.activity-item:hover {
+    transform: translateX(5px);
+    background: rgba(232, 231, 231, 0.91);
+}
+
+/* Enhanced Text Contrast */
+.card-title,
+.card-text,
+.profile-name,
+.profile-id,
+.department-badge,
+.stat-label,
+.stat-value,
+.section-title,
+.activity-header h6 {
+    color: #051f4b;
+}
+
+.text-muted {
+    color: #6c757d !important;
+}
+
+/* Enhanced Form Controls */
+.form-select {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #2d3748;
+}
+.form-select:focus {
+    background: rgba(215, 214, 214, 0.966);
+    border-color: rgba(8, 8, 8, 0.822);
+    color: #2d3748;
+    box-shadow: 0 0 0 0.2rem rgba(255,255,255,0.2);
+}
+
+/* Enhanced Dropdown */
+.dropdown-menu {
+    background: rgba(255,255,255,0.95);
+    border: 1px solid rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
+}
+.dropdown-item {
+    color: #2d3748;
+}
+.dropdown-item:hover {
+    background: rgba(102, 126, 234, 0.1);
+    color: #2d3748;
+}
+
+/* Enhanced Empty States */
+.empty-state h5,
+.empty-state p {
+    color: #2d3748;
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+// Data from Django context
+const REAL_DATA = {
+    attendance: {
+        labels: {{ attendance_labels_json|safe }},
+        values: {{ attendance_values_json|safe }}
+    },
+    departments: {
+        names: {{ department_names_json|safe }},
+        counts: {{ department_employee_counts_json|safe }}
+    },
+    leaves: {
+        labels: {{ leave_labels_json|safe }},
+        values: {{ leave_values_json|safe }}
+    }
+};
+
 document.addEventListener("DOMContentLoaded", function () {
-    const chartCanvas = document.getElementById("attendanceChart");
-    const placeholder = document.querySelector(".chart-placeholder");
-    let attendanceChart = null;
+    // Initialize all charts with real data
+        // Global Chart Instances
+    let attendanceChartInstance = null;
+    let trendChartInstance = null;
+    initializeAttendanceChart();
+    {% if is_admin %}
+    initializeTrendChart();
+    initializeDepartmentChart();
+    {% endif %}
 
-    // Detect employee ID (if applicable)
-    const empId = new URLSearchParams(window.location.search).get("emp_id");
-
-    // Default API URL
-    let apiUrl = "{% url 'attendance_summary_api' %}";
-    if (empId) {
-        apiUrl += `?emp_id=${empId}`;
-    }
-
-    // Load chart data from API
-    function loadAttendanceData(range = 7) {
-        placeholder.style.display = "flex";
-
-        fetch(`${apiUrl}&range=${range}`)
-            .then(response => response.json())
-            .then(data => {
-                placeholder.style.display = "none";
-                renderAttendanceChart(data);
-            })
-            .catch(error => {
-                console.error("Error loading attendance data:", error);
-                placeholder.innerHTML = `<p class="text-danger">Failed to load data.</p>`;
-            });
-    }
-
-    // Render chart using Chart.js
-    function renderAttendanceChart(data) {
-        if (!data.labels || !data.present || !data.absent) {
-            placeholder.innerHTML = `<p class="text-danger">Invalid chart data.</p>`;
-            return;
-        }
-
-        if (attendanceChart) attendanceChart.destroy();
-
-        attendanceChart = new Chart(chartCanvas, {
-            type: "bar",
-            data: {
-                labels: data.labels,
-                datasets: [
-                    {
-                        label: "Present",
-                        data: data.present,
-                        backgroundColor: "rgba(13, 110, 253, 0.7)",
-                        borderRadius: 6,
-                    },
-                    {
-                        label: "Absent",
-                        data: data.absent,
-                        backgroundColor: "rgba(220, 53, 69, 0.7)",
-                        borderRadius: 6,
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-                plugins: {
-                    legend: { position: "bottom" },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}`
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    // Handle range selection
+    // Range selector functionality
     document.querySelectorAll(".dropdown-item[data-range]").forEach(item => {
         item.addEventListener("click", function (e) {
             e.preventDefault();
             const range = this.getAttribute("data-range");
-            document.querySelector(".dropdown-toggle").innerHTML =
-                `<i class="fas fa-calendar me-1"></i> Last ${range} Days`;
-            loadAttendanceData(range);
+            const button = this.closest('.dropdown').querySelector('.dropdown-toggle');
+            button.innerHTML = `<i class="fas fa-calendar me-1"></i> Last ${range} Days`;
+            updateCharts(range);
         });
     });
 
-    // Hover effect for cards
+    // Hover effects
     document.querySelectorAll(".stats-card, .status-card, .dashboard-card").forEach(card => {
-        card.addEventListener("mouseenter", () => card.style.transform = "translateY(-5px)");
-        card.addEventListener("mouseleave", () => card.style.transform = "translateY(0)");
+        card.addEventListener("mouseenter", () => {
+            if (!card.classList.contains('stats-card')) {
+                card.style.transform = "translateY(-5px)";
+            }
+        });
+        card.addEventListener("mouseleave", () => {
+            if (!card.classList.contains('stats-card')) {
+                card.style.transform = "translateY(0)";
+            }
+        });
     });
 
-    // Load chart initially
-    loadAttendanceData();
-
-    // Auto-refresh for active employee
+    // Auto-refresh for active employees
     {% if current_status == 'Checked In' %}
-    setInterval(loadAttendanceData, 30000);
+    setInterval(() => {
+        location.reload(); // Simple refresh for real-time updates
+    }, 30000);
     {% endif %}
+});
+
+function initializeAttendanceChart() {
+    const ctx = document.getElementById('attendanceChart');
+    if (!ctx) return;
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: REAL_DATA.attendance.labels,
+            datasets: [{
+                label: 'Daily Check-ins',
+                data: REAL_DATA.attendance.values,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: '#667eea',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Check-ins'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function initializeTrendChart() {
+    const ctx = document.getElementById('attendanceTrendChart');
+    if (!ctx) return;
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: REAL_DATA.attendance.labels,
+            datasets: [{
+                label: 'Daily Attendance',
+                data: REAL_DATA.attendance.values,
+                backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                borderRadius: 6,
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Records'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function initializeDepartmentChart() {
+    const ctx = document.getElementById('departmentChart');
+    if (!ctx) return;
+    
+    // Generate colors based on number of departments
+    const colors = generateColors(REAL_DATA.departments.names.length);
+    
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: REAL_DATA.departments.names,
+            datasets: [{
+                data: REAL_DATA.departments.counts,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} employees (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function generateColors(count) {
+    const baseColors = [
+        '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe',
+        '#43e97b', '#38f9d7', '#fa709a', '#fee140', '#a78bfa'
+    ];
+    
+    const colors = [];
+    for (let i = 0; i < count; i++) {
+        colors.push(baseColors[i % baseColors.length]);
+    }
+    return colors;
+}
+
+function updateCharts(range) {
+    // In a real application, you would fetch new data based on the range
+    console.log(`Updating charts for ${range} days`);
+    // This would typically involve API calls to get new data
+    // For now, we'll reload the page with the new range parameter
+    const url = new URL(window.location.href);
+    url.searchParams.set('range', range);
+    window.location.href = url.toString();
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    // Mark Single Notification as Read
+    document.querySelectorAll(".mark-read-btn").forEach(button => {
+        button.addEventListener("click", function() {
+            let id = this.getAttribute("data-id");
+            fetch(`/notifications/mark-read/${id}/`, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": "{{ csrf_token }}",
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById(`notif-${id}`).classList.remove("unread");
+                    this.remove();
+                    updateNotifCount();
+                }
+            });
+        });
+    });
+
+    // Mark All as Read
+    document.getElementById("markAllRead").addEventListener("click", function() {
+        fetch(`/notifications/mark-all-read/`, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": "{{ csrf_token }}",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.querySelectorAll(".notification-item.unread").forEach(item => {
+                    item.classList.remove("unread");
+                    let btn = item.querySelector(".mark-read-btn");
+                    if (btn) btn.remove();
+                });
+                updateNotifCount();
+            }
+        });
+    });
+
+    function updateNotifCount() {
+        let unread = document.querySelectorAll(".notification-item.unread").length;
+        document.getElementById("notifCount").innerHTML = unread;
+    }
 });
 </script>
 

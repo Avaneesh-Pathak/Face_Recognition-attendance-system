@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center bg-light">
+      <div>
+        <h5 class="mb-1">Salary History</h5>
+        <p class="mb-0 text-muted small">{{ employee.user.get_full_name }} ({{ employee.employee_id }})</p>
+      </div>
+      <div>
+        <a href="{% url 'payroll_list' %}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Back to Payroll
+        </a>
+      </div>
+    </div>
+    
+    <div class="card-body">
+      <!-- Summary Cards -->
+      <div class="row mb-4">
+        <div class="col-md-3 col-sm-6 mb-3">
+          <div class="card border-primary">
+            <div class="card-body p-3">
+              <h6 class="card-title text-muted small">Total Basic</h6>
+              <h4 class="mb-0 text-primary">{{ totals.total_basic|default:0 }}</h4>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+          <div class="card border-success">
+            <div class="card-body p-3">
+              <h6 class="card-title text-muted small">Total Allowances</h6>
+              <h4 class="mb-0 text-success">{{ totals.total_allowances|default:0 }}</h4>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+          <div class="card border-danger">
+            <div class="card-body p-3">
+              <h6 class="card-title text-muted small">Total Deductions</h6>
+              <h4 class="mb-0 text-danger">{{ totals.total_deductions|default:0 }}</h4>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-3">
+          <div class="card border-dark">
+            <div class="card-body p-3">
+              <h6 class="card-title text-muted small">Total Net Salary</h6>
+              <h4 class="mb-0 text-dark">{{ totals.total_net|default:0 }}</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters and Actions -->
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <span class="badge bg-light text-dark">{{ payrolls|length }} record{{ payrolls|length|pluralize }}</span>
+        </div>
+        <div class="d-flex gap-2">
+          <select class="form-select form-select-sm" id="statusFilter">
+            <option value="">All Statuses</option>
+            <option value="paid">Paid</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+          </select>
+          <button class="btn btn-sm btn-outline-primary" id="exportBtn">
+            <i class="bi bi-download me-1"></i>Export
+          </button>
+        </div>
+      </div>
+
+      <!-- Payroll Table -->
+      <div class="table-responsive">
+        <table class="table table-hover align-middle" id="payrollTable">
+          <thead class="table-light">
+            <tr>
+              <th>Month</th>
+              <th>Basic</th>
+              <th>Allowances</th>
+              <th>Deductions</th>
+              <th>Net</th>
+              <th>Status</th>
+              <th>Paid Date</th>
+              <th>Next Pay</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in payrolls %}
+            <tr data-status="{{ p.status|lower }}">
+              <td>
+                <div class="fw-bold">{{ p.month|date:"F Y" }}</div>
+                <small class="text-muted">{{ p.month|date:"M Y" }}</small>
+              </td>
+              <td>{{ p.basic_pay }}</td>
+              <td>
+                <span class="text-success">{{ p.allowances }}</span>
+                {% if p.allowance_details %}
+                <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" 
+                   title="{{ p.allowance_details }}"></i>
+                {% endif %}
+              </td>
+              <td>
+                <span class="text-danger">{{ p.deductions }}</span>
+                {% if p.deduction_details %}
+                <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" 
+                   title="{{ p.deduction_details }}"></i>
+                {% endif %}
+              </td>
+              <td>
+                <strong class="text-dark">{{ p.net_salary }}</strong>
+              </td>
+              <td>
+                {% if p.status == 'paid' %}
+                  <span class="badge bg-success">{{ p.status|title }}</span>
+                {% elif p.status == 'pending' %}
+                  <span class="badge bg-warning text-dark">{{ p.status|title }}</span>
+                {% elif p.status == 'processing' %}
+                  <span class="badge bg-info">{{ p.status|title }}</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ p.status|title }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if p.paid_date %}
+                  <span class="text-success">{{ p.paid_date|date:"M d, Y" }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if p.next_pay_date %}
+                  <span class="text-primary">{{ p.next_pay_date|date:"M d, Y" }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <a class="btn btn-outline-primary" href="{% url 'payroll_slip_pdf' p.pk %}" title="Download PDF">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                  </a>
+                  <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" 
+                          data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                  </button>
+                  <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{% url 'payroll_slip_pdf' p.pk %}">
+                      <i class="bi bi-file-earmark-pdf me-2"></i>Download PDF
+                    </a></li>
+                    <li><a class="dropdown-item" href="#">
+                      <i class="bi bi-eye me-2"></i>View Details
+                    </a></li>
+                    {% if p.status != 'paid' %}
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-warning" href="#">
+                      <i class="bi bi-pencil me-2"></i>Edit
+                    </a></li>
+                    {% endif %}
+                  </ul>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9" class="text-center py-4">
+                <div class="text-muted">
+                  <i class="bi bi-file-text display-4 d-block mb-2"></i>
+                  <p class="mb-0">No payroll records found.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      {% if payrolls.has_other_pages %}
+      <nav aria-label="Payroll pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+          {% if payrolls.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ payrolls.previous_page_number }}">Previous</a>
+          </li>
+          {% else %}
+          <li class="page-item disabled">
+            <span class="page-link">Previous</span>
+          </li>
+          {% endif %}
+          
+          {% for i in payrolls.paginator.page_range %}
+            {% if payrolls.number == i %}
+            <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+            {% else %}
+            <li class="page-item"><a class="page-link" href="?page={{ i }}">{{ i }}</a></li>
+            {% endif %}
+          {% endfor %}
+          
+          {% if payrolls.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ payrolls.next_page_number }}">Next</a>
+          </li>
+          {% else %}
+          <li class="page-item disabled">
+            <span class="page-link">Next</span>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<style>
+  .card-header {
+    border-bottom: 1px solid rgba(0,0,0,.125);
+  }
+  .table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6c757d;
+  }
+  .badge {
+    font-size: 0.7rem;
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Status filter functionality
+    const statusFilter = document.getElementById('statusFilter');
+    const payrollTable = document.getElementById('payrollTable');
+    const rows = payrollTable.querySelectorAll('tbody tr');
+    
+    if (statusFilter) {
+      statusFilter.addEventListener('change', function() {
+        const filterValue = this.value.toLowerCase();
+        
+        rows.forEach(row => {
+          if (filterValue === '' || row.getAttribute('data-status') === filterValue) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      });
+    }
+    
+    // Export functionality
+    const exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', function() {
+        // This would typically make an API call to generate an export
+        alert('Export functionality would be implemented here');
+      });
+    }
+  });
+</script>
+{% endblock %}

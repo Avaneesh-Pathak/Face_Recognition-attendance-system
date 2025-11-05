@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+  <div class="card shadow-sm">
+    <div class="card-header">
+      <h5 class="mb-0">Monthly Salary Expense (Last 12 months)</h5>
+    </div>
+    <div class="card-body">
+      <canvas id="expenseChart" height="110"></canvas>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(async () => {
+  const res = await fetch("{% url 'payroll_expense_api' %}");
+  const data = await res.json();
+  const ctx = document.getElementById('expenseChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: [{
+        label: 'Total Net Salary',
+        data: data.totals,
+        borderWidth: 2,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: true } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+})();
+</script>
+{% endblock %}

@@ -17,7 +17,11 @@ from PIL import Image
 from django.utils import timezone
 from datetime import datetime, date
 import calendar
+from django.db.models import Prefetch
+from django.http import JsonResponse, Http404
+from django.urls import reverse
 from decimal import Decimal
+from django.db.models.functions import TruncDate
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth import login, authenticate
@@ -34,17 +38,23 @@ from django.db.models import Q, Sum, Count, Avg
 from django.db.models import Sum, F, ExpressionWrapper, fields
 from datetime import date
 from django.core.mail import send_mail
+from core.utils.salary_slip import generate_salary_slip
 from django.conf import settings
 from django.urls import reverse
 from dateutil.relativedelta import relativedelta 
 from django.contrib.auth.models import User
+from .decorators import finance_required, hr_required, admin_required
+from .utils_pdf import build_salary_slip_pdf
+from django.core.mail import EmailMessage
+from django.http import FileResponse
+from io import BytesIO
 from .models import (Employee, Attendance, AttendanceSettings, DailyReport,Department, SalaryStructure, Payroll, LeaveType, 
     LeaveApplication, LeaveWorkflowStage, LeaveApproval,
     JoiningDetail, Resignation, Notification,JoiningDocument)
 
 from .forms import ( UserRegistrationForm, EmployeeRegistrationForm, AttendanceSettingsForm,DepartmentForm, SalaryStructureForm, PayrollFilterForm,
     LeaveTypeForm, LeaveApplicationForm, LeaveApprovalForm, LeaveWorkflowStageForm,
-    JoiningDetailForm, ResignationForm, NotificationForm
+    JoiningDetailForm, ResignationForm, NotificationForm,PayrollFilterForm
     )
 from .face_system import get_face_system
 from core.face_recognition_utils import get_face_embedding
@@ -95,6 +105,7 @@ def register(request):
                 position=form.cleaned_data['position'],
                 manager=form.cleaned_data['manager'],
                 phone_number=form.cleaned_data['phone_number'],
+                role=form.cleaned_data['role'],
             )
 
             # ------------------ 3. Handle Face Image Upload -----
@@ -188,7 +199,6 @@ def register(request):
         'reg_success': reg_success,
     })
 
-
 # --- Real-time AJAX validators ---
 def check_username(request):
     username = request.GET.get('username', '').strip()
@@ -210,38 +220,62 @@ def dashboard(request):
     user = request.user
     is_admin = user.is_staff or user.is_superuser
 
+    # Common date values
     today = timezone.localdate()
     start_week = today - timedelta(days=today.weekday())
     start_month = today.replace(day=1)
+    current_month = today.month
+    current_year = today.year
 
-    employees = Employee.objects.all() if is_admin else None
+    # Detect employee object for the logged-in user (if exists)
+    try:
+        employee = request.user.employee
+        employee_exists = True
+    except Exception:
+        employee = None
+        employee_exists = False
 
+    # Admin selection (per-employee selector)
+    employees = Employee.objects.all().select_related('user') if is_admin else None
     emp_id = request.GET.get('emp_id')
+
+    # Attendance queryset scope
     if is_admin:
         if emp_id:
-            employee = Employee.objects.filter(id=emp_id).first()
-            attendance_qs = Attendance.objects.filter(employee=employee)
+            selected_employee = Employee.objects.filter(id=emp_id).first()
+            # For charts & lists, use selected employee's attendance
+            attendance_qs = Attendance.objects.filter(employee=selected_employee)
+            # Also set "employee" for EMS sections if selected (optional)
+            employee = selected_employee
         else:
-            employee = None
+            selected_employee = None
             attendance_qs = Attendance.objects.all()
     else:
-        employee = Employee.objects.filter(user=user).first()
+        selected_employee = None
         attendance_qs = Attendance.objects.filter(employee=employee)
 
+    # Attendance lists
     today_records = attendance_qs.filter(timestamp__date=today).order_by('timestamp')
     week_records = attendance_qs.filter(timestamp__date__gte=start_week)
     month_records = attendance_qs.filter(timestamp__date__gte=start_month)
 
+    # Aggregates
     avg_confidence = attendance_qs.aggregate(avg=Avg('confidence_score'))['avg'] or 0
     total_employees = Employee.objects.count()
 
+    # Employee status (if we have a concrete employee context)
     current_status = None
     total_hours = 0
     last_checkin = None
+    if (is_admin and selected_employee) or (not is_admin and employee):
+        concrete_emp = selected_employee if selected_employee else employee
+        # Filter for today for that employee
+        _emp_today = Attendance.objects.filter(
+            employee=concrete_emp, timestamp__date=today
+        ).order_by('timestamp')
 
-    if employee:
-        last_checkin = today_records.filter(attendance_type='check_in').last()
-        last_checkout = today_records.filter(attendance_type='check_out').last()
+        last_checkin = _emp_today.filter(attendance_type='check_in').last()
+        last_checkout = _emp_today.filter(attendance_type='check_out').last()
 
         if last_checkin and (not last_checkout or last_checkout.timestamp < last_checkin.timestamp):
             current_status = 'Checked In'
@@ -250,18 +284,120 @@ def dashboard(request):
         else:
             current_status = 'Not Checked In'
 
-        checkins = today_records.filter(attendance_type='check_in')
-        checkouts = today_records.filter(attendance_type='check_out')
+        # Calculate hours
+        checkins = _emp_today.filter(attendance_type='check_in')
+        checkouts = _emp_today.filter(attendance_type='check_out')
         for ci in checkins:
             co = checkouts.filter(timestamp__gt=ci.timestamp).first()
             if co:
                 total_hours += (co.timestamp - ci.timestamp).total_seconds() / 3600
 
-    now = timezone.now()
+    # =========================
+    # EMS blocks (per-employee)
+    # =========================
+    leave_stats = None
+    pending_approvals = 0
+    recent_notifications = None
+    recent_payroll = None
+
+    # Decide which employee to show EMS panels for:
+    ems_emp = selected_employee if selected_employee else employee
+
+    if ems_emp:
+        # Leave stats for current year (status buckets)
+        leave_stats = (
+            LeaveApplication.objects
+            .filter(employee=ems_emp, start_date__year=current_year)
+            .values('status').annotate(count=Count('id'))
+        )
+
+        # Pending approvals for this employee (if they are approver/manager)
+        pending_approvals = (
+            LeaveApplication.objects
+            .filter(approvals__approver=ems_emp, approvals__status='pending')
+            .count()
+        )
+
+        # Recent notifications to the logged-in user
+        recent_notifications = (
+            Notification.objects
+            .filter(recipient=user)
+            .order_by('-created_at')[:5]
+        )
+
+        # Latest payroll for this employee
+        recent_payroll = (
+            Payroll.objects
+            .filter(employee=ems_emp)
+            .order_by('-month').first()
+        )
+
+    # =========================
+    # Department stats (admin)
+    # =========================
+    department_stats = Department.objects.annotate(
+        # If you don't have related_name="employees", use Count('employee') or Count('employee_set')
+        employee_count=Count('employees')
+    ).values('name', 'employee_count')
+
+    # Build department chart arrays
+    department_names = []
+    department_employee_counts = []
+    if is_admin and department_stats:
+        for d in department_stats:
+            department_names.append(d['name'])
+            department_employee_counts.append(d['employee_count'])
+
+    # =========================
+    # Charts (using available data)
+    # =========================
+
+    # 30-day attendance (count of check-ins per day) using the current attendance_qs scope
+    start_30 = today - timedelta(days=29)
+    att_30 = (
+        attendance_qs
+        .filter(timestamp__date__gte=start_30, attendance_type='check_in')
+        .annotate(day=TruncDate('timestamp'))
+        .values('day')
+        .annotate(count=Count('id'))
+    )
+    att_counts = {item['day']: item['count'] for item in att_30}
+    date_range = [start_30 + timedelta(days=i) for i in range(30)]
+    attendance_labels = [d.strftime('%d %b') for d in date_range]
+    attendance_values = [att_counts.get(d, 0) for d in date_range]
+
+    # Leave donut chart arrays
+    leave_labels, leave_values = [], []
+    if leave_stats:
+        status_order = ['approved', 'pending', 'rejected', 'cancelled']
+        by_status = {row['status'].lower(): row['count'] for row in leave_stats}
+        for st in status_order:
+            if st in by_status:
+                leave_labels.append(st.capitalize())
+                leave_values.append(by_status[st])
+        for row in leave_stats:
+            k = row['status'].capitalize()
+            if k not in leave_labels:
+                leave_labels.append(k)
+                leave_values.append(row['count'])
+
+    payroll_history = None
+    leave_applications = None
+    if ems_emp:
+        payroll_history = (
+        Payroll.objects.filter(employee=ems_emp).order_by('-month')[1:7]
+        )
+        leave_applications = (
+        LeaveApplication.objects.filter(employee=ems_emp).order_by('-start_date')[:10]
+        )
+    
+    # JSON dumps for template
     context = {
         'is_admin': is_admin,
         'employees': employees,
-        'employee': employee,
+        'employee': ems_emp,
+        'employee_exists': ems_emp is not None,
+
         'today_attendance': today_records,
         'week_attendance': week_records,
         'month_attendance': month_records,
@@ -271,12 +407,34 @@ def dashboard(request):
         'total_hours': round(total_hours, 2),
         'total_employees': total_employees,
         'selected_emp_id': int(emp_id) if emp_id else None,
-        'year': now.year,
-        'month': now.month,
+
+        'leave_stats': leave_stats,
+        'pending_approvals': pending_approvals,
+        'recent_notifications': recent_notifications,
+        'department_stats': department_stats,
+        'recent_payroll': recent_payroll,
+
+        'year': today.year,
+        'month': today.month,
+        'title': 'Dashboard',
+
+        # charts
+        'attendance_labels_json': json.dumps(attendance_labels),
+        'attendance_values_json': json.dumps(attendance_values),
+        'leave_labels_json': json.dumps(leave_labels),
+        'leave_values_json': json.dumps(leave_values),
+        'department_names_json': json.dumps(department_names),
+        'department_employee_counts_json': json.dumps(department_employee_counts),
+        'payroll_history': payroll_history,
+        'leave_applications': leave_applications,
     }
 
     return render(request, 'dashboard.html', context)
 
+
+def my_profile_view(request):
+    employee = request.user.employee  # assuming employee is linked to user
+    return render(request, 'ems/my_profile.html', {'employee': employee})
 
 @login_required
 def attendance_summary_api(request):
@@ -962,10 +1120,122 @@ def attendance_day_detail(request, emp_id, date):
 
 
 
-
 # ============================================================
 # 🏢 ORGANISATION STRUCTURE VIEWS
 # ============================================================
+
+@login_required
+def org_chart_view(request, employee_id=None):
+    # Use logged-in employee if no ID passed
+    if employee_id:
+        employee = get_object_or_404(Employee, employee_id=employee_id)
+    else:
+        employee = request.user.employee
+
+    reporting_chain = employee.get_reporting_chain()
+
+    return render(request, 'ems/org_chart.html', {'reporting_chain': reporting_chain})
+
+# -------- Helpers --------
+def build_path_to_root(emp):
+    """CEO -> ... -> emp (list of dicts)."""
+    path = []
+    visited = set()
+    cur = emp
+    while cur and cur.id not in visited:
+        visited.add(cur.id)
+        path.append(cur)
+        cur = cur.manager
+    # reverse for CEO->...->emp
+    return list(reversed(path))
+
+def employee_to_dict(emp):
+    return {
+        "id": emp.id,
+        "employee_id": emp.employee_id,
+        "name": emp.user.get_full_name() if emp and emp.user else "",
+        "position": emp.position or "",
+        "department": emp.department.name if emp and emp.department else "",
+        "image": (emp.face_image.url if emp.face_image else None),
+        "profile_url": reverse('employee_detail', args=[emp.employee_id]),  # <- add this if available
+    }
+
+def build_subtree(emp, visited=None, max_depth=10, depth=0):
+    """
+    Build full subordinate tree for 'emp' up to max_depth to avoid infinite loops.
+    """
+    if visited is None:
+        visited = set()
+    if not emp or emp.id in visited or depth > max_depth:
+        return None
+    visited.add(emp.id)
+    node = employee_to_dict(emp)
+    # children
+    children = []
+    # Prefetch is usually handled outside; keeping simple here
+    for child in emp.subordinates.all().order_by('position', 'user__first_name'):
+        if child.id not in visited:
+            sub = build_subtree(child, visited, max_depth, depth+1)
+            if sub:
+                children.append(sub)
+    node["children"] = children
+    return node
+
+# -------- Page view --------
+@login_required
+def org_chart_page(request):
+    """
+    Renders the page; data comes via AJAX from /api/org-tree/
+    """
+    return render(request, 'ems/org_chart.html')
+
+# -------- APIs --------
+@login_required
+def org_tree_api_me(request):
+    """
+    Returns JSON with:
+      - path: CEO -> ... -> you
+      - team: you -> all subordinates
+    """
+    try:
+        emp = request.user.employee
+    except Employee.DoesNotExist:
+        raise Http404("No employee bound to the current user.")
+
+    # Prefetch children to reduce queries
+    emp = Employee.objects.select_related('user', 'department', 'manager').prefetch_related(
+        Prefetch('subordinates', queryset=Employee.objects.select_related('user', 'department'))
+    ).get(pk=emp.pk)
+
+    # Ensure a similar prefetch chain for all nodes in path
+    path_emps = build_path_to_root(emp)
+    # Build a set of IDs we’ll need to prefetch for subtree root (emp)
+    # (already prefetched on emp via subordinates)
+    path = [employee_to_dict(e) for e in path_emps]
+
+    team_tree = build_subtree(emp)
+
+    return JsonResponse({"ok": True, "path": path, "team": team_tree})
+
+@login_required
+def org_tree_api(request, employee_id):
+    """
+    Same as above but for any employee_id (admin/HR usage).
+    """
+    employee = get_object_or_404(Employee.objects.select_related('user', 'department', 'manager'), employee_id=employee_id)
+    employee = Employee.objects.select_related('user', 'department', 'manager').prefetch_related(
+        Prefetch('subordinates', queryset=Employee.objects.select_related('user', 'department'))
+    ).get(pk=employee.pk)
+
+    path_emps = build_path_to_root(employee)
+    path = [employee_to_dict(e) for e in path_emps]
+    team_tree = build_subtree(employee)
+
+    return JsonResponse({"ok": True, "path": path, "team": team_tree})
+
+def employee_detail(request, employee_id):
+    employee = get_object_or_404(Employee, employee_id=employee_id)
+    return render(request, 'ems/my_profile.html', {'employee': employee})
 
 @login_required
 def department_list(request):
@@ -1059,36 +1329,63 @@ def salary_structure_create(request):
         'title': 'Create Salary Structure'
     })
 
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from datetime import date
+
+@receiver(post_save, sender=SalaryStructure)
+def create_initial_payroll(sender, instance, created, **kwargs):
+    if created:  # Only when salary structure is added first time
+        today = date.today()
+        month_start = date(today.year, today.month, 1)
+
+        Payroll.objects.get_or_create(
+            employee=instance.employee,
+            month=month_start,
+            defaults={
+                'basic_pay': instance.base_salary,
+                'allowances': instance.allowances,
+                'deductions': instance.deductions,
+                'net_salary': instance.total_salary(),
+                'status': 'processed',
+                'processed_at': timezone.now(),
+            }
+        )
+
+
 @login_required
+@finance_required
 def payroll_list(request):
     form = PayrollFilterForm(request.GET or None)
-    payrolls = Payroll.objects.select_related('employee__user').all()
-    
+    payrolls = Payroll.objects.select_related('employee__user').order_by('-month', 'employee__user__first_name')
+
     if form.is_valid():
         month = form.cleaned_data.get('month')
         year = form.cleaned_data.get('year')
         status = form.cleaned_data.get('status')
-        
+
         if month:
             payrolls = payrolls.filter(month__month=month)
         if year:
             payrolls = payrolls.filter(month__year=year)
         if status:
             payrolls = payrolls.filter(status=status)
-    
-    # Calculate totals
-    total_basic = payrolls.aggregate(Sum('basic_pay'))['basic_pay__sum'] or 0
-    total_allowances = payrolls.aggregate(Sum('allowances'))['allowances__sum'] or 0
-    total_deductions = payrolls.aggregate(Sum('deductions'))['deductions__sum'] or 0
-    total_net = payrolls.aggregate(Sum('net_salary'))['net_salary__sum'] or 0
-    
+
+    totals = payrolls.aggregate(
+        total_basic=Sum('basic_pay'),
+        total_allowances=Sum('allowances'),
+        total_deductions=Sum('deductions'),
+        total_net=Sum('net_salary'),
+    )
+
     return render(request, 'ems/payroll_list.html', {
         'payrolls': payrolls,
         'form': form,
-        'total_basic': total_basic,
-        'total_allowances': total_allowances,
-        'total_deductions': total_deductions,
-        'total_net': total_net,
+        'total_basic': totals['total_basic'] or 0,
+        'total_allowances': totals['total_allowances'] or 0,
+        'total_deductions': totals['total_deductions'] or 0,
+        'total_net': totals['total_net'] or 0,
         'title': 'Payroll'
     })
 
@@ -1132,6 +1429,118 @@ def my_salary(request):
         'salary_structure': salary_structure,
         'title': 'My Salary'
     })
+
+
+@finance_required
+def pay_salary(request, pk):
+    payroll = get_object_or_404(Payroll, pk=pk)
+
+    if request.method == "POST":
+        paid_date = request.POST.get('paid_date')
+        amount_paid = request.POST.get('amount_paid')
+
+        payroll.status = 'paid'
+        payroll.paid_date = paid_date
+        payroll.net_salary = amount_paid if amount_paid else payroll.net_salary
+        payroll.save()
+
+        # ✅ Generate Salary Slip PDF
+        pdf_path = generate_salary_slip(payroll)
+
+        # ✅ Send Email to Employee
+        email = EmailMessage(
+            subject=f"Salary Slip - {payroll.month.strftime('%B %Y')}",
+            body=f"Dear {payroll.employee.user.first_name},\n\nYour salary for {payroll.month.strftime('%B %Y')} has been processed. Please find attached your salary slip.\n\nRegards,\nFinance Team",
+            from_email="avaneeshpathak900@gmail.com",  # change to your mail
+            to=[payroll.employee.user.email]
+        )
+        email.attach_file(pdf_path)
+        email.send()
+
+        messages.success(request, "✅ Salary paid & email sent with salary slip!")
+        return redirect('payroll_list')
+
+    return render(request, 'ems/pay_salary.html', {'payroll': payroll})
+
+@login_required
+def download_salary_slip(request, pk):
+    payroll = get_object_or_404(Payroll, pk=pk)
+    pdf_path = generate_salary_slip(payroll)
+    return FileResponse(open(pdf_path, 'rb'), content_type='application/pdf')
+
+@login_required
+def payroll_slip_pdf(request, pk):
+    payroll = get_object_or_404(Payroll.objects.select_related('employee__user'), pk=pk)
+
+    # Security: allow Finance/Admin or the employee themselves
+    allow = False
+    if hasattr(request.user, 'employee'):
+        role = request.user.employee.role
+        if role in ['Finance', 'Admin']:
+            allow = True
+        if payroll.employee_id == request.user.employee.id:
+            allow = True
+    if not allow and not request.user.is_superuser:
+        messages.error(request, "You are not allowed to download this slip.")
+        return redirect('payroll_list')
+
+    pdf_io = build_salary_slip_pdf(payroll)
+    filename = f"salary_slip_{payroll.employee.employee_id}_{payroll.month.strftime('%Y_%m')}.pdf"
+    return FileResponse(pdf_io, as_attachment=True, filename=filename)
+
+@login_required
+@finance_required
+def payroll_expense_chart(request):
+    """
+    Renders page with Chart.js that fetches data from payroll_expense_api.
+    """
+    return render(request, 'ems/payroll_expense_chart.html', {'title': 'Payroll Expense'})
+
+@login_required
+@finance_required
+def payroll_expense_api(request):
+    """
+    Returns JSON: labels (YYYY-MM), totals (sum of net_salary)
+    Last 12 months by default.
+    """
+    from datetime import date
+    today = date.today()
+    months = []
+    labels = []
+    totals = []
+
+    for i in range(11, -1, -1):  # last 12 months
+        year = (today.year if today.month - i > 0 else today.year - 1) if (today.month - i) != 0 else today.year - 1
+        month = ((today.month - i - 1) % 12) + 1
+        months.append((year, month))
+        labels.append(f"{year}-{str(month).zfill(2)}")
+
+    for (y, m) in months:
+        s = Payroll.objects.filter(month__year=y, month__month=m).aggregate(total=Sum('net_salary'))['total'] or 0
+        totals.append(float(s))
+
+    return JsonResponse({'labels': labels, 'totals': totals})
+
+@login_required
+@finance_required
+def employee_salary_history(request, employee_id):
+    emp = get_object_or_404(Employee.objects.select_related('user'), id=employee_id)
+    qs = Payroll.objects.filter(employee=emp).order_by('-month')
+
+    totals = qs.aggregate(
+        total_basic=Sum('basic_pay'),
+        total_allowances=Sum('allowances'),
+        total_deductions=Sum('deductions'),
+        total_net=Sum('net_salary'),
+    )
+    return render(request, 'ems/employee_salary_history.html', {
+        'employee': emp,
+        'payrolls': qs,
+        'totals': totals,
+        'title': f"Salary History - {emp.user.get_full_name()}"
+    })
+
+
 
 # ============================================================
 # 📝 LEAVE MANAGEMENT VIEWS
@@ -1238,11 +1647,11 @@ def leave_application_create(request):
         'pending_applications': pending_applications,
     })
 
-
-
 @login_required
 def leave_approval_action(request, pk):
     leave_app = get_object_or_404(LeaveApplication, pk=pk)
+
+    # ✅ Ensure current user is an approver
     try:
         approver = request.user.employee
     except Employee.DoesNotExist:
@@ -1254,6 +1663,7 @@ def leave_approval_action(request, pk):
         approver=approver,
         status='pending'
     ).first()
+
     if not approval:
         messages.error(request, 'You are not authorized to approve this leave!')
         return redirect('leave_application_list')
@@ -1265,11 +1675,12 @@ def leave_approval_action(request, pk):
             approval_obj.acted_at = timezone.now()
             approval_obj.save()
 
+            # ✅ APPROVED CASE
             if approval_obj.status == 'approved':
-                # Is there a next level?
                 next_stage = LeaveWorkflowStage.objects.filter(level=approval.level + 1).first()
+
                 if next_stage:
-                    # Pick next approver by role name in position (simple strategy)
+                    # Try to find next approver
                     next_approver = Employee.objects.filter(
                         employment_status='active',
                         position__icontains=next_stage.role_name
@@ -1282,25 +1693,31 @@ def leave_approval_action(request, pk):
                             level=next_stage.level,
                             status='pending'
                         )
-                        # notify next approver
-                        link = reverse('leave_approval_action', args=[leave_app.pk])
-                        notify_user(next_approver.user, f"Leave request for {leave_app.employee.user.get_full_name()} moved to you for approval.", link)
+                        notify_user(next_approver.user,
+                                    f"Leave request for {leave_app.employee.user.get_full_name()} moved to you for approval.",
+                                    reverse('leave_approval_action', args=[leave_app.pk]))
+                    else:
+                        # ✅ No approver found for next level → Final approval
+                        leave_app.status = 'approved'
+                        leave_app.approved_by = approver
+                        leave_app.save()
                 else:
-                    # Finalize
+                    # ✅ No next stage → Final approval
                     leave_app.status = 'approved'
                     leave_app.approved_by = approver
                     leave_app.save()
-                    # notify applicant
-                    notify_user(leave_app.employee.user, "Your leave has been approved.", reverse('leave_application_list'))
 
+                notify_user(leave_app.employee.user, "Your leave has been approved.", reverse('leave_application_list'))
+
+            # ✅ REJECTED CASE
             elif approval_obj.status == 'rejected':
                 leave_app.status = 'rejected'
                 leave_app.save()
-                # notify applicant
                 notify_user(leave_app.employee.user, "Your leave has been rejected.", reverse('leave_application_list'))
 
             messages.success(request, f'Leave {approval_obj.status} successfully!')
             return redirect('leave_application_list')
+
     else:
         form = LeaveApprovalForm(instance=approval)
 
@@ -1375,7 +1792,6 @@ def leave_application_update(request, pk):
         'form': form,
         'title': 'Update Leave Application'
     })
-
 
 
 @login_required
@@ -1659,8 +2075,6 @@ def ems_dashboard(request):
         'recent_payroll': recent_payroll,
         'title': 'EMS Dashboard'
     })
-
-
 
 
 def notify_user(user: User, message: str, link_path: str = ""):

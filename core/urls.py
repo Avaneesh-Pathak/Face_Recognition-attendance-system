@@ -5,6 +5,8 @@ urlpatterns = [
     path('', views.home, name='home'),
     path('register/', views.register, name='register'),
     path('api/check-username/', views.check_username, name='check_username'),
+    path('my-profile/', views.my_profile_view, name='my_profile'),
+
     path('api/check-email/', views.check_email, name='check_email'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('attendance/', views.attendance_page, name='attendance_page'),
@@ -21,10 +23,17 @@ urlpatterns = [
     path('attendance-calendar-data/<int:employee_id>/<int:year>/<int:month>/', views.attendance_calendar_data, name='attendance_calendar_data'),
     path('attendance-day-detail/<int:emp_id>/<str:date>/', views.attendance_day_detail, name='attendance_day_detail'),
     # 🏢 Organization Structure URLs
+    path('org-chart/', views.org_chart_page, name='org_chart'),
+    path('api/org-tree/', views.org_tree_api_me, name='org_tree_api_me'),
+    path('api/org-tree/<str:employee_id>/', views.org_tree_api, name='org_tree_api'),
+
+    # ✅ Department URLs
     path('departments/', views.department_list, name='department_list'),
     path('departments/create/', views.department_create, name='department_create'),
     path('departments/<int:pk>/edit/', views.department_edit, name='department_edit'),
     path('departments/<int:pk>/delete/', views.department_delete, name='department_delete'),
+
+    path('employees/<str:employee_id>/', views.employee_detail, name='employee_detail'),
     
     # 💰 Salary & Payroll URLs
     path('salary-structures/', views.salary_structure_list, name='salary_structure_list'),
@@ -32,6 +41,11 @@ urlpatterns = [
     path('payroll/', views.payroll_list, name='payroll_list'),
     path('payroll/generate/', views.generate_payroll, name='generate_payroll'),
     path('my-salary/', views.my_salary, name='my_salary'),
+    path('payroll/pay/<int:pk>/', views.pay_salary, name='pay_salary'),
+    path('payroll/slip/<int:pk>/', views.payroll_slip_pdf, name='payroll_slip_pdf'),
+    path('payroll/expense/', views.payroll_expense_chart, name='payroll_expense_chart'),
+    path('api/payroll/expense/', views.payroll_expense_api, name='payroll_expense_api'),
+    path('payroll/history/<int:employee_id>/', views.employee_salary_history, name='employee_salary_history'),
     
     # 📝 Leave Management URLs
     path('leave-types/', views.leave_type_list, name='leave_type_list'),

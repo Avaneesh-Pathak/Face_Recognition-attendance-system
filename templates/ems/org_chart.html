@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="container py-4">
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+    <h3 class="fw-bold mb-2 mb-md-0">Organization Structure</h3>
+
+    <div class="d-flex gap-2">
+      <!-- View switch -->
+      <div class="btn-group" role="group" aria-label="View">
+        <button class="btn btn-outline-primary active" id="btnViewPath">My Path</button>
+        <button class="btn btn-outline-primary" id="btnViewTeam">My Team Tree</button>
+      </div>
+
+      <!-- Layout switch -->
+      <div class="btn-group" role="group" aria-label="Layout">
+        <button class="btn btn-outline-secondary active" id="btnVertical">Vertical</button>
+        <button class="btn btn-outline-secondary" id="btnHorizontal">Horizontal</button>
+      </div>
+
+      <!-- Export / Print -->
+      <div class="btn-group" role="group">
+        <button class="btn btn-outline-success" id="btnPrint">
+          <i class="bi bi-printer"></i> Print / PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="small text-muted mb-3">
+    Click a card border to expand/collapse subordinates in Team Tree view.
+  </div>
+
+  <!-- Chart container -->
+  <div id="orgRoot" class="org-viewport vertical">
+    <!-- JS will render here -->
+  </div>
+
+</div>
+
+<style>
+/* Viewport toggles */
+.org-viewport.vertical {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.org-viewport.horizontal {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+
+/* Columns for horizontal */
+.org-level {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+}
+
+/* Node card */
+.org-node {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(20, 20, 20, 0.08);
+  border: 2px solid transparent;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  min-width: 260px;
+  max-width: 280px;
+  padding: 12px 14px;
+  position: relative;
+}
+
+.org-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(20, 20, 20, 0.12);
+  border-color: #0d6efd33;
+}
+
+/* Node body */
+.org-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.org-avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  object-fit: cover; border: 3px solid #0d6efd;
+}
+
+.org-info .name {
+  font-weight: 700; line-height: 1.1;
+}
+.org-info .position {
+  font-size: .9rem; color: #6c757d; margin-top: 2px;
+}
+.org-info .dept {
+  font-size: .85rem; color: #0d6efd; margin-top: 2px;
+}
+
+/* Connectors (vertical) */
+.vertical .connector-down {
+  width: 2px; height: 22px; background: #0d6efd; margin: 6px auto 0;
+  position: relative;
+}
+.vertical .connector-down::after {
+  content: ""; width: 10px; height: 10px; background: #0d6efd; border-radius: 50%;
+  position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%);
+}
+
+/* Children container */
+.children {
+  display: none;
+  gap: 14px; flex-wrap: wrap; justify-content: center;
+  margin-top: 10px;
+}
+.children.show { display: flex; }
+
+/* Action row */
+.org-actions {
+  margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;
+}
+.org-actions a {
+  text-decoration: none;
+}
+
+/* Horizontal connectors (simple) */
+.horizontal .org-node { margin-bottom: 14px; }
+.horizontal .children {
+  display: flex; flex-direction: column; align-items: flex-start;
+}
+
+/* Click affordance */
+.org-node.toggleable { cursor: pointer; }
+.org-node.toggleable::after {
+  content: "Click to expand/collapse";
+  position: absolute; bottom: 8px; right: 12px; font-size: .72rem; color: #adb5bd;
+}
+</style>
+
+<!-- If you use Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const rootEl = document.getElementById('orgRoot');
+  const btnPath = document.getElementById('btnViewPath');
+  const btnTeam = document.getElementById('btnViewTeam');
+  const btnVertical = document.getElementById('btnVertical');
+  const btnHorizontal = document.getElementById('btnHorizontal');
+  const btnPrint = document.getElementById('btnPrint');
+
+  // Load JSON from API (current user)
+  async function fetchData() {
+    const res = await fetch("{% url 'org_tree_api_me' %}", {headers: {'X-Requested-With':'XMLHttpRequest'}});
+    const data = await res.json();
+    if (!data.ok) throw new Error('Failed to load org tree');
+    return data;
+  }
+
+  // Utilities
+  function createNodeCard(node, {toggleable=false}) {
+    const card = document.createElement('div');
+    card.className = 'org-node' + (toggleable ? ' toggleable' : '');
+    // Card content
+    card.innerHTML = `
+      <div class="org-head">
+        <img class="org-avatar" src="${node.image ?? '{% static "images/default_profile.png" %}'}" alt="avatar">
+        <div class="org-info">
+          <div class="name">${escapeHtml(node.name || '')}</div>
+          <div class="position">${escapeHtml(node.position || '')}</div>
+          <div class="dept">${escapeHtml(node.department || '')}</div>
+        </div>
+      </div>
+      <div class="org-actions">
+        ${node.profile_url ? `<a class="btn btn-sm btn-outline-primary" href="${node.profile_url}">
+          <i class="bi bi-person"></i> View Profile</a>` : ''}
+      </div>
+    `;
+    return card;
+  }
+
+  function escapeHtml(str) {
+    return (str ?? "").toString().replace(/[&<>"']/g, s => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[s]));
+  }
+
+  // PATH VIEW (CEO -> ... -> You)
+  function renderPath(path) {
+    rootEl.classList.remove('horizontal');
+    rootEl.classList.add('vertical');
+    rootEl.innerHTML = '';
+
+    path.forEach((n, idx) => {
+      const card = createNodeCard(n, {toggleable:false});
+      rootEl.appendChild(card);
+      if (idx < path.length - 1) {
+        const c = document.createElement('div');
+        c.className = 'connector-down';
+        rootEl.appendChild(c);
+      }
+    });
+  }
+
+  // TEAM TREE (You -> all subordinates with expand/collapse)
+  function renderTeam(root) {
+    // Default vertical (toggle can switch to horizontal class)
+    rootEl.innerHTML = '';
+
+    // recursive renderer
+    function renderNode(node) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'node-wrapper';
+
+      const card = createNodeCard(node, {toggleable: true});
+      wrapper.appendChild(card);
+
+      // children container
+      const childrenWrap = document.createElement('div');
+      childrenWrap.className = 'children';
+      wrapper.appendChild(childrenWrap);
+
+      // expand/collapse on border click (not on buttons)
+      card.addEventListener('click', (e) => {
+        // ignore clicks on action buttons/links
+        if (e.target.closest('.org-actions a')) return;
+        childrenWrap.classList.toggle('show');
+      });
+
+      // add children
+      if (Array.isArray(node.children)) {
+        node.children.forEach(child => {
+          const childBlock = renderNode(child);
+          childrenWrap.appendChild(childBlock);
+        });
+      }
+      return wrapper;
+    }
+
+    const block = renderNode(root);
+    rootEl.appendChild(block);
+  }
+
+  // Layout toggles
+  function setVertical() {
+    rootEl.classList.remove('horizontal');
+    rootEl.classList.add('vertical');
+    btnVertical.classList.add('active');
+    btnHorizontal.classList.remove('active');
+  }
+  function setHorizontal() {
+    rootEl.classList.remove('vertical');
+    rootEl.classList.add('horizontal');
+    btnHorizontal.classList.add('active');
+    btnVertical.classList.remove('active');
+  }
+
+  // Print
+  btnPrint.addEventListener('click', () => {
+    window.print();
+  });
+
+  // Load & bind view switching
+  const data = await fetchData();
+
+  // Default view: Path
+  renderPath(data.path);
+
+  btnPath.addEventListener('click', () => {
+    btnPath.classList.add('active');
+    btnTeam.classList.remove('active');
+    setVertical(); // best for path
+    renderPath(data.path);
+  });
+
+  btnTeam.addEventListener('click', () => {
+    btnTeam.classList.add('active');
+    btnPath.classList.remove('active');
+    setVertical(); // default vertical; user can flip to horizontal
+    renderTeam(data.team);
+  });
+
+  btnVertical.addEventListener('click', setVertical);
+  btnHorizontal.addEventListener('click', setHorizontal);
+});
+</script>
+
+{% endblock %}

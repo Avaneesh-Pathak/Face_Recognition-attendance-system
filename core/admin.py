@@ -61,7 +61,7 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ('employee_id', 'user_full_name', 'department', 'position', 'employment_status', 'is_active', 'date_of_joining')
+    list_display = ('employee_id', 'user_full_name', 'department', 'position', 'employment_status', 'is_active', 'date_of_joining','role')
     list_filter = ('department', 'position', 'employment_status', 'is_active', 'date_of_joining')
     search_fields = ('employee_id', 'user__first_name', 'user__last_name', 'user__email', 'department')
     readonly_fields = ('created_at', 'face_encoding_preview')
@@ -181,7 +181,7 @@ class PayrollMonthFilter(admin.SimpleListFilter):
 
 @admin.register(Payroll)
 class PayrollAdmin(admin.ModelAdmin):
-    list_display = ('employee', 'month_display', 'basic_pay', 'allowances', 'deductions', 'net_salary', 'status', 'processed_at')
+    list_display = ('employee', 'month_display', 'basic_pay', 'allowances', 'deductions', 'net_salary', 'status', 'processed_at', 'paid_date', 'next_pay_date')
     list_filter = (PayrollMonthFilter, 'status', 'processed_at')
     search_fields = ('employee__user__first_name', 'employee__user__last_name', 'employee__employee_id')
     readonly_fields = ('processed_at',)

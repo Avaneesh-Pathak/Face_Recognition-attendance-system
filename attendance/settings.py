@@ -159,6 +159,19 @@ FACE_RECOGNITION_MODEL = config('FACE_RECOGNITION_MODEL', default='cnn')  # 'cnn
 FACE_ENCODINGS_PATH = MEDIA_ROOT / 'face_encodings'
 FACE_ENCODINGS_PATH.mkdir(parents=True, exist_ok=True)
 
+# -------------------------------------------------------------------
+# EMAIL SETTINGS
+# -------------------------------------------------------------------
+
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_HOST_USER = 'avaneeshpathak900@gmail.com'
+EMAIL_HOST_PASSWORD = 'loue zfhx jwtb srow'
+EMAIL_USE_TLS = True
+
+EMAIL_TIMEOUT = 20   # seconds
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
 
 # -------------------------------------------------------------------
 # LIVENESS DETECTION SETTINGS

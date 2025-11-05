@@ -60,7 +60,7 @@ class EmployeeRegistrationForm(forms.Form):
     email = forms.EmailField(label="Email Address")
     password1 = forms.CharField(widget=forms.PasswordInput, label="Password")
     password2 = forms.CharField(widget=forms.PasswordInput, label="Confirm Password")
-
+    role = forms.ChoiceField(choices=Employee.ROLE_CHOICES, label="Role")
     # --- 🧾 Employee Info ---
     # employee_id = forms.CharField(max_length=20, label="Employee ID")
     department = forms.ModelChoiceField(queryset=Department.objects.all(), required=False)
@@ -123,10 +123,8 @@ class DepartmentForm(forms.ModelForm):
         model = Department
         fields = ['name', 'head', 'parent_department']
         widgets = {
-            'name': forms.TextInput(attrs={
-                'class': 'form-control', 
-                'placeholder': 'Enter department name',
-                'autofocus': True
+            'name': forms.Select(attrs={
+                'class': 'form-control select2',
             }),
             'head': forms.Select(attrs={
                 'class': 'form-control select2'
@@ -140,35 +138,32 @@ class DepartmentForm(forms.ModelForm):
             'head': 'Department Head',
             'parent_department': 'Parent Department'
         }
-        help_texts = {
-            'parent_department': 'Leave blank if this is a main department'
-        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Only show active employees as potential department heads
+
+        # Filter only active employees as possible heads
         self.fields['head'].queryset = Employee.objects.filter(
             employment_status='active'
         ).select_related('user')
-        
-        # Exclude current department from parent department choices to avoid circular references
+
+        # Avoid showing self as parent department
         if self.instance.pk:
-            self.fields['parent_department'].queryset = Department.objects.exclude(
-                pk=self.instance.pk
-            )
+            self.fields['parent_department'].queryset = Department.objects.exclude(pk=self.instance.pk)
         else:
             self.fields['parent_department'].queryset = Department.objects.all()
 
-    def clean_name(self):
-        name = self.cleaned_data.get('name')
-        if name:
-            # Check for duplicate department names (case-insensitive)
-            departments = Department.objects.filter(name__iexact=name)
-            if self.instance.pk:
-                departments = departments.exclude(pk=self.instance.pk)
-            if departments.exists():
-                raise ValidationError('A department with this name already exists.')
-        return name
+    def clean(self):
+        cleaned_data = super().clean()
+        name = cleaned_data.get('name')
+        parent = cleaned_data.get('parent_department')
+
+        # ✅ Prevent choosing same department as parent
+        if self.instance.pk and parent and parent.pk == self.instance.pk:
+            self.add_error('parent_department', "A department cannot be its own parent!")
+
+        return cleaned_data
+
 
 # ============================================================
 # 💰 SALARY & PAYROLL FORMS
@@ -770,3 +765,19 @@ class LeaveReportFilterForm(DateRangeFilterForm):
             'class': 'form-control'
         })
     )
+
+
+STATUS_CHOICES = (
+    ('', 'All'),
+    ('pending', 'Pending'),
+    ('processed', 'Processed'),
+    ('paid', 'Paid'),
+)
+
+class PayrollFilterForm(forms.Form):
+    month = forms.IntegerField(required=False, min_value=1, max_value=12,
+                               widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '1-12'}))
+    year = forms.IntegerField(required=False,
+                              widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'YYYY'}))
+    status = forms.ChoiceField(required=False, choices=STATUS_CHOICES,
+                               widget=forms.Select(attrs={'class': 'form-select'}))
