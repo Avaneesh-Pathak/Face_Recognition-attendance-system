@@ -1,88 +1,83 @@
-import os
+
 import json
 import logging
-
-import cv2
 import numpy as np
 from django.core.management.base import BaseCommand
-from django.conf import settings
+from django.db import transaction
 
 from core.models import Employee
 
 logger = logging.getLogger('core')
 
-try:
-    from insightface.app import FaceAnalysis
-    INSIGHTFACE_AVAILABLE = True
-except Exception as e:
-    INSIGHTFACE_AVAILABLE = False
-    logger.exception("insightface not available: %s", e)
-
+def _normalize(v: np.ndarray) -> np.ndarray:
+    v = np.asarray(v, dtype=np.float32).ravel()
+    n = np.linalg.norm(v)
+    if n <= 0:
+        return v.astype(np.float32)
+    return (v / n).astype(np.float32)
 
 class Command(BaseCommand):
-    help = "Rebuild all employee face embeddings using InsightFace (ArcFace)"
+    help = "Sanitize existing face encodings: normalize, convert single vectors to list form, and deduplicate."
 
-    def handle(self, *args, **options):
-        if not INSIGHTFACE_AVAILABLE:
-            self.stdout.write(self.style.ERROR("insightface is not installed or failed to import. Install insightface to use this command."))
-            return
+    def add_arguments(self, parser):
+        parser.add_argument('--dry-run', action='store_true', help='Do not write changes')
+        parser.add_argument('--max-per-employee', type=int, default=24, help='If more than this, keep the most recent N (when possible)')
+        parser.add_argument('--force-mean', action='store_true', help='Replace with a single mean vector (still stored as a list with one element)')
 
-        model_name = getattr(settings, "INSIGHTFACE_MODEL", "buffalo_l")
-        det_size = getattr(settings, "INSIGHTFACE_DET_SIZE", (640, 640))
-        ctx_id = getattr(settings, "INSIGHTFACE_CTX_ID", -1)  # -1 = CPU
+    def handle(self, *args, **opts):
+        dry = bool(opts['dry_run'])
+        kmax = int(opts['max_per_employee'])
+        force_mean = bool(opts['force_mean'])
 
-        try:
-            app = FaceAnalysis(name=model_name)
-            app.prepare(ctx_id=ctx_id, det_size=det_size)
-        except Exception as e:
-            logger.exception("Failed to initialize InsightFace FaceAnalysis: %s", e)
-            self.stdout.write(self.style.ERROR(f"Failed to initialize insightface: {e}"))
-            return
+        qs = Employee.objects.exclude(face_encoding__isnull=True).exclude(face_encoding__exact='')
+        count = 0
+        changed = 0
 
-        updated = 0
-        for emp in Employee.objects.all():
+        for emp in qs:
+            count += 1
+            raw = emp.face_encoding
+            arr = None
             try:
-                user_label = emp.user.get_full_name() or getattr(emp.user, "username", str(getattr(emp, "pk", "unknown")))
-                if not emp.face_image:
-                    self.stdout.write(self.style.WARNING(f"Skipping {user_label} — no face image found"))
-                    continue
+                obj = json.loads(raw)
+                arr = np.asarray(obj, dtype=np.float32)
+            except Exception:
+                # Try comma separated
+                try:
+                    parts = [float(x) for x in raw.strip('[]() ').split(',') if x.strip()]
+                    arr = np.asarray(parts, dtype=np.float32)
+                except Exception:
+                    arr = None
 
-                img_path = getattr(emp.face_image, "path", None) or getattr(emp.face_image, "name", None)
-                if not img_path or not os.path.exists(img_path):
-                    # if storage path is different, try using storage.path if available
-                    self.stdout.write(self.style.WARNING(f"Image not found for {user_label}: {img_path}"))
-                    continue
+            if arr is None or arr.size == 0:
+                continue
 
-                img = cv2.imread(img_path)
-                if img is None:
-                    self.stdout.write(self.style.WARNING(f"Failed to read image for {user_label}: {img_path}"))
-                    continue
+            # normalize & convert to list-of-vectors JSON
+            if arr.ndim == 1:
+                vecs = [_normalize(arr).tolist()]
+            else:
+                # dedupe near-identical vectors
+                normed = np.vstack([_normalize(v) for v in arr])
+                # simple unique by rounding
+                rounded = np.round(normed, 4)
+                _, unique_idx = np.unique(rounded, axis=0, return_index=True)
+                normed = normed[sorted(unique_idx)]
+                if normed.shape[0] > kmax:
+                    normed = normed[-kmax:]  # keep last N (approx; since order unknown after unique)
+                if force_mean:
+                    meanv = _normalize(normed.mean(axis=0)).tolist()
+                    vecs = [meanv]
+                else:
+                    vecs = [v.tolist() for v in normed]
 
-                rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                faces = app.get(rgb)
-                if not faces:
-                    self.stdout.write(self.style.WARNING(f"No face detected for {user_label}"))
-                    continue
+            new_json = json.dumps(vecs)
+            if new_json != raw:
+                changed += 1
+                if not dry:
+                    try:
+                        with transaction.atomic():
+                            emp.face_encoding = new_json
+                            emp.save(update_fields=['face_encoding'])
+                    except Exception:
+                        logger.exception("Failed saving cleaned embedding for emp %s", getattr(emp, 'pk', None))
 
-                # pick best face by det_score (if available)
-                faces = sorted(faces, key=lambda f: float(getattr(f, "det_score", 0.0)), reverse=True)
-                f = faces[0]
-                embedding = getattr(f, "normed_embedding", None) or getattr(f, "embedding", None)
-                if embedding is None:
-                    self.stdout.write(self.style.WARNING(f"No embedding produced for {user_label}"))
-                    continue
-
-                arr = np.asarray(embedding, dtype=np.float32).ravel()
-                emb_list = [float(x) for x in arr.tolist()]
-
-                # store as JSON for portability
-                emp.face_encoding = json.dumps(emb_list)
-                emp.save(update_fields=["face_encoding"])
-
-                updated += 1
-                self.stdout.write(self.style.SUCCESS(f"Updated embedding for {user_label}"))
-            except Exception as e:
-                logger.exception("Failed processing employee %s: %s", getattr(emp, "pk", None), e)
-                self.stdout.write(self.style.ERROR(f"Error processing {getattr(emp.user, 'username', getattr(emp, 'pk', 'unknown'))}: {e}"))
-
-        self.stdout.write(self.style.SUCCESS(f"Rebuilt embeddings for {updated} employees."))
+        self.stdout.write(self.style.SUCCESS(f"Processed {count} employees; updated {changed}{' (dry-run)' if dry else ''}"))

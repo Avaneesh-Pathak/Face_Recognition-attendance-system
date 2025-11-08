@@ -256,12 +256,12 @@ def build_salary_slip_pdf(payroll):
     p.drawRightString(MARGIN_L + 7.2 * cm, y, fmt_money(net))
     y -= 0.5 * cm
 
-    # if calc_net != net:
-    #     p.setFillColor(colors.red)
-    #     p.setFont("Helvetica-Oblique", 8)
-    #     p.drawString(MARGIN_L, y, f"⚠ Salary prorated (Calculated: {fmt_money(calc_net)}, Paid: {fmt_money(net)})")
-    #     p.setFillColor(colors.black)
-    #     y -= 0.3 * cm
+    if calc_net != net:
+        p.setFillColor(colors.red)
+        p.setFont("Helvetica-Oblique", 8)
+        p.drawString(MARGIN_L, y, f"⚠ Salary prorated (Calculated: {fmt_money(calc_net)}, Paid: {fmt_money(net)})")
+        p.setFillColor(colors.black)
+        y -= 0.3 * cm
 
     p.setFont("Helvetica", 9)
     p.drawString(MARGIN_L, y, f"In Words: {number_to_words(int(net))} Rupees Only")

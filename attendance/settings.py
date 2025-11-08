@@ -158,6 +158,24 @@ CORS_ALLOW_ALL_ORIGINS = True
 FACE_RECOGNITION_MODEL = config('FACE_RECOGNITION_MODEL', default='cnn')  # 'cnn' or 'hog'
 FACE_ENCODINGS_PATH = MEDIA_ROOT / 'face_encodings'
 FACE_ENCODINGS_PATH.mkdir(parents=True, exist_ok=True)
+INSIGHTFACE_CTX_ID = 0                 # -1 for CPU, >=0 for GPU
+FACE_RECOGNITION_THRESHOLD = 0.60
+FACE_EUCLIDEAN_MAX = 1.15
+FR_MIN_DET_INTERVAL = 0.25
+COOLDOWN_SECONDS = 600
+
+
+LIVENESS = {
+  "BLINK_THRESHOLD": 0.28,     # easier to register a blink (open EAR ~0.28–0.35)
+  "CONSEC_FRAMES": 2,
+  "BLINK_REQUIRED": 1,
+  "MOTION_THRESHOLD": 0.0010,  # a bit more lenient
+  "HISTORY": 6,
+  "REQUIRE_BOTH": False,       # start with OR; set True after you verify
+  "MIN_FACE_SIZE": 120,
+}
+
+
 
 # -------------------------------------------------------------------
 # EMAIL SETTINGS

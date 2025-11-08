@@ -12,3 +12,9 @@ celery==5.3.4
 redis==5.0.1
 django-htmx==1.1.0
 channels==4.0.0
+dlib
+face-recognition
+opencv-python
+Pillow
+numpy
+gunicorn

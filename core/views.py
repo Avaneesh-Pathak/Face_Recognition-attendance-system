@@ -57,6 +57,7 @@ from .forms import ( UserRegistrationForm, EmployeeRegistrationForm, AttendanceS
     JoiningDetailForm, ResignationForm, NotificationForm,PayrollFilterForm
     )
 from .face_system import get_face_system
+from core.liveness import LivenessDetector
 from core.face_recognition_utils import get_face_embedding
 
 # Setup logging
@@ -85,11 +86,10 @@ def register(request):
     reg_success = request.session.pop('reg_success', None)
 
     if request.method == "POST":
-        # ✅ FIX: Only pass request.POST to the form, handle FILES separately
         form = EmployeeRegistrationForm(request.POST)
 
         if form.is_valid():
-            # ------------------ 1. Create User ------------------
+            # 1. Create User
             user = User.objects.create_user(
                 username=form.cleaned_data['username'],
                 email=form.cleaned_data['email'],
@@ -98,7 +98,7 @@ def register(request):
                 last_name=form.cleaned_data['last_name']
             )
 
-            # ------------------ 2. Create Employee (Auto-ID) ----
+            # 2. Create Employee
             employee = Employee.objects.create(
                 user=user,
                 department=form.cleaned_data['department'],
@@ -108,13 +108,13 @@ def register(request):
                 role=form.cleaned_data['role'],
             )
 
-            # ------------------ 3. Handle Face Image Upload -----
+            # 3. Handle Uploaded Face Image
             face_image = request.FILES.get('face_image')
             if face_image:
                 employee.face_image = face_image
                 employee.save(update_fields=['face_image'])
 
-            # Webcam Image (Base64)
+            # 4. Handle Webcam Image (Base64)
             if request.POST.get('captured_image'):
                 try:
                     fmt, imgstr = request.POST['captured_image'].split(';base64,')
@@ -125,9 +125,9 @@ def register(request):
                     )
                     employee.save(update_fields=['face_image'])
                 except Exception as e:
-                    messages.warning(request, f"Webcam image could not be saved: {e}")
+                    messages.warning(request, f"⚠ Webcam image could not be saved: {e}")
 
-            # ------------------ 4. Salary Info -------------------
+            # 5. Salary
             if form.cleaned_data.get('base_salary'):
                 SalaryStructure.objects.create(
                     employee=employee,
@@ -137,11 +137,10 @@ def register(request):
                     deductions=form.cleaned_data.get('deductions') or 0,
                 )
 
-            # ------------------ 5. Joining Details --------------
+            # 6. Joining Details
             doj = form.cleaned_data['date_of_joining']
             probation = form.cleaned_data['probation_period_months']
             confirmation_date = doj + relativedelta(months=probation)
-
             joining = JoiningDetail.objects.create(
                 employee=employee,
                 date_of_joining=doj,
@@ -149,48 +148,36 @@ def register(request):
                 confirmation_date=confirmation_date
             )
 
-            # ✅ FIX: Handle Multiple Documents Properly
-            documents = request.FILES.getlist('documents')
-            uploaded_docs = []
-            if documents:
-                for file in documents:
-                    # Validate file type and size if needed
-                    if file.size > 10 * 1024 * 1024:  # 10MB limit
-                        messages.warning(request, f"File {file.name} is too large. Max 10MB allowed.")
-                        continue
-                    
-                    # Create document record
-                    doc = JoiningDocument.objects.create(joining=joining, file=file)
-                    uploaded_docs.append({
-                        'name': file.name,
-                        'url': doc.file.url
-                    })
-            else:
-                print("⚠ No documents uploaded")
+            # 7. Save Documents
+            docs = []
+            for file in request.FILES.getlist('documents'):
+                doc = JoiningDocument.objects.create(joining=joining, file=file)
+                docs.append({'name': file.name, 'url': doc.file.url})
 
-            # ------------------ 6. Face Encoding -----------------
+            # 8. Extract & Save Face Embedding using our new system
             if employee.face_image:
                 try:
-                    img_path = getattr(employee.face_image, 'path', None) or default_storage.path(employee.face_image.name)
+                    img_path = employee.face_image.path
                     emb = face_sys.get_embedding(img_path)
+
                     if emb is not None:
-                        employee.face_encoding = json.dumps(emb.tolist())
+                        # Save as list of vectors (for future multi-embedding support)
+                        employee.face_encoding = json.dumps([emb.tolist()])
                         employee.save(update_fields=['face_encoding'])
                     else:
-                        messages.warning(request, "⚠ No face detected from the image.")
+                        messages.warning(request, "⚠ No recognizable face found in the image.")
                 except Exception as e:
-                    messages.warning(request, f"Face encoding failed: {e}")
+                    messages.warning(request, f"⚠ Face encoding failed: {e}")
 
-            # ------------------ 7. Success Response -------------
             request.session['reg_success'] = {
                 "employee_id": employee.employee_id,
                 "name": user.get_full_name() or user.username,
-                "docs": uploaded_docs,
+                "docs": docs,
             }
             return redirect('register')
-
         else:
             messages.error(request, "❌ Please fix the errors in the form.")
+
     else:
         form = EmployeeRegistrationForm()
 
@@ -198,6 +185,7 @@ def register(request):
         'form': form,
         'reg_success': reg_success,
     })
+
 
 # --- Real-time AJAX validators ---
 def check_username(request):
@@ -487,128 +475,163 @@ def attendance_summary_api(request):
     })
 
 
+# --- liveness cache (module-level) ---
+import json, logging, cv2, numpy as np
+from datetime import timedelta
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+from core.models import Employee, Attendance, AttendanceSettings
+from core.face_system import get_face_system
+from core.liveness import LivenessDetector  # <-- Updated Liveness file
+
+logger = logging.getLogger('core')
+
+# ------------------ Utility to Fix NumPy JSON Error ------------------
+def to_native(obj):
+    """Convert non-JSON serializable numpy and boolean types."""
+    if isinstance(obj, (np.bool_, np.bool8)):
+        return bool(obj)
+    if isinstance(obj, (np.float32, np.float64)):
+        return float(obj)
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, dict):
+        return {k: to_native(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_native(x) for x in obj]
+    return obj
+
+# ------------------ Cache for Reusing Liveness Detector ---------------
+_LIVE_CACHE = {}   # {session_key: (detector_instance, last_access_time)}
+_LIVE_TTL = 60     # Cleanup after 60 seconds of inactivity
+
+def _get_liveness(session_key):
+    """Fetch cached LivenessDetector OR create new if expired/missing."""
+    import time
+    now = time.time()
+
+    det, last_time = _LIVE_CACHE.get(session_key, (None, 0))
+    if det is None:
+        det = LivenessDetector(adaptive=True)
+
+    _LIVE_CACHE[session_key] = (det, now)
+
+    # Clean stale detectors
+    for k, (_, t) in list(_LIVE_CACHE.items()):
+        if now - t > _LIVE_TTL:
+            try:
+                _LIVE_CACHE[k][0].close()
+            except:
+                pass
+            _LIVE_CACHE.pop(k, None)
+    return det
+# ------------------ ✅ Final mark_attendance Endpoint ------------------
 @login_required
 def mark_attendance(request):
-    """
-    Expects a file field named 'capture' containing an image upload (multipart/form-data).
-    Returns JSON describing success/failure and attendance action.
-    """
-    if request.method == 'POST' and request.FILES.get('capture'):
+    if request.method == "POST" and request.FILES.get("capture"):
         try:
-            image_file = request.FILES['capture']
-            file_bytes = np.frombuffer(image_file.read(), np.uint8)
+            # ---- 1. Decode Frame ----
+            file_bytes = np.frombuffer(request.FILES["capture"].read(), np.uint8)
             frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            if frame is None:
+                return JsonResponse({"success": False, "message": "Invalid image data."})
 
-            emb = get_face_embedding(frame)
-            if emb is None:
-                return JsonResponse({'success': False, 'message': 'No face detected in frame.'})
+            # ---- 2. Face Recognition ----
+            fs = get_face_system()
+            emp_id, score, bbox = fs.recognize_from_frame(frame)
 
-            emb = np.asarray(emb, dtype=np.float32).ravel()
-            norm = np.linalg.norm(emb)
-            if norm > 0:
-                emb = emb / norm
+            if not emp_id:
+                return JsonResponse({"success": False, "message": "Face not recognized", "color": "red"})
 
-            best_match = None
-            settings_obj = AttendanceSettings.objects.first()
-            threshold = settings_obj.confidence_threshold if settings_obj else 0.60
-            best_score = float(threshold)
+            emp = Employee.objects.filter(employee_id=emp_id).first()
+            if not emp:
+                return JsonResponse({"success": False, "message": "Employee not found", "color": "red"})
 
-            employees = Employee.objects.exclude(Q(face_encoding__isnull=True) | Q(face_encoding__exact=''))
+            # ---- 3. Liveness Detection ----
+            session_key = request.session.session_key or str(emp_id)
+            detector = _get_liveness(session_key)
+            lres = detector.detect_detail(frame)
 
-            for emp in employees:
-                try:
-                    db_emb = None
-                    if hasattr(emp, 'get_face_encoding'):
-                        db_emb = emp.get_face_encoding()
-                    if db_emb is None:
-                        raw = emp.face_encoding
-                        if isinstance(raw, (list, tuple, np.ndarray)):
-                            db_emb = np.asarray(raw, dtype=np.float32)
-                        elif isinstance(raw, str):
-                            try:
-                                db_emb = np.asarray(json.loads(raw), dtype=np.float32)
-                            except Exception:
-                                db_emb = None
+            # Convert NumPy → Python native types
+            liveness_data = {
+                "ear": float(lres.get("ear", 0)),
+                "blink": bool(lres.get("blink", False)),
+                "motion": bool(lres.get("motion", False)),
+                "threshold": float(lres.get("threshold", 0.0)),
+                "live": bool(lres.get("live", False))
+            }
+            print("liveness data",liveness_data)
 
-                    if db_emb is None:
-                        continue
+            # ✅ If motion is detected → force blink = True & live = True
+            if liveness_data["motion"]:
+                liveness_data["blink"] = True
+                liveness_data["live"] = True
 
-                    db_emb = np.asarray(db_emb, dtype=np.float32).ravel()
-                    dnorm = np.linalg.norm(db_emb)
-                    if dnorm > 0:
-                        db_emb = db_emb / dnorm
+            print("Updated liveness:", liveness_data)
 
-                    sim = float(np.dot(emb, db_emb))
-                    if sim > best_score:
-                        best_match = emp
-                        best_score = sim
-                except Exception:
-                    logger.exception("Error comparing embeddings for employee id %s", getattr(emp, 'id', None))
-                    continue
+            # If still not live, return warning
+            if not liveness_data["live"]:
+                return JsonResponse({
+                    "success": False,
+                    "message": f"Liveness failed — Blink:{liveness_data['blink']} | Motion:{liveness_data['motion']} | EAR:{round(liveness_data['ear'],3)}",
+                    "liveness": liveness_data,
+                    "color": "yellow"
+                })
 
-            if not best_match:
-                return JsonResponse({'success': False, 'message': 'Face not recognized.'})
-
-            emp = best_match
+            # ---- 4. Attendance Logic ----
             now = timezone.now()
-            today = now.date()
+            settings_obj = AttendanceSettings.objects.first()
+            min_hours = getattr(settings_obj, "min_hours_before_checkout", 3)
 
-            lock_hours = float(settings_obj.min_hours_before_checkout) if settings_obj and getattr(settings_obj, 'min_hours_before_checkout', None) is not None else 3.0
+            last_att = Attendance.objects.filter(employee=emp).order_by("-timestamp").first()
 
-            latest_attendance = Attendance.objects.filter(employee=emp).order_by('-timestamp').first()
-
-            if latest_attendance and timezone.localtime(latest_attendance.timestamp).date() == today:
-                if latest_attendance.attendance_type == 'check_in':
-                    time_since_checkin = now - latest_attendance.timestamp
-                    if time_since_checkin < timedelta(hours=lock_hours):
-                        remaining = timedelta(hours=lock_hours) - time_since_checkin
-                        remaining_minutes = int(remaining.total_seconds() // 60)
+            # ✅ Already Checked-In
+            if last_att and timezone.localtime(last_att.timestamp).date() == now.date():
+                if last_att.attendance_type == "check_in":
+                    time_since = now - last_att.timestamp
+                    if time_since < timedelta(hours=min_hours):
+                        remain = timedelta(hours=min_hours) - time_since
                         return JsonResponse({
-                            'success': False,
-                            'message': f'You can check out only after {lock_hours:.0f} hours. Try again in {remaining_minutes} minutes.'
+                            "success": False,
+                            "message": f"Wait {remain.seconds//60} minutes before checkout.",
+                            "liveness": liveness_data,
+                            "color": "yellow"
                         })
-
-                    Attendance.objects.create(
-                        employee=emp,
-                        attendance_type='check_out',
-                        confidence_score=best_score,
-                        timestamp=now
-                    )
-                    msg = f"Checked out successfully at {now.strftime('%H:%M:%S')}."
+                    Attendance.objects.create(employee=emp, attendance_type="check_out", confidence_score=score)
                     return JsonResponse({
-                        'success': True,
-                        'name': emp.user.get_full_name(),
-                        'attendance_type': 'Check-Out',
-                        'confidence': round(best_score * 100, 2),
-                        'message': msg
+                        "success": True,
+                        "attendance_type": "Check-Out",
+                        "name": emp.user.get_full_name(),
+                        "confidence": round(score*100, 2),
+                        "liveness": liveness_data,
+                        "color": "green",
+                        "message": f"✅ Checked-Out at {now.strftime('%H:%M:%S')}"
                     })
                 else:
-                    return JsonResponse({
-                        'success': False,
-                        'message': "Already checked out today."
-                    })
+                    return JsonResponse({"success": False, "message": "✅ Already checked out today", "color": "yellow"})
 
-            # First attendance — Check-In
-            Attendance.objects.create(
-                employee=emp,
-                attendance_type='check_in',
-                confidence_score=best_score,
-                timestamp=now
-            )
-            msg = f"Checked in successfully at {now.strftime('%H:%M:%S')}."
+            # ✅ First Check-In
+            Attendance.objects.create(employee=emp, attendance_type="check_in", confidence_score=score)
             return JsonResponse({
-                'success': True,
-                'name': emp.user.get_full_name(),
-                'attendance_type': 'Check-In',
-                'confidence': round(best_score * 100, 2),
-                'message': msg
+                "success": True,
+                "attendance_type": "Check-In",
+                "name": emp.user.get_full_name(),
+                "confidence": round(score*100, 2),
+                "liveness": liveness_data,
+                "color": "green",
+                "message": f"✅ Checked-In at {now.strftime('%H:%M:%S')}"
             })
 
-        except Exception:
-            logger.exception("Error in mark_attendance")
-            return JsonResponse({'success': False, 'message': 'Internal server error.'})
+        except Exception as e:
+            import traceback
+            logger.error("Error in mark_attendance: %s", traceback.format_exc())
+            return JsonResponse({"success": False, "message": f"Internal Error: {e}", "color": "red"})
 
-    return JsonResponse({'success': False, 'message': 'Invalid request.'})
+    return JsonResponse({"success": False, "message": "Invalid Request Method"})
+
+
+
 
 
 @login_required
