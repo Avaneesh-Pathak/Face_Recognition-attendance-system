@@ -1,0 +1,449 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Attendance Reports - Analytics Dashboard{% endblock %}
+
+{% block page_title %}Attendance Analytics{% endblock %}
+{% block page_subtitle %}Comprehensive overview of employee attendance patterns{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <!-- Summary Cards -->
+  <div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card dashboard-card border-start border-primary border-4">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-grow-1">
+              <p class="text-muted mb-1">Total Employees</p>
+              <h4 class="mb-0">{{ total_employees }}</h4>
+            </div>
+            <div class="flex-shrink-0">
+              <i class="fas fa-users fa-2x text-primary"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card dashboard-card border-start border-success border-4">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-grow-1">
+              <p class="text-muted mb-1">Present (Range)</p>
+              <h4 class="mb-0">{{ present_employees }}</h4>
+            </div>
+            <div class="flex-shrink-0">
+              <i class="fas fa-user-check fa-2x text-success"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card dashboard-card border-start border-danger border-4">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-grow-1">
+              <p class="text-muted mb-1">Absent (Range)</p>
+              <h4 class="mb-0">{{ absent_employees }}</h4>
+            </div>
+            <div class="flex-shrink-0">
+              <i class="fas fa-user-times fa-2x text-danger"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-4">
+      <div class="card dashboard-card border-start border-warning border-4">
+        <div class="card-body">
+          <div class="d-flex align-items-center">
+            <div class="flex-grow-1">
+              <p class="text-muted mb-1">Attendance Rate</p>
+              <h4 class="mb-0">
+                {% if total_employees > 0 %}
+                  {% widthratio present_employees total_employees 100 %}%
+                {% else %}
+                  0%
+                {% endif %}
+              </h4>
+            </div>
+            <div class="flex-shrink-0">
+              <i class="fas fa-chart-pie fa-2x text-warning"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters and Controls -->
+  <div class="card dashboard-card mb-4">
+    <div class="card-header">
+      <h5 class="card-title mb-0">
+        <i class="fas fa-filter me-2"></i>Report Filters
+      </h5>
+    </div>
+    <div class="card-body">
+        <form method="get" class="text-center mb-3">
+            <div class="row justify-content-center align-items-end g-2">
+                <div class="col-md-3">
+                    <label for="start_date" class="form-label text-start w-100">Start Date</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label for="end_date" class="form-label text-start w-100">End Date</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label for="employee" class="form-label text-start w-100">Employee</label>
+                    <select name="employee" id="employee" class="form-select">
+                        <option value="">All Employees</option>
+                        {% for emp in employees %}
+                        <option value="{{ emp.id }}" {% if emp.id == selected_employee %}selected{% endif %}>
+                            {{ emp.user.get_full_name|default:emp.user.username }} ({{ emp.employee_id }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-1"></i> Filter Results
+                    </button>
+                </div>
+            </div>
+        </form>
+      
+      <div class="row mt-3">
+        <div class="col-12">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <span class="text-muted">
+                {% if start_date and end_date %}
+                    {% if start_date == end_date %}
+                        Showing data for <strong>{{ start_date|date:"M d, Y" }}</strong>
+                    {% else %}
+                        Showing data from <strong>{{ start_date|date:"M d, Y" }}</strong> to <strong>{{ end_date|date:"M d, Y" }}</strong>
+                    {% endif %}
+                {% else %}
+                  Showing all recent data
+                {% endif %}
+              </span>
+            </div>
+            <!-- CSV Download -->
+            <div>
+                <a href="?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}&download=excel" class="btn btn-success">
+                  <i class="fas fa-file-excel me-1"></i> Export Excel
+                </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Row -->
+  <div class="row mb-4">
+    <div class="col-lg-8">
+      <div class="card dashboard-card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Attendance Overview</h5>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              <i class="fas fa-calendar me-1"></i> Period
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="?range=week">This Week</a></li>
+              <li><a class="dropdown-item" href="?range=month">This Month</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="card-body">
+            <!-- FIXED: Added Canvas for Chart.js and removed placeholder -->
+            <div style="position: relative; height: 300px; width: 100%;">
+                <canvas id="attendanceChart"></canvas>
+            </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-lg-4">
+      <div class="card dashboard-card h-100">
+        <div class="card-header">
+          <h5 class="card-title mb-0">Attendance Distribution</h5>
+        </div>
+        <div class="card-body">
+          <div class="d-flex justify-content-center py-3">
+            <div class="position-relative" style="width: 180px; height: 180px; border-radius: 50%; background: conic-gradient(#198754 0% {% widthratio present_employees total_employees 100 %}%, #dc3545 0% 100%);">
+              <!-- Simple CSS pie chart representation -->
+              <div class="position-absolute top-50 start-50 translate-middle bg-white rounded-circle d-flex align-items-center justify-content-center" style="width: 140px; height: 140px;">
+                <div class="text-center">
+                  {% if total_employees > 0 %}
+                    <h3 class="mb-0">{% widthratio present_employees total_employees 100 %}%</h3>
+                  {% else %}
+                    <h3 class="mb-0">0%</h3>
+                  {% endif %}
+                  <small class="text-muted">Present</small>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="row text-center mt-3">
+            <div class="col-6">
+              <span class="badge bg-success p-2 w-100">
+                <i class="fas fa-user-check me-1"></i> {{ present_employees }} Present
+              </span>
+            </div>
+            <div class="col-6">
+              <span class="badge bg-danger p-2 w-100">
+                <i class="fas fa-user-times me-1"></i> {{ absent_employees }} Absent
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance Table -->
+  <div class="card dashboard-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="card-title mb-0">
+        <i class="fas fa-table me-2"></i>Attendance Records
+      </h5>
+      <span class="badge bg-primary">{{ attendance_data.paginator.count }} records</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-4">Employee</th>
+              <th>Type</th>
+              <th>Timestamp</th>
+              <th>Confidence</th>
+              <th>Location</th>
+              <th class="text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in attendance_data %}
+            <tr>
+              <td class="ps-4">
+                <div class="d-flex align-items-center">
+                  <div class="flex-shrink-0">
+                    <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" 
+                         style="width: 40px; height: 40px; font-size: 14px;">
+                      {{ record.employee.user.first_name|first|upper }}{{ record.employee.user.last_name|first|upper }}
+                    </div>
+                  </div>
+                  <div class="flex-grow-1 ms-3">
+                    <h6 class="mb-0">{{ record.employee.user.get_full_name|default:record.employee }}</h6>
+                    <small class="text-muted">ID: {{ record.employee.employee_id|default:"N/A" }}</small>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="badge rounded-pill
+                  {% if record.attendance_type == 'check_in' %}bg-success
+                  {% else %}bg-info{% endif %}">
+                  {{ record.get_attendance_type_display }}
+                </span>
+              </td>
+              <td>
+                <div class="d-flex flex-column">
+                  <span class="fw-medium">{{ record.timestamp|date:"M d, Y" }}</span>
+                  <span class="text-muted small">{{ record.timestamp|date:"H:i A" }}</span>
+                </div>
+              </td>
+              <td>
+                {% if record.confidence_score %}
+                  <div class="d-flex align-items-center" style="width: 120px;">
+                    <div class="progress flex-grow-1 me-2" style="height: 6px;">
+                      <div class="progress-bar 
+                        {% if record.confidence_score >= 90 %}bg-success
+                        {% elif record.confidence_score >= 70 %}bg-warning
+                        {% else %}bg-danger{% endif %}" 
+                        role="progressbar"
+                        style="width: {{ record.confidence_score }}%">
+                      </div>
+                    </div>
+                    <span class="small fw-bold">{{ record.confidence_score|floatformat:0 }}%</span>
+                  </div>
+                {% else %}
+                  <span class="text-muted small">N/A</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if record.location %}
+                  <span class="small text-muted">
+                    <i class="fas fa-map-marker-alt me-1 text-danger"></i> {{ record.location|truncatechars:20 }}
+                  </span>
+                {% else %}
+                  <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                {% if record.attendance_type == 'check_in' %}
+                  <i class="fas fa-check-circle text-success fs-5" title="Checked In"></i>
+                {% else %}
+                  <i class="fas fa-sign-out-alt text-info fs-5" title="Checked Out"></i>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="text-center py-5">
+                <div class="py-4">
+                  <i class="fas fa-inbox fa-3x text-muted mb-3 opacity-50"></i>
+                  <h5 class="text-muted">No attendance records found</h5>
+                  <p class="text-muted small">Try adjusting the date filters or selecting a different employee.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- Pagination -->
+    {% if attendance_data.has_other_pages %}
+    <div class="card-footer bg-white">
+      <nav aria-label="Attendance records navigation">
+        <ul class="pagination justify-content-center mb-0">
+          {% if attendance_data.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ attendance_data.previous_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">
+                <i class="fas fa-chevron-left"></i>
+              </a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-left"></i></span></li>
+          {% endif %}
+          
+          {% for i in attendance_data.paginator.page_range %}
+            {% if attendance_data.number == i %}
+              <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+            {% elif i > attendance_data.number|add:'-3' and i < attendance_data.number|add:'3' %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ i }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">{{ i }}</a>
+              </li>
+            {% endif %}
+          {% endfor %}
+          
+          {% if attendance_data.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ attendance_data.next_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">
+                <i class="fas fa-chevron-right"></i>
+              </a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-right"></i></span></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+.dashboard-card {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  border: 0;
+  border-radius: 0.5rem;
+}
+
+.table > :not(caption) > * > * {
+  padding: 1rem 0.75rem;
+}
+
+/* Fix for the Pie Chart CSS implementation */
+.border-start {
+  border-left-width: 4px !important;
+}
+</style>
+<!-- FIXED: Added Scripts for Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('attendanceChart').getContext('2d');
+    
+    // Parse the JSON data passed from Django
+    var labels = JSON.parse('{{ chart_labels|safe }}');
+    var data = JSON.parse('{{ chart_data|safe }}');
+
+    var attendanceChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Employees Present',
+                data: data,
+                backgroundColor: 'rgba(13, 110, 253, 0.7)', // Bootstrap primary color
+                borderColor: 'rgba(13, 110, 253, 1)',
+                borderWidth: 1,
+                borderRadius: 4,
+                maxBarThickness: 40
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false // Hide legend for single dataset
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.raw + ' Employees';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0
+                    },
+                    grid: {
+                        borderDash: [2, 4],
+                        color: "#e9ecef"
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+
+<style>
+.dashboard-card {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  border: 0;
+  border-radius: 0.5rem;
+}
+
+.table > :not(caption) > * > * {
+  padding: 1rem 0.75rem;
+}
+
+.border-start {
+  border-left-width: 4px !important;
+}
+</style>
+{% endblock %}

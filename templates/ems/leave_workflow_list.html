@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Approval Workflow{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm bg-white">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3 text-center text-primary">Current Workflow Visualization</h5>
+                {% if stages %}
+                <div class="d-flex align-items-center justify-content-center flex-wrap gap-4 py-3 position-relative">
+                    {% for stage in stages %}
+                    <div class="text-center position-relative z-1">
+                        <div class="workflow-node bg-white border border-2 border-primary text-primary rounded-circle d-flex align-items-center justify-content-center mx-auto shadow-sm mb-2"
+                            style="width: 80px; height: 80px; transition: all 0.3s;">
+                            <div class="d-flex flex-column">
+                                <span class="small fw-bold text-uppercase" style="font-size: 0.65rem;">Level</span>
+                                <span class="h4 mb-0 fw-bold">{{ stage.level }}</span>
+                            </div>
+                        </div>
+                        <div class="badge bg-light text-dark border">{{ stage.role_name }}</div>
+                    </div>
+                    {% if not forloop.last %}
+                    <div class="text-muted d-none d-md-block">
+                        <i class="fas fa-arrow-right fa-2x text-primary opacity-25"></i>
+                    </div>
+                    <div class="text-muted d-md-none w-100 text-center my-2">
+                        <i class="fas fa-arrow-down fa-2x text-primary opacity-25"></i>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+
+                    <!-- End Node -->
+                    <div class="text-muted d-none d-md-block">
+                        <i class="fas fa-arrow-right fa-2x text-success opacity-25"></i>
+                    </div>
+                    <div class="text-center position-relative z-1">
+                        <div class="workflow-node bg-success text-white rounded-circle d-flex align-items-center justify-content-center mx-auto shadow-sm mb-2"
+                            style="width: 60px; height: 60px;">
+                            <i class="fas fa-check fa-lg"></i>
+                        </div>
+                        <div class="badge bg-success-soft text-success">Approved</div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <p>No workflow stages defined yet.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold text-dark">Workflow Configuration</h5>
+        {% if user.is_staff %}
+        <a href="{% url 'leave_workflow_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Add Stage
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        {% if stages %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Level</th>
+                        <th>Role Name</th>
+                        <th>Next Step</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stage in stages %}
+                    <tr>
+                        <td class="ps-4">
+                            <span class="badge bg-primary rounded-circle p-2"
+                                style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                                {{stage.level }}</span>
+                        </td>
+                        <td>
+                            <span class="fw-bold text-dark">{{ stage.role_name }}</span>
+                        </td>
+                        <td>
+                            {% if stage.next_level %}
+                            <span class="text-muted"><i class="fas fa-arrow-right me-2 small"></i>Level {{
+                                stage.next_level }}</span>
+                            {% else %}
+                            <span class="badge bg-success-soft text-success"><i
+                                    class="fas fa-flag-checkered me-1"></i>Final Approval</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            {% if user.is_staff %}
+                            <div class="btn-group">
+                                <button class="btn btn-icon" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-icon delete" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-project-diagram"></i>
+            <h6>No Workflow Stages</h6>
+            <p class="small">Define the approval hierarchy for leave applications.</p>
+            {% if user.is_staff %}
+            <a href="{% url 'leave_workflow_create' %}" class="btn btn-primary mt-3">
+                <i class="fas fa-plus me-2"></i>Create First Stage
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .workflow-node:hover {
+        transform: scale(1.1);
+        box-shadow: var(--shadow-md) !important;
+    }
+</style>
+{% endblock %}

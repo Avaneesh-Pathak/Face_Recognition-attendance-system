@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow">
+        <div class="card-header bg-success text-white">
+            <h5>
+                💰 Pay Salary – {{ payroll.employee.user.get_full_name }}
+                ({{ payroll.month|date:"F Y" }})
+            </h5>
+        </div>
+
+        <div class="card-body">
+            <form method="POST">
+                {% csrf_token %}
+
+                <!-- Calculated Salary -->
+                <div class="mb-3">
+                    <label class="form-label">
+                        Calculated Salary (System)
+                    </label>
+                    <input type="text"
+                           class="form-control"
+                           value="₹ {{ payroll.calculated_salary }}"
+                           readonly>
+                    <small class="text-muted">
+                        Based on attendance, work rule, overtime, deductions
+                    </small>
+                </div>
+
+                <!-- Actual Salary Paid -->
+                <div class="mb-3">
+                    <label class="form-label">
+                        Actual Salary Paid (Override if required)
+                    </label>
+                    <input type="number"
+                           step="0.01"
+                           name="amount_paid"
+                           class="form-control"
+                           value="{{ payroll.net_salary }}">
+                    <small class="text-warning">
+                        Leave unchanged to pay calculated salary.
+                        Change only if approval exists.
+                    </small>
+                </div>
+
+                <!-- Payment Date -->
+                <div class="mb-3">
+                    <label class="form-label">Payment Date</label>
+                    <input type="date"
+                           name="paid_date"
+                           class="form-control"
+                           value="{{ today|default:None }}"
+                           required>
+                </div>
+
+                {% if payroll.actual_paid_salary %}
+                <div class="alert alert-warning">
+                    ⚠ Salary override applied earlier.
+                    Calculated: ₹{{ payroll.calculated_salary }},
+                    Paid: ₹{{ payroll.actual_paid_salary }}
+                </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'payroll_list' %}"
+                       class="btn btn-secondary">
+                        Cancel
+                    </a>
+                    <button type="submit"
+                            class="btn btn-success">
+                        ✅ Mark as Paid
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

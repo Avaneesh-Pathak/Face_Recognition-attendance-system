@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-5">
+    <div class="card shadow border-danger">
+        <div class="card-header bg-danger text-white">
+            <h5>⚠ Delete Work Rule</h5>
+        </div>
+
+        <div class="card-body">
+            <p>
+                Are you sure you want to delete the work rule:
+                <strong>{{ rule.name }}</strong>?
+            </p>
+
+            <div class="alert alert-warning">
+                This action <strong>cannot be undone</strong>.
+                Employees using this rule may be affected.
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'workrule_list' %}" class="btn btn-secondary">
+                        Cancel
+                    </a>
+                    <button type="submit" class="btn btn-danger">
+                        Yes, Delete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

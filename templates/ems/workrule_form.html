@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | Configuration{% endblock %}
+
+{% block content %}
+<div class="container fade-in-up" style="max-width: 1100px;">
+    
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">
+                <i class="fas fa-clock text-primary me-2"></i>{{ title }}
+            </h2>
+            <p class="text-muted mb-0">Define shift timings, working days, and overtime rules.</p>
+        </div>
+        <a href="{% url 'workrule_list' %}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fas fa-arrow-left me-2"></i>Back to Rules
+        </a>
+    </div>
+
+    <form method="post" id="workRuleForm" novalidate>
+        {% csrf_token %}
+
+        <div class="row g-4">
+            
+            <!-- SECTION 1: General Schedule -->
+            <div class="col-lg-12">
+                <div class="card modern-card">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-primary-soft text-primary">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <h5 class="mb-0">General Schedule</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-4 align-items-center">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold required-field">Rule Name</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="fas fa-tag"></i></span>
+                                    {{ form.name }}
+                                </div>
+                                <div class="form-text">e.g., "General Shift", "Night Ops", "Support Team"</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Working Pattern</label>
+                                {{ form.working_days }}
+                            </div>
+
+                            <!-- Toggles for Weekends -->
+                            <div class="col-md-12 mt-3">
+                                <div class="p-3 bg-light rounded-3 d-flex flex-wrap gap-4 border border-light">
+                                    <div class="d-flex align-items-center">
+                                        <div class="form-check form-switch custom-switch">
+                                            {{ form.saturday_is_working }}
+                                            <label class="form-check-label fw-semibold ms-2" for="{{ form.saturday_is_working.id_for_label }}">
+                                                Saturday Working
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <div class="form-check form-switch custom-switch">
+                                            {{ form.sunday_is_working }}
+                                            <label class="form-check-label fw-semibold ms-2" for="{{ form.sunday_is_working.id_for_label }}">
+                                                Sunday Working
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: Standard Shift Timing -->
+            <div class="col-lg-6">
+                <div class="card modern-card h-100">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-info-soft text-info">
+                            <i class="fas fa-sun"></i>
+                        </div>
+                        <h5 class="mb-0">Day Shift Timing</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Start Time</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="far fa-clock"></i></span>
+                                    {{ form.shift_start_time }}
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">End Time</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="far fa-clock"></i></span>
+                                    {{ form.shift_end_time }}
+                                </div>
+                            </div>
+                            <div class="col-12"><hr class="text-muted opacity-25 my-1"></div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Full Day (Hrs)</label>
+                                {{ form.full_day_hours }}
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Half Day (Hrs)</label>
+                                {{ form.half_day_hours }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: Night Shift Configuration -->
+            <div class="col-lg-6">
+                <div class="card modern-card h-100">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-purple-soft text-purple">
+                            <i class="fas fa-moon"></i>
+                        </div>
+                        <h5 class="mb-0">Night Shift Config</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Start Time</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="fas fa-cloud-moon"></i></span>
+                                    {{ form.night_shift_start }}
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">End Time</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="fas fa-cloud-sun"></i></span>
+                                    {{ form.night_shift_end }}
+                                </div>
+                            </div>
+                            <div class="col-12 mt-4">
+                                <label class="form-label fw-semibold">Bonus Multiplier</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text">x</span>
+                                    {{ form.night_bonus_multiplier }}
+                                </div>
+                                <div class="form-text text-end">e.g., 1.25 for 25% extra pay</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 4: Overtime & Financials -->
+            <div class="col-lg-12">
+                <div class="card modern-card mb-5">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-success-soft text-success">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <h5 class="mb-0">Overtime (OT) Rules</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-4 mb-3 mb-md-0">
+                                <label class="form-label fw-semibold">OT Rate (Hourly)</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text fw-bold">₹</span>
+                                    {{ form.overtime_rate }}
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="d-flex flex-column flex-sm-row gap-4 ms-md-4">
+                                    <div class="form-check form-switch custom-switch">
+                                        {{ form.count_weekend_overtime }}
+                                        <label class="form-check-label ms-2" for="{{ form.count_weekend_overtime.id_for_label }}">
+                                            Include Weekend OT
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-switch custom-switch">
+                                        {{ form.count_holiday_overtime }}
+                                        <label class="form-check-label ms-2" for="{{ form.count_holiday_overtime.id_for_label }}">
+                                            Include Holiday OT
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Sticky Footer for Actions -->
+        <div class="form-actions text-center pb-5">
+            <button type="submit" class="btn btn-primary btn-lg px-5 shadow-lg rounded-pill hover-scale">
+                <i class="fas fa-save me-2"></i>Save Work Rule
+            </button>
+            <a href="{% url 'workrule_list' %}" class="btn btn-link text-secondary text-decoration-none mt-2 d-block">
+                Cancel and Return
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- Modern CSS -->
+<style>
+    :root {
+        --primary: #4361ee;
+        --card-radius: 16px;
+        --input-radius: 10px;
+    }
+
+    /* Layout & Animation */
+    .fade-in-up { animation: fadeInUp 0.4s ease-out; }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Modern Card */
+    .modern-card {
+        background: #fff;
+        border: 0;
+        border-radius: var(--card-radius);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.03);
+        border: 1px solid rgba(0,0,0,0.02);
+    }
+    .card-header-modern {
+        padding: 18px 25px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        background: #fff;
+        border-radius: var(--card-radius) var(--card-radius) 0 0;
+    }
+
+    /* Icon Boxes */
+    .icon-box {
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 12px;
+        font-size: 1.1rem;
+    }
+    .bg-primary-soft { background: rgba(67, 97, 238, 0.1); color: var(--primary); }
+    .bg-info-soft { background: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
+    .bg-purple-soft { background: rgba(111, 66, 193, 0.1); color: #6f42c1; }
+    .bg-success-soft { background: rgba(25, 135, 84, 0.1); color: #198754; }
+
+    /* Input Styling */
+    .form-control, .form-select {
+        border-radius: var(--input-radius);
+        border: 1px solid #e2e8f0;
+        padding: 0.6rem 1rem;
+        transition: all 0.2s;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+    }
+    
+    /* Input Group Icons */
+    .input-group-modern .input-group-text {
+        background: #f8f9fa;
+        border: 1px solid #e2e8f0;
+        border-right: none;
+        color: #6c757d;
+        border-top-left-radius: var(--input-radius);
+        border-bottom-left-radius: var(--input-radius);
+    }
+    .input-group-modern .form-control {
+        border-left: none;
+    }
+
+    /* Custom Toggles */
+    .custom-switch .form-check-input {
+        width: 3em;
+        height: 1.5em;
+        cursor: pointer;
+        margin-top: 0;
+        background-color: #e9ecef;
+        border-color: #dee2e6;
+    }
+    .custom-switch .form-check-input:checked {
+        background-color: var(--primary);
+        border-color: var(--primary);
+    }
+    .hover-scale:hover { transform: translateY(-2px); transition: transform 0.2s; }
+    .required-field::after { content: "*"; color: #dc3545; margin-left: 4px; }
+</style>
+
+<!-- Scripts to initialize form widgets -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. Auto-style all inputs
+        const inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea');
+        inputs.forEach(input => {
+            input.classList.add('form-control');
+            if(input.tagName === 'SELECT') input.classList.replace('form-control', 'form-select');
+        });
+
+        // 2. Auto-style toggles (checkboxes)
+        const checks = document.querySelectorAll('input[type="checkbox"]');
+        checks.forEach(c => {
+            c.classList.add('form-check-input');
+            c.setAttribute('role', 'switch');
+        });
+
+        // 3. Ensure Time Inputs render correctly
+        // Since Django standard TimeWidget renders as text="text", we force type="time" via JS
+        // based on common ID patterns or manually selecting specific fields.
+        const timeFields = [
+            'id_shift_start_time', 'id_shift_end_time', 
+            'id_night_shift_start', 'id_night_shift_end'
+        ];
+        timeFields.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.setAttribute('type', 'time');
+        });
+    });
+</script>
+
+{% endblock %}

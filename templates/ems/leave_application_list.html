@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Leave Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="d-flex gap-3">
+            <div class="card border-0 shadow-sm px-3 py-2 d-flex flex-row align-items-center">
+                <div class="bg-primary-soft p-2 rounded-circle me-2">
+                    <i class="fas fa-file-alt text-primary"></i>
+                </div>
+                <div>
+                    <small class="text-muted d-block">My Applications</small>
+                    <span class="fw-bold">{{ my_leaves.count|default:"0" }}</span>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm px-3 py-2 d-flex flex-row align-items-center">
+                <div class="bg-warning-soft p-2 rounded-circle me-2">
+                    <i class="fas fa-clock text-warning"></i>
+                </div>
+                <div>
+                    <small class="text-muted d-block">Pending Review</small>
+                    <span class="fw-bold">{{ pending_approvals|length|default:"0" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a href="{% url 'leave_workflow_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-cog me-2"></i>Workflow
+            </a>
+            <a href="{% url 'leave_application_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Apply for Leave
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- My Leave Applications -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-dark">My Applications</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Leave Type</th>
+                                <th>Duration</th>
+                                <th>Days</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for leave in my_leaves %}
+                            <tr>
+                                <td class="ps-4">
+                                    <span class="fw-medium">{{ leave.leave_type.name }}</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <span class="small fw-bold">{{ leave.start_date|date:"M d, Y" }}</span>
+                                        <span class="small text-muted">to {{ leave.end_date|date:"M d, Y" }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">{{ leave.total_days }} Days</span>
+                                </td>
+                                <td>
+                                    {% if leave.status == 'approved' %}
+                                    <span class="badge bg-success-soft">Approved</span>
+                                    {% elif leave.status == 'rejected' %}
+                                    <span class="badge bg-danger-soft">Rejected</span>
+                                    {% elif leave.status == 'cancelled' %}
+                                    <span class="badge bg-secondary">Cancelled</span>
+                                    {% else %}
+                                    <span class="badge bg-warning-soft">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-icon" data-bs-toggle="modal"
+                                        data-bs-target="#leaveModal{{ leave.id }}">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <!-- Modal -->
+                            <div class="modal fade" id="leaveModal{{ leave.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content border-0 shadow">
+                                        <div class="modal-header border-bottom-0 pb-0">
+                                            <h5 class="modal-title fw-bold">Leave Details</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="mb-3">
+                                                <label class="small text-muted text-uppercase fw-bold">Reason</label>
+                                                <p class="bg-light p-3 rounded">{{ leave.reason }}</p>
+                                            </div>
+
+                                            <label class="small text-muted text-uppercase fw-bold mb-2">Approval
+                                                Timeline</label>
+                                            <div class="timeline">
+                                                {% for approval in leave.approvals.all %}
+                                                <div class="d-flex mb-3">
+                                                    <div class="me-3">
+                                                        <div class="bg-light rounded-circle d-flex align-items-center justify-content-center"
+                                                            style="width: 32px; height: 32px;">
+                                                            <span class="small fw-bold">{{ approval.level }}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <p class="mb-0 fw-bold">{{ approval.approver.user.get_full_name
+                                                            }}</p>
+                                                        <small class="text-muted">
+                                                            <span
+                                                                class="badge {% if approval.status == 'approved' %}bg-success-soft{% elif approval.status == 'rejected' %}bg-danger-soft{% else %}bg-warning-soft{% endif %} me-1">
+                                                                {{ approval.status|title }}
+                                                            </span>
+                                                            {% if approval.acted_at %}{{ approval.acted_at|date:"M d,
+                                                            H:i" }}{% endif %}
+                                                        </small>
+                                                        {% if approval.remarks %}
+                                                        <p class="small text-muted mt-1 fst-italic">"{{ approval.remarks
+                                                            }}"</p>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                {% empty %}
+                                                <p class="text-muted small">No approval actions yet.</p>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="empty-state">
+                                        <i class="fas fa-calendar-times"></i>
+                                        <h6>No Applications</h6>
+                                        <p class="small">You haven't applied for any leave yet.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Approvals -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">Pending Approvals</h5>
+                {% if pending_approvals %}
+                <span class="badge bg-warning text-dark">{{ pending_approvals|length }} New</span>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if pending_approvals %}
+                <div class="list-group list-group-flush">
+                    {% for leave in pending_approvals %}
+                    <div class="list-group-item p-3 border-bottom">
+                        <div class="d-flex justify-content-between mb-2">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-initials bg-primary-soft text-primary rounded-circle me-2 d-flex align-items-center justify-content-center"
+                                    style="width: 32px; height: 32px;">
+                                    {{ leave.employee.user.first_name|first }}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold">{{ leave.employee.user.get_full_name }}</h6>
+                                    <small class="text-muted">{{ leave.leave_type.name }}</small>
+                                </div>
+                            </div>
+                            <span class="badge bg-light text-dark border align-self-start">{{ leave.total_days }}
+                                Days</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-end mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-calendar me-1"></i>
+                                {{ leave.start_date|date:"M d" }} - {{ leave.end_date|date:"M d" }}
+                            </small>
+                            <a href="{% url 'leave_approval_action' leave.pk %}" class="btn btn-sm btn-primary">
+                                Review
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state py-5">
+                    <i class="fas fa-check-circle text-success"></i>
+                    <h6>All Caught Up!</h6>
+                    <p class="small">No pending approvals at the moment.</p>
+                </div>
+                {% endif %}
+            </div>
+            {% if pending_approvals %}
+            <div class="card-footer bg-white text-center p-2">
+                <a href="{% url 'my_pending_approvals' %}" class="text-decoration-none small fw-bold">View All
+                    Approvals</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

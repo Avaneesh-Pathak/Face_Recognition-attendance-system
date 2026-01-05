@@ -1,0 +1,401 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load attendance_filters %}
+
+{% block title %}Dashboard | FaceAttend{% endblock %}
+
+{% block page_title %}
+    {% if is_admin %}
+        <i class="fas fa-chart-pie me-2 text-primary"></i>Admin Panel
+    {% else %}
+        <i class="fas fa-home me-2 text-primary"></i>My Overview
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4 py-4">
+
+    <!-- 1. Admin Control Bar -->
+    {% if is_admin %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm p-3" style="border-radius: 16px;">
+                <div class="row align-items-center g-3">
+                    <div class="col-lg-8">
+                        <h5 class="fw-bold mb-1">Welcome back, Admin</h5>
+                        <p class="text-muted small mb-0">System-wide attendance and AI confidence metrics.</p>
+                    </div>
+                    <div class="col-lg-4">
+                        <form method="get" class="d-flex gap-2">
+                            <select name="emp_id" class="form-select border-light-subtle shadow-sm" onchange="this.form.submit()" style="border-radius: 10px;">
+                                <option value="">Global Overview</option>
+                                {% for emp in employees %}
+                                    <option value="{{ emp.id }}" {% if emp.id == selected_emp_id %}selected{% endif %}>
+                                        {{ emp.user.get_full_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            {% if selected_emp_id %}
+                                <a href="{% url 'dashboard' %}" class="btn btn-light"><i class="fas fa-undo"></i></a>
+                            {% endif %}
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Admin Stats Grid (6 Cards Wide on Desktop, 3 on Tablet, 1 on Mobile) -->
+    <div class="row g-3 mb-4">
+        <!-- Total Employees -->
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="stat-card-modern indigo">
+                <div class="icon"><i class="fas fa-users"></i></div>
+                <div class="label">Total Staff</div>
+                <div class="value">{{ total_employees }}</div>
+                <div class="trend text-white-50">Active Payroll</div>
+            </div>
+        </div>
+        <!-- Today's Records -->
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="stat-card-modern emerald">
+                <div class="icon"><i class="fas fa-check-circle"></i></div>
+                <div class="label">Today's Logs</div>
+                <div class="value">{{ today_attendance|length }}</div>
+                <div class="trend text-white-50">Real-time sync</div>
+            </div>
+        </div>
+        <!-- Weekly Records -->
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="stat-card-modern blue">
+                <div class="icon"><i class="fas fa-calendar-week"></i></div>
+                <div class="label">This Week</div>
+                <div class="value">{{ week_attendance|length }}</div>
+                <div class="trend text-white-50">System Logs</div>
+            </div>
+        </div>
+        <!-- Monthly -->
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="stat-card-modern amber">
+                <div class="icon"><i class="fas fa-chart-area"></i></div>
+                <div class="label">This Month</div>
+                <div class="value">{{ month_attendance|length }}</div>
+                <div class="trend text-white-50">Total entries</div>
+            </div>
+        </div>
+        <!-- Avg Confidence -->
+        <!-- <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="stat-card-modern purple">
+                <div class="icon"><i class="fas fa-brain"></i></div>
+                <div class="label">AI Confidence</div>
+                <div class="value">{{ avg_confidence }}%</div>
+                <div class="trend text-white-50">Face Match</div>
+            </div>
+        </div> -->
+        <!-- Pending Approvals -->
+        <div class="col-xl-2 col-md-4 col-sm-6">
+            <div class="stat-card-modern rose">
+                <div class="icon"><i class="fas fa-clock"></i></div>
+                <div class="label">Pending</div>
+                <div class="value">{{ pending_approvals|default:0 }}</div>
+                <div class="trend text-white-50">Action required</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 3. Dynamic Dashboard Section -->
+    <div class="row g-4">
+        <!-- Main Content Area (LHS) -->
+        <div class="col-xl-8 col-lg-7">
+            
+            <!-- Employee Quick Stats (Active status, Hours, Leaves) -->
+            {% if not is_admin or selected_emp_id %}
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="status-box {% if current_status == 'Checked In' %}status-green{% else %}status-red{% endif %}">
+                        <small>Status</small>
+                        <h4>{{ current_status }}</h4>
+                        <span>Since {{ last_checkin.timestamp|time:"H:i"|default:"--" }}</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="status-box status-blue">
+                        <small>Work Hours</small>
+                        <h4>{{ total_hours }}h</h4>
+                        <span>Daily Cumulative</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="status-box status-amber">
+                        <small>Approved Leaves</small>
+                        <h4>{{ leave_stats|length|default:"0" }}d</h4>
+                        <span>Remaining Balance</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Analytics Charts -->
+            <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px;">
+                <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                    <h6 class="fw-bold mb-0">Attendance Frequency</h6>
+                    <span class="badge bg-light text-dark border">Last 30 Days</span>
+                </div>
+                <div class="card-body p-4">
+                    <div style="height: 320px;">
+                        <canvas id="attendanceChartMain"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity Timeline -->
+            <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h6 class="fw-bold mb-0">Recent Activity Log</h6>
+                </div>
+                <div class="card-body p-4">
+                    {% if today_attendance %}
+                        <div class="modern-timeline">
+                            {% for record in today_attendance %}
+                            <div class="timeline-item">
+                                <div class="timeline-time">{{ record.timestamp|time:"h:i A" }}</div>
+                                <div class="timeline-marker"></div>
+                                <div class="timeline-content">
+                                    <h6 class="fw-bold mb-1">{{ record.get_attendance_type_display }}</h6>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-fingerprint fa-3x text-light-emphasis mb-3"></i>
+                            <h6 class="text-muted">No biometric records found today.</h6>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Area (RHS) -->
+        <div class="col-xl-4 col-lg-5">
+            <!-- 1. Quick Actions -->
+            <div class="card border-0 shadow-sm mb-4 bg-primary text-white" style="border-radius: 16px; overflow: hidden;">
+                <div class="card-body p-4 text-center">
+                    <h5 class="fw-bold mb-3">Daily Operations</h5>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'attendance_page' %}" class="btn btn-white btn-lg fw-bold shadow-sm py-3" style="border-radius: 12px;">
+                            <i class="fas fa-camera me-2 text-primary"></i> Mark Attendance
+                        </a>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <a href="{% url 'leave_application_list' %}" class="btn btn-primary-light w-100 py-2" style="border-radius: 10px;">
+                                    <i class="fas fa-paper-plane me-1"></i> Leaves
+                                </a>
+                            </div>
+                            <div class="col-6">
+                                <a href="{% url 'attendance_history_all' %}" class="btn btn-primary-light w-100 py-2" style="border-radius: 10px;">
+                                    <i class="fas fa-history me-1"></i> History
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Profile Summary -->
+            <div class="card border-0 shadow-sm mb-4 overflow-hidden" style="border-radius: 16px;">
+                <div style="height: 100px; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);"></div>
+                <div class="card-body text-center" style="margin-top: -50px;">
+                    <div class="avatar-lg shadow-sm mx-auto mb-3">
+                        {{ employee.user.get_full_name|make_list|first|upper|default:"U" }}
+                    </div>
+                    <h5 class="fw-bold mb-0">{{ employee.user.get_full_name }}</h5>
+                    <p class="text-muted small mb-3">{{ employee.employee_id }} • {{ employee.department }}</p>
+                    
+                    <div class="d-flex justify-content-center gap-4 py-3 border-top border-bottom border-light">
+                        <div class="text-center">
+                            <div class="fw-bold">{{ month_attendance.count }}</div>
+                            <small class="text-muted">Logs/Mo</small>
+                        </div>
+                        <div class="text-center">
+                            <div class="fw-bold">{{ avg_confidence }}%</div>
+                            <small class="text-muted">Avg Trust</small>
+                        </div>
+                    </div>
+                </div>
+                <!-- Only show the calendar button if an employee ID exists -->
+                {% if employee.id %}
+                    <div class="card-footer bg-white border-0 p-3 text-center">
+                        <a href="{% url 'attendance_calendar' employee.id year month %}" class="btn btn-sm btn-outline-primary px-4 rounded-pill">
+                            Full Calendar View
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="card-footer bg-white border-0 p-3 text-center">
+                        <span class="text-muted small">Select an employee to view calendar</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- 3. Notifications/Alerts -->
+            {% if is_admin %}
+            <div class="card border-0 shadow-sm" style="border-radius: 16px;">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h6 class="fw-bold mb-0">System Alerts</h6>
+                </div>
+                <div class="card-body px-4 pb-4 pt-2">
+                    <div class="alert-list">
+                        {% for notification in recent_notifications|slice:":4" %}
+                        <div class="alert-item d-flex gap-3 mb-3">
+                            <div class="alert-icon bg-light text-primary rounded-circle" style="width: 35px; height: 35px; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+                                <i class="fas fa-bell small"></i>
+                            </div>
+                            <div>
+                                <div class="small fw-bold">{{ notification.message }}</div>
+                                <div class="text-muted" style="font-size: 0.7rem;">{{ notification.created_at|timesince }} ago</div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted small text-center my-3">No new notifications</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+/* --- Dashboard Layout & Component Styles --- */
+:root {
+    --primary: #4f46e5;
+    --indigo: #6366f1;
+    --emerald: #10b981;
+    --blue: #3b82f6;
+    --amber: #f59e0b;
+    --rose: #f43f5e;
+    --purple: #8b5cf6;
+}
+
+/* Modern Stat Cards (Admin) */
+.stat-card-modern {
+    padding: 1.25rem;
+    border-radius: 16px;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+}
+.stat-card-modern:hover { transform: translateY(-5px); }
+.stat-card-modern .icon { position: absolute; right: -10px; bottom: -10px; font-size: 3.5rem; opacity: 0.2; }
+.stat-card-modern .label { font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 5px; opacity: 0.9; }
+.stat-card-modern .value { font-size: 1.5rem; font-weight: 800; font-family: 'Outfit'; margin-bottom: 2px; }
+.stat-card-modern .trend { font-size: 0.7rem; font-weight: 500; }
+
+.stat-card-modern.indigo { background: linear-gradient(135deg, #4f46e5, #6366f1); }
+.stat-card-modern.emerald { background: linear-gradient(135deg, #059669, #10b981); }
+.stat-card-modern.blue { background: linear-gradient(135deg, #2563eb, #3b82f6); }
+.stat-card-modern.amber { background: linear-gradient(135deg, #d97706, #f59e0b); }
+.stat-card-modern.rose { background: linear-gradient(135deg, #e11d48, #f43f5e); }
+.stat-card-modern.purple { background: linear-gradient(135deg, #7c3aed, #8b5cf6); }
+
+/* Status Boxes (Employee) */
+.status-box {
+    padding: 1.25rem;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    border-left: 4px solid #e2e8f0;
+}
+.status-box small { text-transform: uppercase; font-size: 0.7rem; font-weight: 700; color: #64748b; letter-spacing: 0.05em; }
+.status-box h4 { margin: 4px 0; font-weight: 800; color: #1e293b; }
+.status-box span { font-size: 0.75rem; color: #94a3b8; }
+
+.status-green { border-left-color: var(--emerald); }
+.status-red { border-left-color: var(--rose); }
+.status-blue { border-left-color: var(--blue); }
+.status-amber { border-left-color: var(--amber); }
+
+/* Vertical Timeline */
+.modern-timeline { position: relative; padding-left: 20px; }
+.timeline-item { position: relative; display: flex; gap: 20px; padding-bottom: 25px; }
+.timeline-item::before { content: ''; position: absolute; left: 88px; top: 0; bottom: 0; width: 2px; background: #f1f5f9; }
+.timeline-item:last-child::before { display: none; }
+.timeline-time { min-width: 75px; font-size: 0.75rem; font-weight: 700; color: #64748b; padding-top: 3px; }
+.timeline-marker { width: 12px; height: 12px; border-radius: 50%; background: var(--primary); border: 3px solid #fff; box-shadow: 0 0 0 3px #e0e7ff; z-index: 1; margin-top: 6px; }
+.timeline-content { flex: 1; }
+
+/* Profile Card Customizations */
+.avatar-lg {
+    width: 100px; height: 100px; background: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 2.2rem; font-weight: 800; color: var(--primary); border: 4px solid #fff;
+}
+.btn-white { background: #fff; color: var(--primary); border: none; }
+.btn-white:hover { background: #f8fafc; color: #4338ca; }
+.btn-primary-light { background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.3); }
+.btn-primary-light:hover { background: rgba(255,255,255,0.3); color: #fff; }
+
+/* Tablet and Mobile Optimization */
+@media (max-width: 1199px) {
+    .timeline-item::before { left: 88px; }
+}
+@media (max-width: 768px) {
+    .timeline-item { gap: 10px; }
+    .timeline-time { min-width: 65px; font-size: 0.7rem; }
+    .timeline-item::before { left: 78px; }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('attendanceChartMain');
+    if (!ctx) return;
+
+    // Use JSON-parsed data from Django
+    const labels = {{ attendance_labels_json|safe|default:"[]" }};
+    const values = {{ attendance_values_json|safe|default:"[]" }};
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Check-ins',
+                data: values,
+                borderColor: '#4f46e5',
+                backgroundColor: 'rgba(79, 70, 229, 0.05)',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: '#4f46e5',
+                pointBorderWidth: 2,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#f1f5f9' },
+                    ticks: { color: '#94a3b8', font: { size: 11 } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#94a3b8', font: { size: 11 } }
+                }
+            }
+        }
+    });
+});
+</script>
+
+{% endblock %}

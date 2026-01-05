@@ -1,0 +1,449 @@
+{% extends 'base.html' %}
+
+{% block title %}Apply for Leave - Employee Management System{% endblock %}
+
+{% block page_title %}Apply for Leave{% endblock %}
+
+{% block page_subtitle %}Submit your leave application for approval{% endblock %}
+
+{% block header_buttons %}
+<div class="btn-group">
+    <a href="{% url 'leave_application_list' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i> Back to Leaves
+    </a>
+    <a href="{% url 'leave_type_list' %}" class="btn btn-outline-primary">
+        <i class="fas fa-list me-1"></i> Leave Types
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card dashboard-card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-calendar-plus me-2"></i>Leave Application Form
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Quick Stats -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="stat-card text-center">
+                            <div class="stat-number text-primary">{{ available_leave_days }}</div>
+                            <div class="stat-label">Available Days</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card text-center">
+                            <div class="stat-number text-info">{{ used_leave_days }}</div>
+                            <div class="stat-label">Used This Year</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-card text-center">
+                            <div class="stat-number text-success">{{ pending_applications }}</div>
+                            <div class="stat-label">Pending Applications</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Leave Application Form -->
+                <form method="post" id="leaveApplicationForm">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <!-- Leave Type -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.leave_type.id_for_label }}" class="form-label">
+                                <i class="fas fa-tag me-1 text-primary"></i>Leave Type
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.leave_type }}
+                            {% if form.leave_type.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.leave_type.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">Select the type of leave you're applying for</div>
+                        </div>
+
+                        <!-- Leave Duration Display -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-clock me-1 text-primary"></i>Leave Duration
+                            </label>
+                            <div class="border rounded p-3 bg-light">
+                                <div class="text-center">
+                                    <span id="leaveDuration" class="h5 text-primary">0 days</span>
+                                    <div class="small text-muted" id="leaveDates"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Start Date -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.start_date.id_for_label }}" class="form-label">
+                                <i class="fas fa-calendar-day me-1 text-primary"></i>Start Date
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.start_date }}
+                            {% if form.start_date.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.start_date.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">First day of your leave</div>
+                        </div>
+
+                        <!-- End Date -->
+                        <div class="col-md-6 mb-3">
+                            <label for="{{ form.end_date.id_for_label }}" class="form-label">
+                                <i class="fas fa-calendar-day me-1 text-primary"></i>End Date
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.end_date }}
+                            {% if form.end_date.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.end_date.errors %}
+                                {{ error }}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">Last day of your leave</div>
+                        </div>
+                    </div>
+
+                    <!-- Reason -->
+                    <div class="mb-4">
+                        <label for="{{ form.reason.id_for_label }}" class="form-label">
+                            <i class="fas fa-comment-dots me-1 text-primary"></i>Reason for Leave
+                            <span class="text-danger">*</span>
+                        </label>
+                        {{ form.reason }}
+                        {% if form.reason.errors %}
+                        <div class="invalid-feedback d-block">
+                            {% for error in form.reason.errors %}
+                            {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <div class="form-text">Please provide a detailed reason for your leave application</div>
+                    </div>
+
+                    <!-- Leave Policy Information -->
+                    <div class="alert alert-info">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-info-circle me-2"></i>Leave Policy Information
+                        </h6>
+                        <ul class="mb-0">
+                            <li>Leave applications require approval from your manager</li>
+                            <li>Apply at least 3 working days in advance for planned leaves</li>
+                            <li>Emergency leaves can be applied with proper documentation</li>
+                            <li>You will be notified via email about approval status</li>
+                        </ul>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                        <a href="{% url 'leave_application_list' %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="fas fa-paper-plane me-1"></i> Submit Application
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Quick Help Card -->
+        <div class="card dashboard-card mt-4">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-question-circle me-2"></i>Need Help?
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Contact Information:</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="fas fa-user-tie me-2 text-primary"></i>
+                                <strong>Your Manager:</strong>
+                                <br>
+                                <span class="text-muted">
+                                    {% if request.user.employee.manager %}
+                                        {{ request.user.employee.manager.user.get_full_name }}
+                                    {% else %}
+                                        Not assigned
+                                    {% endif %}
+                                </span>
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-users me-2 text-primary"></i>
+                                <strong>HR Department:</strong>
+                                <br>
+                                <span class="text-muted">hr@company.com</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Quick Links:</h6>
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'leave_application_list' %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-history me-1"></i> View My Leaves
+                            </a>
+                            <a href="{% url 'leave_type_list' %}" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-list me-1"></i> Leave Types
+                            </a>
+                            <a href="{% url 'ems_dashboard' %}" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-tachometer-alt me-1"></i> EMS Dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add Bootstrap classes to form elements
+    const formElements = document.querySelectorAll('input, select, textarea');
+    formElements.forEach(element => {
+        element.classList.add('form-control');
+    });
+
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('id_start_date').min = today;
+    document.getElementById('id_end_date').min = today;
+
+    // Date fields
+    const startDateField = document.getElementById('id_start_date');
+    const endDateField = document.getElementById('id_end_date');
+    const leaveTypeField = document.getElementById('id_leave_type');
+    const durationDisplay = document.getElementById('leaveDuration');
+    const datesDisplay = document.getElementById('leaveDates');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // Calculate leave duration
+    function calculateLeaveDuration() {
+        const startDate = new Date(startDateField.value);
+        const endDate = new Date(endDateField.value);
+        
+        if (startDate && endDate && startDate <= endDate) {
+            // Calculate business days (Monday-Friday)
+            let businessDays = 0;
+            const currentDate = new Date(startDate);
+            
+            while (currentDate <= endDate) {
+                const dayOfWeek = currentDate.getDay();
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday (0) or Saturday (6)
+                    businessDays++;
+                }
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            const totalDays = Math.floor((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+            
+            durationDisplay.textContent = `${businessDays} working day${businessDays !== 1 ? 's' : ''}`;
+            datesDisplay.innerHTML = `
+                ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}
+                <br><small class="text-muted">${totalDays} calendar day${totalDays !== 1 ? 's' : ''}</small>
+            `;
+            
+            // Check if duration exceeds available days
+            const availableDays = {{ available_leave_days }};
+            if (businessDays > availableDays) {
+                durationDisplay.classList.remove('text-primary');
+                durationDisplay.classList.add('text-danger');
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Exceeds Available Days';
+            } else {
+                durationDisplay.classList.remove('text-danger');
+                durationDisplay.classList.add('text-primary');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Submit Application';
+            }
+        } else {
+            durationDisplay.textContent = '0 days';
+            datesDisplay.textContent = 'Select valid dates';
+            durationDisplay.classList.remove('text-danger');
+            durationDisplay.classList.add('text-primary');
+        }
+    }
+
+    // Add event listeners
+    startDateField.addEventListener('change', function() {
+        endDateField.min = this.value;
+        calculateLeaveDuration();
+    });
+
+    endDateField.addEventListener('change', calculateLeaveDuration);
+
+    // Form validation
+    const form = document.getElementById('leaveApplicationForm');
+    form.addEventListener('submit', function(e) {
+        const startDate = new Date(startDateField.value);
+        const endDate = new Date(endDateField.value);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (startDate < today) {
+            e.preventDefault();
+            showAlert('error', 'Start date cannot be in the past.');
+            return;
+        }
+
+        if (startDate > endDate) {
+            e.preventDefault();
+            showAlert('error', 'End date cannot be before start date.');
+            return;
+        }
+
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Submitting...';
+    });
+
+    // Initialize date pickers with some enhancements
+    function initializeDatePickers() {
+        // Add date validation attributes
+        startDateField.setAttribute('pattern', '[0-9]{4}-[0-9]{2}-[0-9]{2}');
+        endDateField.setAttribute('pattern', '[0-9]{4}-[0-9]{2}-[0-9]{2}');
+        
+        // Add placeholders
+        startDateField.setAttribute('placeholder', 'YYYY-MM-DD');
+        endDateField.setAttribute('placeholder', 'YYYY-MM-DD');
+    }
+
+    // Alert function
+    function showAlert(type, message) {
+        const alertClass = type === 'error' ? 'alert-danger' : 'alert-success';
+        const alertHtml = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 'check-circle'} me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        const existingAlert = document.querySelector('.alert');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+        
+        form.insertAdjacentHTML('beforebegin', alertHtml);
+    }
+
+    // Initialize
+    initializeDatePickers();
+    calculateLeaveDuration();
+
+    // Add keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Ctrl + Enter to submit form
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            form.dispatchEvent(new Event('submit'));
+        }
+        
+        // Escape key to cancel
+        if (e.key === 'Escape') {
+            window.location.href = "{% url 'leave_application_list' %}";
+        }
+    });
+});
+</script>
+
+<style>
+.form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.form-control:focus {
+    border-color: #4361ee;
+    box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25);
+}
+
+.stat-card {
+    background: white;
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    transition: var(--transition);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.stat-number {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+#leaveDuration {
+    font-weight: 700;
+}
+
+#leaveDates {
+    font-size: 0.875rem;
+}
+
+/* Custom styling for the reason textarea */
+#id_reason {
+    min-height: 120px;
+    resize: vertical;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .stat-card {
+        margin-bottom: 1rem;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Loading animation */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.loading {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+</style>
+{% endblock %}

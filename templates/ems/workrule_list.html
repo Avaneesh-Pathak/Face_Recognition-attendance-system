@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Work Rules | Configuration{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 fade-in-up" style="max-width: 1200px;">
+    
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">
+                <i class="fas fa-clipboard-list text-primary me-2"></i>Work Rules
+            </h2>
+            <p class="text-muted mb-0">Manage shift timings, overtime rates, and working day patterns.</p>
+        </div>
+        <a href="{% url 'workrule_create' %}" class="btn btn-primary btn-lg shadow-sm rounded-pill">
+            <i class="fas fa-plus me-2"></i>Create New Rule
+        </a>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="card border-0 shadow-sm mb-4 search-card">
+        <div class="card-body p-3">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
+                <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Search rules by name, shift type, or ID...">
+            </div>
+        </div>
+    </div>
+
+    <!-- Rules Table Card -->
+    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="rulesTable">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Rule Name</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Working Pattern</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Shift Timing</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Overtime (OT)</th>
+                            <th class="text-end pe-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in rules %}
+                        <tr>
+                            <!-- Rule Name -->
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="icon-shape bg-primary-soft text-primary rounded-3 me-3">
+                                        <i class="fas fa-business-time"></i>
+                                    </div>
+                                    <h6 class="mb-0 text-sm fw-bold text-dark">{{ r.name }}</h6>
+                                </div>
+                            </td>
+
+                            <!-- Working Days -->
+                            <td>
+                                <span class="badge bg-info-soft text-info border border-info-soft">
+                                    <i class="fas fa-calendar-week me-1"></i> {{ r.get_working_days_display }}
+                                </span>
+                            </td>
+
+                            <!-- Shift Timing -->
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="text-sm fw-bold text-dark">
+                                        {{ r.shift_start_time|time:"H:i" }} <span class="text-muted mx-1">to</span> {{ r.shift_end_time|time:"H:i" }}
+                                    </span>
+                                    <span class="text-xs text-muted">
+                                        Total: {{ r.full_day_hours }} Hrs
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- Overtime Rate -->
+                            <td>
+                                <span class="text-success fw-bold text-sm">
+                                    ₹ {{ r.overtime_rate }}<span class="text-muted fw-normal">/hr</span>
+                                </span>
+                            </td>
+
+                            <!-- Actions -->
+                            <td class="text-end pe-4">
+                                <a href="{% url 'workrule_update' r.id %}" class="btn btn-link text-primary p-0 me-3" data-bs-toggle="tooltip" title="Edit Rule">
+                                    <i class="fas fa-edit fa-lg"></i>
+                                </a>
+                                <button onclick="confirmDelete('{% url 'workrule_delete' r.id %}', '{{ r.name|escapejs }}')" class="btn btn-link text-danger p-0 border-0 bg-transparent" data-bs-toggle="tooltip" title="Delete Rule">
+                                    <i class="fas fa-trash-alt fa-lg"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5">
+                                <div class="empty-state">
+                                    <i class="fas fa-clipboard-check fa-3x text-muted mb-3 opacity-50"></i>
+                                    <h5 class="text-muted">No Work Rules Found</h5>
+                                    <p class="text-secondary small">Define your first shift pattern to get started.</p>
+                                    <a href="{% url 'workrule_create' %}" class="btn btn-sm btn-outline-primary mt-2">Add Work Rule</a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Styles -->
+<style>
+    /* Soft Colors for Badges & Icons */
+    .bg-primary-soft { background-color: rgba(67, 97, 238, 0.1); color: #4361ee; }
+    .bg-info-soft { background-color: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
+    .border-info-soft { border-color: rgba(13, 202, 240, 0.2) !important; }
+
+    /* Icon Shape */
+    .icon-shape {
+        width: 36px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Table Styles */
+    .table thead th {
+        border-bottom-width: 1px;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        background-color: #f8f9fa;
+        letter-spacing: 0.5px;
+    }
+    .table tbody tr { transition: background-color 0.2s ease; }
+    .table tbody tr:hover { background-color: #f8faff; }
+
+    /* Animations */
+    .fade-in-up { animation: fadeInUp 0.5s ease-out; }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Search Input Focus */
+    .search-card .form-control:focus { box-shadow: none; border-color: #e2e8f0; }
+</style>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // 1. Search Functionality
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        const value = this.value.toLowerCase();
+        const rows = document.querySelectorAll('#rulesTable tbody tr');
+        
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(value) ? '' : 'none';
+        });
+    });
+
+    // 2. SweetAlert Delete Confirmation
+    function confirmDelete(deleteUrl, name) {
+        Swal.fire({
+            title: 'Delete Work Rule?',
+            html: `Are you sure you want to delete <b>${name}</b>?<br><small class="text-muted">Employees assigned to this rule may need re-assignment.</small>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = deleteUrl;
+            }
+        });
+    }
+
+    // 3. Initialize Tooltips
+    document.addEventListener("DOMContentLoaded", function(){
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+
+{% endblock %}

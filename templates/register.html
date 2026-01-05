@@ -1,0 +1,579 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Register Employee | FaceAttend{% endblock %}
+
+{% block content %}
+<div class="registration-container fade-in-up">
+    <!-- Header -->
+    <div class="text-center mb-5">
+        <h1 class="fw-bold text-primary display-6">
+            <i class="fas fa-user-plus me-2"></i>New Employee Onboarding
+        </h1>
+        <p class="text-muted">Create credentials, capture face data, and set up payroll.</p>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-10 col-xl-9">
+            
+            <!-- Alerts -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm border-0" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>{{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- SweetAlert Payload -->
+            {% if reg_success %}
+                <script id="reg-success-payload" type="application/json">
+                    {{ reg_success|safe }}
+                </script>
+            {% endif %}
+
+            <form method="POST" enctype="multipart/form-data" id="registrationForm" novalidate>
+                {% csrf_token %}
+
+                <!-- SECTION 1: Account Credentials -->
+                <div class="card modern-card mb-4">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-primary-soft text-primary">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <h5 class="mb-0">Account Credentials</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-4">
+                            <!-- Username -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold required-field">Username</label>
+                                <div class="position-relative">
+                                    {{ form.username }}
+                                    <span class="validation-icon" id="username-status"></span>
+                                </div>
+                                <div class="form-text text-muted" id="username-hint">Must be unique.</div>
+                                <div class="invalid-feedback d-block" id="username-error"></div>
+                            </div>
+                            <!-- Email -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold required-field">Email Address</label>
+                                <div class="position-relative">
+                                    {{ form.email }}
+                                    <span class="validation-icon" id="email-status"></span>
+                                </div>
+                                {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>{% endif %}
+                                <div class="invalid-feedback d-block" id="email-error"></div>
+                            </div>
+                            <!-- Passwords -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold required-field">Password</label>
+                                {{ form.password1 }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold required-field">Confirm Password</label>
+                                {{ form.password2 }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: Personal & Role Info -->
+                <div class="card modern-card mb-4">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-success-soft text-success">
+                            <i class="fas fa-id-card"></i>
+                        </div>
+                        <h5 class="mb-0">Personal & Role Information</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">First Name</label>
+                                {{ form.first_name }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Last Name</label>
+                                {{ form.last_name }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold required-field">Mobile Number</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                    <input type="tel" name="{{ form.phone_number.name }}" id="{{ form.phone_number.id_for_label }}" 
+                                           class="form-control" placeholder="9876543210" maxlength="10" 
+                                           pattern="[0-9]{10}" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Job Position</label>
+                                {{ form.position }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Department</label>
+                                {{ form.department }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Reporting Manager</label>
+                                {{ form.manager }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">System Role</label>
+                                {{ form.role }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Work Shift/Rule</label>
+                                {{ form.work_rule }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 3: Biometric Data (Modernized) -->
+                <div class="card modern-card mb-4">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-purple-soft text-purple">
+                            <i class="fas fa-face-viewfinder"></i>
+                        </div>
+                        <h5 class="mb-0">Biometric Registration</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row align-items-center">
+                            <div class="col-lg-6 mb-4 mb-lg-0">
+                                <div class="mb-4">
+                                    <label class="form-label fw-semibold">Upload Photo</label>
+                                    {{ form.face_image }}
+                                    <div class="form-text mt-2"><i class="fas fa-check-circle text-success me-1"></i> Ensure good lighting and neutral expression.</div>
+                                    {% if form.face_image.errors %}<div class="text-danger small">{{ form.face_image.errors.0 }}</div>{% endif %}
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-primary w-100" id="openCamBtn">
+                                        <i class="fas fa-camera me-2"></i>Use Webcam
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-6 d-flex justify-content-center">
+                                <!-- Camera/Preview UI -->
+                                <div class="biometric-frame">
+                                    <div class="scan-line"></div>
+                                    <div class="preview-area" id="previewArea">
+                                        <div class="placeholder-content">
+                                            <i class="fas fa-user-astronaut fa-3x text-muted mb-3 opacity-50"></i>
+                                            <span class="text-muted small d-block">Preview will appear here</span>
+                                        </div>
+                                        <img id="previewImage" alt="Face preview" />
+                                        <video id="webcam" autoplay playsinline></video>
+                                    </div>
+                                    <button type="button" class="btn btn-success btn-sm btn-capture" id="captureBtn">
+                                        <i class="fas fa-dot-circle me-1"></i> Capture
+                                    </button>
+                                </div>
+                                <input type="hidden" name="captured_image" id="captured_image">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 4: Payroll & Joining -->
+                <div class="row">
+                    <div class="col-lg-6">
+                        <div class="card modern-card mb-4 h-100">
+                            <div class="card-header-modern">
+                                <div class="icon-box bg-warning-soft text-warning">
+                                    <i class="fas fa-coins"></i>
+                                </div>
+                                <h5 class="mb-0">Salary Structure</h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold">Base Salary</label>
+                                        {{ form.base_salary }}
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold">HRA</label>
+                                        {{ form.hra }}
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold">Allowances</label>
+                                        {{ form.allowances }}
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold">Deductions</label>
+                                        {{ form.deductions }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card modern-card mb-4 h-100">
+                            <div class="card-header-modern">
+                                <div class="icon-box bg-info-soft text-info">
+                                    <i class="fas fa-briefcase"></i>
+                                </div>
+                                <h5 class="mb-0">Joining Details</h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold required-field">Date of Joining</label>
+                                        {{ form.date_of_joining }}
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label fw-semibold">Probation (Months)</label>
+                                        {{ form.probation_period_months }}
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-semibold">Confirmation Date</label>
+                                        {{ form.confirmation_date }}
+                                        <div class="form-text small">Auto-calculated based on probation.</div>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-semibold">Documents</label>
+                                        <input type="file" name="documents" id="documents" class="form-control" multiple accept=".pdf,.doc,.docx,.jpg,.png">
+                                        <div class="file-list mt-2" id="selected-docs"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="form-actions text-center mt-3 mb-5">
+                    <button type="submit" class="btn btn-primary btn-lg px-5 shadow-lg rounded-pill" id="submitBtn">
+                        <span class="spinner-border spinner-border-sm me-2 d-none" id="submitSpinner"></span>
+                        <i class="fas fa-check-circle me-2"></i>Complete Registration
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modern CSS -->
+<style>
+    :root {
+        --primary: #4361ee;
+        --secondary: #3f37c9;
+        --bg-color: #f8f9fa;
+        --card-radius: 16px;
+        --input-radius: 10px;
+    }
+
+    body {
+        background-color: #f3f4f6;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    /* Card Styling */
+    .modern-card {
+        background: #fff;
+        border: none;
+        border-radius: var(--card-radius);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+        transition: transform 0.2s;
+        overflow: hidden;
+    }
+    
+    .card-header-modern {
+        padding: 20px 25px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        background: #fff;
+    }
+
+    /* Icons */
+    .icon-box {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
+        font-size: 1.1rem;
+    }
+    .bg-primary-soft { background: rgba(67, 97, 238, 0.1); color: var(--primary); }
+    .bg-success-soft { background: rgba(25, 135, 84, 0.1); color: #198754; }
+    .bg-info-soft { background: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
+    .bg-warning-soft { background: rgba(255, 193, 7, 0.1); color: #ffc107; }
+    .bg-purple-soft { background: rgba(111, 66, 193, 0.1); color: #6f42c1; }
+
+    /* Inputs */
+    .form-control, .form-select {
+        border-radius: var(--input-radius);
+        border: 1px solid #e2e8f0;
+        padding: 0.75rem 1rem;
+        font-size: 0.95rem;
+        transition: all 0.2s;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+    }
+    .required-field::after { content: "*"; color: #e74c3c; margin-left: 3px; }
+
+    /* Validation Icons */
+    .validation-icon {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 1.1rem;
+        z-index: 5;
+    }
+
+    /* Biometric Frame */
+    .biometric-frame {
+        width: 280px;
+        height: 280px;
+        border: 2px solid #e9ecef;
+        border-radius: 20px;
+        position: relative;
+        overflow: hidden;
+        background: #f8f9fa;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+    }
+    .preview-area {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    #webcam, #previewImage {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: none;
+    }
+    .btn-capture {
+        position: absolute;
+        bottom: 15px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        display: none;
+        border-radius: 20px;
+        padding: 5px 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+    
+    /* Animation */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in-up { animation: fadeInUp 0.5s ease-out; }
+
+    /* File List */
+    .file-list { font-size: 0.85rem; color: #6c757d; }
+    .file-list div { margin-top: 4px; display: flex; align-items: center; }
+    .file-list i { margin-right: 6px; }
+</style>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // 1. Auto-apply Bootstrap classes to Django fields
+    document.addEventListener("DOMContentLoaded", function() {
+        const inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), select, textarea');
+        inputs.forEach(input => input.classList.add('form-control'));
+        
+        const checks = document.querySelectorAll('input[type="checkbox"], input[type="radio"]');
+        checks.forEach(c => c.classList.add('form-check-input'));
+    });
+
+    // 2. Document Selection UI
+    const docsInput = document.getElementById('documents');
+    const docsList = document.getElementById('selected-docs');
+    if (docsInput && docsList) {
+        docsInput.addEventListener('change', () => {
+            docsList.innerHTML = '';
+            Array.from(docsInput.files || []).forEach(f => {
+                const div = document.createElement('div');
+                div.innerHTML = `<i class="far fa-file-alt text-primary"></i> ${f.name}`;
+                docsList.appendChild(div);
+            });
+        });
+    }
+
+    // 3. Image Preview Logic
+    const fileInput = document.querySelector('input[name="face_image"]');
+    const previewImage = document.getElementById("previewImage");
+    const placeholder = document.querySelector(".placeholder-content");
+    
+    if (fileInput) {
+        fileInput.addEventListener("change", function () {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    previewImage.src = e.target.result;
+                    previewImage.style.display = "block";
+                    if(placeholder) placeholder.style.display = "none";
+                    document.getElementById("webcam").style.display = "none";
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // 4. Webcam Logic
+    const openCamBtn = document.getElementById("openCamBtn");
+    const captureBtn = document.getElementById("captureBtn");
+    const webcam = document.getElementById("webcam");
+    const capturedInput = document.getElementById("captured_image");
+    let stream = null;
+
+    if (openCamBtn) {
+        openCamBtn.addEventListener("click", async () => {
+            if (stream) {
+                // Stop camera if already running (toggle behavior)
+                stream.getTracks().forEach(t => t.stop());
+                stream = null;
+                webcam.style.display = "none";
+                captureBtn.style.display = "none";
+                openCamBtn.innerHTML = '<i class="fas fa-camera me-2"></i>Use Webcam';
+                if(placeholder) placeholder.style.display = "flex";
+                return;
+            }
+            
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 400, height: 400, facingMode: "user" } });
+                webcam.srcObject = stream;
+                webcam.style.display = "block";
+                previewImage.style.display = "none";
+                if(placeholder) placeholder.style.display = "none";
+                captureBtn.style.display = "inline-flex";
+                openCamBtn.innerHTML = '<i class="fas fa-times me-2"></i>Close Camera';
+            } catch (err) {
+                console.error("Camera Error: ", err);
+                Swal.fire('Error', 'Could not access camera. Check permissions.', 'error');
+            }
+        });
+    }
+
+    if (captureBtn) {
+        captureBtn.addEventListener("click", () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = webcam.videoWidth;
+            canvas.height = webcam.videoHeight;
+            canvas.getContext("2d").drawImage(webcam, 0, 0);
+            const imageData = canvas.toDataURL("image/png");
+            
+            capturedInput.value = imageData;
+            previewImage.src = imageData;
+            previewImage.style.display = "block";
+            webcam.style.display = "none";
+            
+            // Stop stream
+            stream.getTracks().forEach(t => t.stop());
+            stream = null;
+            captureBtn.style.display = "none";
+            openCamBtn.innerHTML = '<i class="fas fa-camera me-2"></i>Retake Photo';
+        });
+    }
+
+    // 5. Auto Confirmation Date Calculation
+    const dojInput = document.getElementById("id_date_of_joining");
+    const probationInput = document.getElementById("id_probation_period_months");
+    const confirmationInput = document.getElementById("id_confirmation_date");
+    
+    function updateConfirmationDate() {
+        if (dojInput?.value && probationInput?.value) {
+            const d = new Date(dojInput.value);
+            d.setMonth(d.getMonth() + parseInt(probationInput.value || 0));
+            confirmationInput.value = d.toISOString().split('T')[0];
+        }
+    }
+    dojInput?.addEventListener('change', updateConfirmationDate);
+    probationInput?.addEventListener('input', updateConfirmationDate);
+
+    // 6. Form Submission Spinner
+    document.getElementById('registrationForm').addEventListener('submit', function() {
+        const btn = document.getElementById('submitBtn');
+        const spinner = document.getElementById('submitSpinner');
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+    });
+
+    // 7. AJAX Check for User/Email
+    const uInput = document.getElementById('id_username');
+    const eInput = document.getElementById('id_email');
+    const uStatus = document.getElementById('username-status');
+    const eStatus = document.getElementById('email-status');
+
+    async function checkData(field, val, statusEl, errorEl) {
+        if(val.length < 3) return;
+        
+        statusEl.innerHTML = '<div class="spinner-border spinner-border-sm text-secondary" role="status"></div>';
+        
+        // Simulating URL construction - ensure these names match your Django URL patterns
+        const url = field === 'username' ? '{% url "check_username" %}' : '{% url "check_email" %}';
+        const params = new URLSearchParams({ [field]: val });
+        
+        try {
+            const res = await fetch(`${url}?${params}`, { headers: {'X-Requested-With': 'XMLHttpRequest'} });
+            const data = await res.json();
+            
+            if (data.ok) {
+                statusEl.innerHTML = '<i class="fas fa-check-circle text-success"></i>';
+                errorEl.textContent = '';
+                document.getElementById(`id_${field}`).classList.remove('is-invalid');
+                document.getElementById(`id_${field}`).classList.add('is-valid');
+            } else {
+                statusEl.innerHTML = '<i class="fas fa-times-circle text-danger"></i>';
+                errorEl.textContent = data.exists ? `This ${field} is already taken.` : 'Invalid.';
+                document.getElementById(`id_${field}`).classList.add('is-invalid');
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    let timer;
+    if(uInput) {
+        uInput.addEventListener('input', (e) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => checkData('username', e.target.value.trim(), uStatus, document.getElementById('username-error')), 500);
+        });
+    }
+    if(eInput) {
+        eInput.addEventListener('input', (e) => {
+            clearTimeout(timer);
+            if(e.target.value.includes('@')) {
+                timer = setTimeout(() => checkData('email', e.target.value.trim(), eStatus, document.getElementById('email-error')), 500);
+            }
+        });
+    }
+
+    // 8. Success Alert
+    const payloadScript = document.getElementById('reg-success-payload');
+    if (payloadScript) {
+        try {
+            const payload = JSON.parse(payloadScript.textContent);
+            Swal.fire({
+                icon: 'success',
+                title: 'Registration Successful!',
+                html: `
+                  <div class="text-start bg-light p-3 rounded">
+                    <p class="mb-1"><strong>Name:</strong> ${payload.name || 'Employee'}</p>
+                    <p class="mb-0"><strong>ID:</strong> ${payload.employee_id || 'N/A'}</p>
+                  </div>
+                `,
+                confirmButtonText: 'Continue',
+                confirmButtonColor: '#4361ee'
+            });
+        } catch (e) { console.warn('JSON Parse error', e); }
+    }
+</script>
+{% endblock %}

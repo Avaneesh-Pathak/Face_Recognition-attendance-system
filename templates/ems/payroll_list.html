@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Payroll Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="bg-primary-soft p-2 rounded me-3">
+                        <i class="fas fa-money-bill-wave text-primary"></i>
+                    </div>
+                    <span class="text-muted small text-uppercase fw-bold">Total Net Payroll</span>
+                </div>
+                <h3 class="fw-bold mb-0">₹{{ total_net }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="bg-info-soft p-2 rounded me-3">
+                        <i class="fas fa-wallet text-info"></i>
+                    </div>
+                    <span class="text-muted small text-uppercase fw-bold">Basic Salary</span>
+                </div>
+                <h3 class="fw-bold mb-0">₹{{ total_basic }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="bg-success-soft p-2 rounded me-3">
+                        <i class="fas fa-plus-circle text-success"></i>
+                    </div>
+                    <span class="text-muted small text-uppercase fw-bold">Allowances</span>
+                </div>
+                <h3 class="fw-bold mb-0">₹{{ total_allowances }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="bg-danger-soft p-2 rounded me-3">
+                        <i class="fas fa-minus-circle text-danger"></i>
+                    </div>
+                    <span class="text-muted small text-uppercase fw-bold">Deductions</span>
+                </div>
+                <h3 class="fw-bold mb-0">₹{{ total_deductions }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <h5 class="mb-0 fw-bold text-dark">Payroll Records</h5>
+        <div class="d-flex gap-2">
+            <a href="{% url 'payroll_expense_chart' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-chart-pie me-2"></i>Expense Chart
+            </a>
+            <a href="{% url 'generate_payroll' %}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Generate Payroll
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <!-- Filter Section -->
+        <div class="p-3 bg-light border-bottom">
+            <form class="row g-3 align-items-end" method="get">
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted">Month</label>
+                    {{ form.month }}
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-bold text-muted">Year</label>
+                    {{ form.year }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold text-muted">Status</label>
+                    {{ form.status }}
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary me-2">Apply</button>
+                    <a class="btn btn-outline-secondary" href="{% url 'payroll_list' %}">Reset</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Employee</th>
+                        <th>Period</th>
+                        <th>Breakdown</th>
+                        <th>Net Salary</th>
+                        <th>Status</th>
+                        <th>Dates</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in payrolls %}
+                    <tr>
+                        <td class="ps-4">
+                            <a href="{% url 'employee_salary_history' p.employee.id %}"
+                                class="text-decoration-none text-dark">
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-initials bg-primary-soft text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
+                                        style="width: 40px; height: 40px;">
+                                        {{ p.employee.user.first_name|first }}
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold small">{{ p.employee.user.get_full_name }}</h6>
+                                        <small class="text-muted">{{ p.employee.employee_id }}</small>
+                                    </div>
+                                </div>
+                            </a>
+                        </td>
+                        <td>
+                            <span class="fw-medium">{{ p.month|date:"F Y" }}</span>
+                        </td>
+                        <td>
+                            <div class="small">
+                                <div class="text-success"><i class="fas fa-plus me-1" style="width:12px"></i>
+                                    {{p.basic_pay|add:p.allowances }}</div>
+                                <div class="text-danger"><i class="fas fa-minus me-1" style="width:12px"></i>{{p.deductions }}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="fw-bold text-primary">₹{{ p.net_salary }}</span>
+                        </td>
+                        <td>
+                            <span
+                                class="badge {% if p.status == 'paid' %}bg-success-soft text-success{% elif p.status == 'processed' %}bg-info-soft text-info{% else %}bg-warning-soft text-warning{% endif %}">
+                                {{ p.status|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="small text-muted">
+                                <div>Paid: {{ p.paid_date|default:"-" }}</div>
+                                <div>Next: {{ p.next_pay_date|default:"-" }}</div>
+                            </div>
+                        </td>
+                        <td class="text-end pe-4">
+                            <div class="btn-group">
+                                <a href="{% url 'payroll_slip_pdf' p.pk %}" class="btn btn-sm btn-outline-secondary"
+                                    title="Download Slip">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                {% if p.status != 'paid' %}
+                                <a href="{% url 'pay_salary' p.pk %}" class="btn btn-sm btn-success"
+                                    title="Mark as Paid">
+                                    <i class="fas fa-check"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <div class="empty-state">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                                <h6>No Payroll Records</h6>
+                                <p class="small">Generate payroll to get started.</p>
+                                <a href="{% url 'generate_payroll' %}" class="btn btn-primary mt-2">
+                                    <i class="fas fa-plus me-2"></i>Generate
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if payrolls.has_other_pages %}
+    <div class="card-footer bg-white py-3">
+        <!-- Pagination logic here if needed, simplified for now -->
+        <nav>
+            <ul class="pagination justify-content-center mb-0 pagination-sm">
+                <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+                <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <!-- Salary Structure -->
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">My Salary Structure</h5>
+            </div>
+            <div class="card-body">
+                {% if salary_structure %}
+                <div class="salary-breakdown">
+                    <div class="d-flex justify-content-between border-bottom py-2">
+                        <span>Basic Salary:</span>
+                        <strong>₹{{ salary_structure.base_salary }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between border-bottom py-2">
+                        <span>HRA:</span>
+                        <strong>₹{{ salary_structure.hra }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between border-bottom py-2">
+                        <span>Allowances:</span>
+                        <strong>₹{{ salary_structure.allowances }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between border-bottom py-2">
+                        <span>Deductions:</span>
+                        <strong class="text-danger">-₹{{ salary_structure.deductions }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between py-2 bg-light">
+                        <span class="fw-bold">Total Salary:</span>
+                        <strong class="text-success">₹{{ salary_structure.total_salary }}</strong>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <small class="text-muted">
+                        Effective from: {{ salary_structure.effective_from|date:"M d, Y" }}
+                    </small>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-file-invoice-dollar fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Salary structure not defined.</p>
+                    <p class="small">Please contact HR department.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Payroll History -->
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Payroll History</h5>
+            </div>
+            <div class="card-body">
+                {% if payrolls %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Basic Pay</th>
+                                <th>Allowances</th>
+                                <th>Deductions</th>
+                                <th>Net Salary</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for payroll in payrolls %}
+                            <tr>
+                                <td>{{ payroll.month|date:"F Y" }}</td>
+                                <td>₹{{ payroll.basic_pay }}</td>
+                                <td>₹{{ payroll.allowances }}</td>
+                                <td class="text-danger">-₹{{ payroll.deductions }}</td>
+                                <td class="fw-bold text-success">₹{{ payroll.net_salary }}</td>
+                                <td>
+                                    <span class="badge 
+                                        {% if payroll.status == 'paid' %}bg-success
+                                        {% elif payroll.status == 'processed' %}bg-info
+                                        {% else %}bg-warning{% endif %}">
+                                        {{ payroll.status|title }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Summary -->
+                <div class="row mt-4">
+                    <div class="col-md-4 text-center">
+                        <div class="border rounded p-3">
+                            <h6 class="text-muted">Total Earned</h6>
+                            <h4 class="text-success">₹{{ payrolls.0.net_salary }}</h4>
+                            <small class="text-muted">This Month</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="border rounded p-3">
+                            <h6 class="text-muted">Average Monthly</h6>
+                            <h4 class="text-primary">
+                                ₹{% widthratio payrolls.0.net_salary 1 1 %}
+                            </h4>
+                            <small class="text-muted">Last 3 months</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="border rounded p-3">
+                            <h6 class="text-muted">YTD Total</h6>
+                            <h4 class="text-info">
+                                ₹{% widthratio payrolls.0.net_salary 1 6 %}
+                            </h4>
+                            <small class="text-muted">This Year</small>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">No payroll records found.</p>
+                    <p class="small">Payroll records will appear here once processed.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Salary Slip Download Section -->
+{% if payrolls %}
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Download Salary Slips</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for payroll in payrolls|slice:":6" %}
+            <div class="col-md-4 mb-3">
+                <div class="border rounded p-3 text-center">
+                    <h6>{{ payroll.month|date:"F Y" }}</h6>
+                    <p class="text-muted mb-2">Net: ₹{{ payroll.net_salary }}</p>
+                    <button class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-download"></i> Download Slip
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

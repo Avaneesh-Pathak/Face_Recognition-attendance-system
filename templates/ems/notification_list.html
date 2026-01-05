@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Notifications{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center sticky-top z-1">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="fas fa-bell me-2 text-primary"></i>Activity Feed
+                    {% if unread_count > 0 %}
+                    <span class="badge bg-danger-soft text-danger ms-2">{{ unread_count }} New</span>
+                    {% endif %}
+                </h5>
+                {% if unread_count > 0 %}
+                <button id="mark-all-read" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-check-double me-1"></i>Mark All Read
+                </button>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if notifications %}
+                <div class="list-group list-group-flush">
+                    {% for notification in notifications %}
+                    <div class="list-group-item p-4 border-bottom notification-item {% if not notification.is_read %}bg-primary-soft{% endif %}"
+                        id="notification-{{ notification.id }}">
+                        <div class="d-flex align-items-start">
+                            <div class="flex-shrink-0 me-3">
+                                <div class="avatar-initials rounded-circle d-flex align-items-center justify-content-center shadow-sm
+                                    {% if notification.is_read %}bg-light text-muted{% else %}bg-white text-primary{% endif %}"
+                                    style="width: 48px; height: 48px;">
+                                    <i class="fas fa-info"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <p class="mb-1 text-dark {% if not notification.is_read %}fw-bold{% endif %}">
+                                            {{ notification.message }}
+                                        </p>
+                                        <small class="text-muted">
+                                            <i class="far fa-clock me-1"></i>{{ notification.created_at|timesince }} ago
+                                        </small>
+                                    </div>
+                                    <div class="ms-3 d-flex flex-column align-items-end gap-2">
+                                        {% if not notification.is_read %}
+                                        <button class="btn btn-icon btn-sm text-primary mark-read"
+                                            data-id="{{ notification.id }}" title="Mark as read">
+                                            <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% if notification.link %}
+                                <div class="mt-2">
+                                    <a href="{{ notification.link }}"
+                                        class="btn btn-sm btn-light text-primary fw-medium">
+                                        View Details <i class="fas fa-arrow-right ms-1"></i>
+                                    </a>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state py-5">
+                    <div class="bg-light rounded-circle mx-auto d-flex align-items-center justify-content-center mb-3"
+                        style="width: 80px; height: 80px;">
+                        <i class="fas fa-bell-slash fa-2x text-muted opacity-50"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark">All Caught Up!</h6>
+                    <p class="text-muted small mb-0">You have no new notifications.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Mark single notification as read
+        document.querySelectorAll('.mark-read').forEach(button => {
+            button.addEventListener('click', function () {
+                const notificationId = this.getAttribute('data-id');
+                markAsRead(notificationId, this);
+            });
+        });
+
+        // Mark all as read
+        document.getElementById('mark-all-read')?.addEventListener('click', function () {
+            markAllAsRead(this);
+        });
+
+        function markAsRead(notificationId, button) {
+            // Optimistic UI update
+            const item = button.closest('.notification-item');
+            item.classList.remove('bg-primary-soft');
+            item.querySelector('p').classList.remove('fw-bold');
+            item.querySelector('.avatar-initials').classList.remove('bg-white', 'text-primary');
+            item.querySelector('.avatar-initials').classList.add('bg-light', 'text-muted');
+            button.remove();
+
+            fetch(`/notifications/${notificationId}/read/`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            }).catch(err => console.error('Error marking read:', err));
+        }
+
+        function markAllAsRead(button) {
+            // Optimistic UI update
+            document.querySelectorAll('.notification-item').forEach(item => {
+                item.classList.remove('bg-primary-soft');
+                item.querySelector('p').classList.remove('fw-bold');
+                const btn = item.querySelector('.mark-read');
+                if (btn) btn.remove();
+                const avatar = item.querySelector('.avatar-initials');
+                if (avatar) {
+                    avatar.classList.remove('bg-white', 'text-primary');
+                    avatar.classList.add('bg-light', 'text-muted');
+                }
+            });
+            button.remove();
+
+            fetch('{% url "mark_all_notifications_read" %}', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            }).catch(err => console.error('Error marking all read:', err));
+        }
+    });
+</script>
+{% endblock %}

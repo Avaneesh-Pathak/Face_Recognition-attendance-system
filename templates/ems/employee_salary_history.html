@@ -1,0 +1,257 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}Salary History{% endblock %}
+
+{% block content %}
+<!-- Employee Header -->
+<div class="card border-0 shadow-sm mb-4 bg-primary-soft">
+  <div class="card-body p-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+      <div class="d-flex align-items-center">
+        <div
+          class="avatar-initials bg-white text-primary rounded-circle me-3 d-flex align-items-center justify-content-center shadow-sm"
+          style="width: 56px; height: 56px; font-size: 1.5rem;">
+          {{ employee.user.first_name|first }}
+        </div>
+        <div>
+          <h4 class="mb-1 fw-bold text-primary">{{ employee.user.get_full_name }}</h4>
+          <div class="d-flex gap-3 text-muted small">
+            <span><i class="fas fa-id-badge me-1"></i>{{ employee.employee_id }}</span>
+            <span><i class="fas fa-briefcase me-1"></i>{{ employee.department.name }}</span>
+          </div>
+        </div>
+      </div>
+      <a href="{% url 'payroll_list' %}" class="btn btn-white text-primary shadow-sm">
+        <i class="fas fa-arrow-left me-2"></i>Back to Payroll
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Stats Overview -->
+<div class="row mb-4">
+  <div class="col-xl-3 col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-2">
+          <div class="bg-primary-soft p-2 rounded me-3">
+            <i class="fas fa-wallet text-primary"></i>
+          </div>
+          <span class="text-muted small text-uppercase fw-bold">Total Basic</span>
+        </div>
+        <h3 class="fw-bold mb-0">₹{{ totals.total_basic|default:0 }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-3 col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-2">
+          <div class="bg-success-soft p-2 rounded me-3">
+            <i class="fas fa-plus-circle text-success"></i>
+          </div>
+          <span class="text-muted small text-uppercase fw-bold">Total Allowances</span>
+        </div>
+        <h3 class="fw-bold mb-0">₹{{ totals.total_allowances|default:0 }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-3 col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-2">
+          <div class="bg-danger-soft p-2 rounded me-3">
+            <i class="fas fa-minus-circle text-danger"></i>
+          </div>
+          <span class="text-muted small text-uppercase fw-bold">Total Deductions</span>
+        </div>
+        <h3 class="fw-bold mb-0">₹{{ totals.total_deductions|default:0 }}</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-3 col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-2">
+          <div class="bg-dark text-white p-2 rounded me-3">
+            <i class="fas fa-money-bill-wave"></i>
+          </div>
+          <span class="text-muted small text-uppercase fw-bold">Total Net Salary</span>
+        </div>
+        <h3 class="fw-bold mb-0 text-primary">₹{{ totals.total_net|default:0 }}</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <h5 class="mb-0 fw-bold text-dark">Payment History</h5>
+    <div class="d-flex gap-2">
+      <select class="form-select form-select-sm w-auto" id="statusFilter">
+        <option value="">All Statuses</option>
+        <option value="paid">Paid</option>
+        <option value="pending">Pending</option>
+        <option value="processing">Processing</option>
+      </select>
+      <button class="btn btn-sm btn-outline-secondary" id="exportBtn">
+        <i class="fas fa-download me-1"></i>Export
+      </button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0" id="payrollTable">
+        <thead class="bg-light">
+          <tr>
+            <th class="ps-4">Month</th>
+            <th>Basic</th>
+            <th>Allowances</th>
+            <th>Deductions</th>
+            <th>Net Salary</th>
+            <th>Status</th>
+            <th>Paid Date</th>
+            <th class="text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in payrolls %}
+          <tr data-status="{{ p.status|lower }}">
+            <td class="ps-4">
+              <div class="d-flex flex-column">
+                <span class="fw-bold">{{ p.month|date:"F Y" }}</span>
+                <small class="text-muted">{{ p.month|date:"Y" }}</small>
+              </div>
+            </td>
+            <td>₹{{ p.basic_pay }}</td>
+            <td>
+              <span class="text-success">₹{{ p.allowances }}</span>
+              {% if p.allowance_details %}
+              <i class="fas fa-info-circle text-muted ms-1 small" data-bs-toggle="tooltip"
+                title="{{ p.allowance_details }}"></i>
+              {% endif %}
+            </td>
+            <td>
+              <span class="text-danger">-₹{{ p.deductions }}</span>
+              {% if p.deduction_details %}
+              <i class="fas fa-info-circle text-muted ms-1 small" data-bs-toggle="tooltip"
+                title="{{ p.deduction_details }}"></i>
+              {% endif %}
+            </td>
+            <td>
+              <span class="fw-bold text-primary">₹{{ p.net_salary }}</span>
+            </td>
+            <td>
+              <span
+                class="badge {% if p.status == 'paid' %}bg-success-soft text-success{% elif p.status == 'pending' %}bg-warning-soft text-warning{% else %}bg-info-soft text-info{% endif %}">
+                {{ p.status|title }}
+              </span>
+            </td>
+            <td>
+              {% if p.paid_date %}
+              <span class="text-dark small"><i class="fas fa-calendar-check me-1 text-success"></i>{{
+                p.paid_date|date:"M d, Y" }}</span>
+              {% else %}
+              <span class="text-muted small">-</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <div class="btn-group">
+                <a href="{% url 'payroll_slip_pdf' p.pk %}" class="btn btn-icon" title="Download Slip">
+                  <i class="fas fa-file-pdf"></i>
+                </a>
+                {% if p.status != 'paid' %}
+                <button class="btn btn-icon text-warning" title="Edit">
+                  <i class="fas fa-edit"></i>
+                </button>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center py-5">
+              <div class="empty-state">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <h6>No Payment History</h6>
+                <p class="small">No payroll records found for this employee.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if payrolls.has_other_pages %}
+  <div class="card-footer bg-white py-3">
+    <nav>
+      <ul class="pagination justify-content-center mb-0 pagination-sm">
+        {% if payrolls.has_previous %}
+        <li class="page-item">
+          <a class="page-link border-0 rounded-circle mx-1 d-flex align-items-center justify-content-center"
+            href="?page={{ payrolls.previous_page_number }}" style="width: 32px; height: 32px;">
+            <i class="fas fa-chevron-left"></i>
+          </a>
+        </li>
+        {% endif %}
+
+        {% for i in payrolls.paginator.page_range %}
+        {% if payrolls.number == i %}
+        <li class="page-item active">
+          <span class="page-link border-0 rounded-circle mx-1 d-flex align-items-center justify-content-center"
+            style="width: 32px; height: 32px;">{{ i }}</span>
+        </li>
+        {% else %}
+        <li class="page-item">
+          <a class="page-link border-0 rounded-circle mx-1 d-flex align-items-center justify-content-center"
+            href="?page={{ i }}" style="width: 32px; height: 32px;">{{ i }}</a>
+        </li>
+        {% endif %}
+        {% endfor %}
+
+        {% if payrolls.has_next %}
+        <li class="page-item">
+          <a class="page-link border-0 rounded-circle mx-1 d-flex align-items-center justify-content-center"
+            href="?page={{ payrolls.next_page_number }}" style="width: 32px; height: 32px;">
+            <i class="fas fa-chevron-right"></i>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+
+    // Status filter functionality
+    const statusFilter = document.getElementById('statusFilter');
+    const payrollTable = document.getElementById('payrollTable');
+    const rows = payrollTable.querySelectorAll('tbody tr');
+
+    if (statusFilter) {
+      statusFilter.addEventListener('change', function () {
+        const filterValue = this.value.toLowerCase();
+        rows.forEach(row => {
+          if (filterValue === '' || row.getAttribute('data-status') === filterValue) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      });
+    }
+  });
+</script>
+{% endblock %}

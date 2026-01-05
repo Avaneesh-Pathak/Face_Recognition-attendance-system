@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load attendance_filters %}
+
+{% block page_title %}Joining Details{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="bg-primary-soft p-3 rounded-circle me-3">
+                    <i class="fas fa-file-contract text-primary fa-lg"></i>
+                </div>
+                <div>
+                    <h6 class="text-muted mb-1 text-uppercase small fw-bold">Total Records</h6>
+                    <h3 class="mb-0 fw-bold">{{ joining_details.count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold text-dark">Joining Records</h5>
+        {% if user.is_staff %}
+        <a href="{% url 'joining_detail_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Add Details
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Employee</th>
+                        <th>Date of Joining</th>
+                        <th>Probation</th>
+                        <th>Confirmation</th>
+                        <th>Documents</th>
+                        <th>Status</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for detail in joining_details %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-initials bg-primary-soft text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
+                                    style="width: 40px; height: 40px;">
+                                    {{ detail.employee.user.first_name|first }}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold small">{{ detail.employee.user.get_full_name }}</h6>
+                                    <small class="text-muted">{{ detail.employee.employee_id }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ detail.date_of_joining|date:"M d, Y" }}</td>
+                        <td>{{ detail.probation_period_months }} Months</td>
+                        <td>
+                            {% if detail.confirmation_date %}
+                            {{ detail.confirmation_date|date:"M d, Y" }}
+                            {% else %}
+                            <span class="text-muted small">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if detail.joining_documents.count %}
+                            <span class="badge bg-info-soft text-info">{{ detail.joining_documents.count }}
+                                File(s)</span>
+                            {% else %}
+                            <span class="badge bg-light text-muted border">None</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if detail.confirmation_date %}
+                            <span class="badge bg-success-soft text-success">Confirmed</span>
+                            {% else %}
+                            <span class="badge bg-warning-soft text-warning">On Probation</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            <button class="btn btn-icon" data-bs-toggle="modal"
+                                data-bs-target="#docsModal{{ detail.id }}" title="View Documents">
+                                <i class="fas fa-folder-open"></i>
+                            </button>
+                        </td>
+                    </tr>
+
+                    <!-- Modal for documents -->
+                    <div class="modal fade" id="docsModal{{ detail.id }}" tabindex="-1">
+                        <div class="modal-dialog modal-lg modal-dialog-centered">
+                            <div class="modal-content border-0 shadow">
+                                <div class="modal-header border-bottom-0 pb-0">
+                                    <h5 class="modal-title fw-bold">Documents - {{ detail.employee.user.get_full_name }}
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body pt-4">
+                                    {% if detail.joining_documents.exists %}
+                                    <div class="list-group list-group-flush mb-3">
+                                        {% for doc in detail.joining_documents.all %}
+                                        <div
+                                            class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                            <div class="d-flex align-items-center">
+                                                <div class="bg-light p-2 rounded me-3">
+                                                    <i class="fas fa-file-alt text-secondary"></i>
+                                                </div>
+                                                <div>
+                                                    <a href="{{ doc.file.url }}" target="_blank"
+                                                        class="text-decoration-none text-dark fw-medium">
+                                                        {{ doc.file.name|basename }}
+                                                    </a>
+                                                    <small class="text-muted d-block">{{ doc.uploaded_at|date:"M d, Y
+                                                        h:i A" }}</small>
+                                                </div>
+                                            </div>
+                                            <a href="{% url 'delete_document' doc.id %}"
+                                                class="btn btn-sm btn-outline-danger border-0" title="Delete">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+
+                                    <div class="text-end">
+                                        <a href="{% url 'download_all_documents' detail.id %}" class="btn btn-primary">
+                                            <i class="fas fa-download me-2"></i>Download All (ZIP)
+                                        </a>
+                                    </div>
+                                    {% else %}
+                                    <div class="empty-state py-4">
+                                        <i class="fas fa-folder-open text-muted mb-3" style="font-size: 2rem;"></i>
+                                        <p class="text-muted mb-0">No documents uploaded yet.</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <div class="empty-state">
+                                <i class="fas fa-file-contract"></i>
+                                <h6>No Joining Details</h6>
+                                <p class="small">Add joining details for your employees.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

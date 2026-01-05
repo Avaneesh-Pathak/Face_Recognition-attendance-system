@@ -1,0 +1,89 @@
+# 🧠 Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 🧰 Virtual environments
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+
+# 🧩 IDEs and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 🧱 Build / cache
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dll
+*.db
+*.sqlite3
+*.swp
+*.swo
+*.bak
+*.tmp
+*.old
+*.orig
+*~
+
+# 🧪 Python packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+
+# 🧮 Django specific
+staticfiles/
+media/
+db.sqlite3
+*.mo
+*.log
+
+# 🗂️ Migrations cache (ignore auto-generated ones)
+**/migrations/__pycache__/
+**/migrations/*.pyc
+**/migrations/*.py~
+**/migrations/*.log
+# keep __init__.py only
+# **/migrations/[!__init__]*.py
+
+# 🧰 Face recognition cache
+face_rec_data/
+temp_faces/
+training_data/
+uploads/
+
+# ⚙️ System
+*.ini
+*.cfg
+*.json
+*.csv
+*.xlsx
+*.pdf
+*.zip
+*.rar
+*.tar.gz
+
+# 🧩 Environment files
+.env
+.env.local
+.env.prod
+.env.dev
+.env.test

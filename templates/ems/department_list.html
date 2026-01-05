@@ -1,0 +1,299 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block page_title %}Departments | Organization{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 fade-in-up" style="max-width: 1200px;">
+
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">
+                <i class="fas fa-building text-primary me-2"></i>Departments
+            </h2>
+            <p class="text-muted mb-0">Structure your organization and assign leadership.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'org_chart' %}" class="btn btn-outline-secondary rounded-pill shadow-sm">
+                <i class="fas fa-sitemap me-2"></i>Org Chart
+            </a>
+            {% if user.is_staff %}
+            <a href="{% url 'department_create' %}" class="btn btn-primary rounded-pill shadow-sm">
+                <i class="fas fa-plus me-2"></i>Add Department
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row g-4 mb-4">
+        <!-- Total Departments -->
+        <div class="col-md-4">
+            <div class="card modern-card h-100 p-3">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-primary-soft text-primary me-3">
+                        <i class="fas fa-layer-group fa-lg"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted text-uppercase text-xs fw-bold mb-1">Total Departments</h6>
+                        <h3 class="mb-0 fw-bold text-dark">{{ departments.count }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- With Heads -->
+        <div class="col-md-4">
+            <div class="card modern-card h-100 p-3">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-success-soft text-success me-3">
+                        <i class="fas fa-user-tie fa-lg"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted text-uppercase text-xs fw-bold mb-1">Assigned Heads</h6>
+                        <h3 class="mb-0 fw-bold text-dark">{{ departments_with_heads|default:"0" }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Sub Departments -->
+        <div class="col-md-4">
+            <div class="card modern-card h-100 p-3">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box bg-info-soft text-info me-3">
+                        <i class="fas fa-project-diagram fa-lg"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted text-uppercase text-xs fw-bold mb-1">Sub-Departments</h6>
+                        <h3 class="mb-0 fw-bold text-dark">{{ sub_departments|default:"0" }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="card border-0 shadow-sm mb-4 search-card">
+        <div class="card-body p-3">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
+                <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Search by department name, manager, or parent...">
+            </div>
+        </div>
+    </div>
+
+    <!-- Departments Table -->
+    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="deptTable">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Department Name</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Head of Dept</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Parent Dept</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Workforce</th>
+                            <th class="text-end pe-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for department in departments %}
+                        <tr>
+                            <!-- Name -->
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-initials bg-primary-soft text-primary rounded-circle me-3 fw-bold">
+                                        {{ department.name|first|upper }}
+                                    </div>
+                                    <span class="fw-bold text-dark text-sm">{{ department.name }}</span>
+                                </div>
+                            </td>
+
+                            <!-- HOD -->
+                            <td>
+                                {% if department.head %}
+                                <div class="d-flex align-items-center">
+                                    {% if department.head.face_image %}
+                                        <img src="{{ department.head.face_image.url }}" class="avatar-sm rounded-circle me-2 border">
+                                    {% else %}
+                                        <div class="avatar-sm rounded-circle me-2 bg-light d-flex align-items-center justify-content-center text-muted border">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                    {% endif %}
+                                    <div class="d-flex flex-column">
+                                        <span class="text-sm fw-semibold text-dark">{{ department.head.user.get_full_name }}</span>
+                                        <span class="text-xs text-muted">ID: {{ department.head.employee_id }}</span>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <span class="badge bg-warning-soft text-warning border border-warning-soft">
+                                    <i class="fas fa-exclamation-circle me-1"></i>Unassigned
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Parent -->
+                            <td>
+                                {% if department.parent_department %}
+                                <span class="badge bg-light text-secondary border">
+                                    <i class="fas fa-level-up-alt me-1"></i>{{ department.parent_department.name }}
+                                </span>
+                                {% else %}
+                                <span class="badge bg-info-soft text-info">
+                                    <i class="fas fa-crown me-1"></i>Root Level
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Workforce -->
+                            <td>
+                                <span class="badge bg-light text-dark border">
+                                    <i class="fas fa-users me-1 text-secondary"></i> {{ department.employee_set.count }} Members
+                                </span>
+                            </td>
+
+                            <!-- Actions -->
+                            <td class="text-end pe-4">
+                                {% if user.is_staff %}
+                                <a href="{% url 'department_edit' department.pk %}" class="btn btn-link text-primary p-0 me-3" data-bs-toggle="tooltip" title="Edit">
+                                    <i class="fas fa-edit fa-lg"></i>
+                                </a>
+                                <button onclick="confirmDelete('{% url 'department_delete' department.pk %}', '{{ department.name|escapejs }}')" class="btn btn-link text-danger p-0 border-0 bg-transparent" data-bs-toggle="tooltip" title="Delete">
+                                    <i class="fas fa-trash-alt fa-lg"></i>
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5">
+                                <div class="empty-state">
+                                    <div class="mb-3">
+                                        <div class="icon-box bg-light text-muted mx-auto rounded-circle" style="width: 60px; height: 60px; font-size: 1.5rem;">
+                                            <i class="fas fa-building"></i>
+                                        </div>
+                                    </div>
+                                    <h5 class="text-muted">No Departments Found</h5>
+                                    <p class="text-secondary small">Get started by building your organizational structure.</p>
+                                    {% if user.is_staff %}
+                                    <a href="{% url 'department_create' %}" class="btn btn-sm btn-primary mt-2">
+                                        <i class="fas fa-plus me-1"></i>Create First Department
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Styles -->
+<style>
+    /* Card & General Styles */
+    .modern-card {
+        background: #fff;
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        transition: transform 0.2s;
+    }
+    .modern-card:hover { transform: translateY(-3px); }
+
+    /* Icon Box */
+    .icon-box {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+    
+    /* Soft Colors */
+    .bg-primary-soft { background: rgba(67, 97, 238, 0.1); color: #4361ee; }
+    .bg-success-soft { background: rgba(25, 135, 84, 0.1); color: #198754; }
+    .bg-info-soft { background: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
+    .bg-warning-soft { background: rgba(255, 193, 7, 0.1); color: #b88a00; }
+    .border-warning-soft { border-color: rgba(255, 193, 7, 0.3) !important; }
+
+    /* Avatars */
+    .avatar-initials {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+    .avatar-sm {
+        width: 36px;
+        height: 36px;
+        object-fit: cover;
+    }
+
+    /* Table Typography */
+    .table thead th {
+        border-bottom-width: 1px;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        letter-spacing: 0.5px;
+    }
+    .text-xs { font-size: 0.75rem; }
+    .text-sm { font-size: 0.875rem; }
+
+    /* Animation */
+    .fade-in-up { animation: fadeInUp 0.5s ease-out; }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Search */
+    .search-card .form-control:focus { box-shadow: none; border-color: #e2e8f0; }
+</style>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    // 1. Search Functionality
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        const value = this.value.toLowerCase();
+        const rows = document.querySelectorAll('#deptTable tbody tr');
+        
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(value) ? '' : 'none';
+        });
+    });
+
+    // 2. SweetAlert Delete
+    function confirmDelete(deleteUrl, name) {
+        Swal.fire({
+            title: 'Delete Department?',
+            html: `Are you sure you want to delete <b>${name}</b>?<br><small class="text-danger">This may affect employees assigned to this department.</small>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, delete it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = deleteUrl;
+            }
+        });
+    }
+
+    // 3. Tooltips
+    document.addEventListener("DOMContentLoaded", function(){
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}

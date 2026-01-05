@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Update Profile | {{ employee.employee_id }}{% endblock %}
+
+{% block content %}
+<div class="container fade-in-up" style="max-width: 1000px;">
+    
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">
+                <i class="fas fa-user-edit text-primary me-2"></i>Edit Employee Profile
+            </h2>
+            <p class="text-muted mb-0">
+                Managing ID: <span class="badge bg-light text-primary border border-primary fw-bold">{{ employee.employee_id }}</span>
+            </p>
+        </div>
+        <a href="{% url 'employee_list' %}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fas fa-arrow-left me-2"></i>Back to List
+        </a>
+    </div>
+
+    <form method="post" id="updateForm" novalidate>
+        {% csrf_token %}
+
+        <div class="row">
+            <!-- Left Column: Personal Info (User Model) -->
+            <div class="col-lg-12 mb-4">
+                <div class="card modern-card h-100">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-info-soft text-info">
+                            <i class="fas fa-address-card"></i>
+                        </div>
+                        <h5 class="mb-0">Personal Details</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">First Name</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                    <input type="text" name="first_name" value="{{ user_obj.first_name }}" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Last Name</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                    <input type="text" name="last_name" value="{{ user_obj.last_name }}" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Email Address</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                    <input type="email" name="email" value="{{ user_obj.email }}" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold">Phone Number</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                    {{ form.phone_number }}
+                                </div>
+                                {% if form.phone_number.errors %}
+                                    <div class="text-danger small mt-1">{{ form.phone_number.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Section: Professional Info (Employee Model) -->
+            <div class="col-lg-8">
+                <div class="card modern-card mb-4">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-primary-soft text-primary">
+                            <i class="fas fa-briefcase"></i>
+                        </div>
+                        <h5 class="mb-0">Job & Department</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Department</label>
+                                {{ form.department }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Position</label>
+                                {{ form.position }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Reporting Manager</label>
+                                {{ form.manager }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">System Role</label>
+                                {{ form.role }}
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label fw-semibold">Work Rule (Shift)</label>
+                                {{ form.work_rule }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Status & Settings -->
+            <div class="col-lg-4">
+                <div class="card modern-card mb-4">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-warning-soft text-warning">
+                            <i class="fas fa-sliders-h"></i>
+                        </div>
+                        <h5 class="mb-0">Status & Access</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Employment Status</label>
+                            {{ form.employment_status }}
+                        </div>
+
+                        <hr class="text-muted opacity-25">
+
+                        <div class="form-check form-switch p-0 d-flex justify-content-between align-items-center">
+                            <div>
+                                <label class="form-check-label fw-bold mb-0" for="{{ form.is_active.id_for_label }}">Active Account</label>
+                                <div class="small text-muted">Toggle login access</div>
+                            </div>
+                            <!-- Render checkbox manually to ensure styling -->
+                            {{ form.is_active }}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg shadow-sm" id="submitBtn">
+                        <i class="fas fa-save me-2"></i>Save Changes
+                    </button>
+                    <a href="{% url 'employee_list' %}" class="btn btn-light btn-lg text-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modern CSS Styles -->
+<style>
+    :root {
+        --primary: #4361ee;
+        --card-radius: 16px;
+        --input-radius: 10px;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in-up { animation: fadeInUp 0.4s ease-out; }
+
+    /* Card Styling */
+    .modern-card {
+        background: #fff;
+        border: 0;
+        border-radius: var(--card-radius);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.03);
+        transition: transform 0.2s;
+        overflow: hidden;
+    }
+    .card-header-modern {
+        padding: 18px 25px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        background: #fff;
+    }
+
+    /* Icon Boxes */
+    .icon-box {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 12px;
+        font-size: 1rem;
+    }
+    .bg-primary-soft { background: rgba(67, 97, 238, 0.1); color: var(--primary); }
+    .bg-info-soft { background: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
+    .bg-warning-soft { background: rgba(255, 193, 7, 0.1); color: #ffc107; }
+
+    /* Form Controls */
+    .form-control, .form-select {
+        border-radius: var(--input-radius);
+        border: 1px solid #e2e8f0;
+        padding: 0.6rem 1rem;
+        font-size: 0.95rem;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+    }
+    
+    /* Input Group Icons */
+    .input-group-modern .input-group-text {
+        background: #f8f9fa;
+        border: 1px solid #e2e8f0;
+        border-right: none;
+        color: #6c757d;
+        border-top-left-radius: var(--input-radius);
+        border-bottom-left-radius: var(--input-radius);
+    }
+    .input-group-modern .form-control {
+        border-left: none;
+    }
+
+    /* Toggle Switch Customization */
+    .form-switch .form-check-input {
+        width: 3em;
+        height: 1.5em;
+        margin-left: 0; /* Reset default bootstrap margin */
+        cursor: pointer;
+    }
+    .form-switch .form-check-input:checked {
+        background-color: #198754;
+        border-color: #198754;
+    }
+</style>
+
+<!-- Scripts -->
+<script>
+    // Automatically apply Bootstrap classes to Django fields
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. Style standard inputs and selects
+        const inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea');
+        inputs.forEach(input => {
+            if (!input.classList.contains('form-control')) {
+                input.classList.add('form-control');
+            }
+        });
+
+        // 2. Style Checkboxes (Is Active)
+        const checks = document.querySelectorAll('input[type="checkbox"]');
+        checks.forEach(c => {
+            c.classList.add('form-check-input');
+            c.setAttribute('role', 'switch'); // Ensure it acts like a switch
+        });
+
+        // 3. Loading state on submit
+        const form = document.getElementById('updateForm');
+        const btn = document.getElementById('submitBtn');
+        form.addEventListener('submit', function() {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+            btn.disabled = true;
+        });
+    });
+</script>
+
+{% endblock %}
