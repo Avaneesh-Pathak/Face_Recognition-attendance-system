@@ -1,247 +1,351 @@
 from io import BytesIO
+from decimal import Decimal, ROUND_HALF_UP
+import calendar
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
-import calendar
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle,
+    Paragraph, Spacer, Flowable
+)
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from reportlab.pdfgen import canvas
 
-def format_currency(amount):
-    """Helper to format currency beautifully"""
-    if amount is None:
-        return "0.00"
-    return f"{float(amount):,.2f}"
+
+# =====================================================
+# CONFIGURATION & THEME
+# =====================================================
+
+THEME_COLOR = colors.Color(0.12, 0.20, 0.35)
+ACCENT_COLOR = colors.Color(0.96, 0.96, 0.96)
+TEXT_BODY = colors.Color(0.1, 0.1, 0.1)
+
+
+# =====================================================
+# UTILITIES
+# =====================================================
+
+def money(val):
+    try:
+        return Decimal(val).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except:
+        return Decimal("0.00")
+
+
+def format_currency(val):
+    return f"{money(val):,}"
+
+
+def number_to_words(amount):
+    try:
+        from num2words import num2words
+        amt = money(amount)
+        rupees = int(amt)
+        paise = int((amt - rupees) * 100)
+
+        words = num2words(rupees, lang="en_IN").title() + " Rupees"
+        if paise:
+            words += f" And {num2words(paise).title()} Paise"
+        return words + " Only"
+    except:
+        return f"{int(amount)} Rupees Only"
+
+
+class HorizontalLine(Flowable):
+    def __init__(self, thickness=0.5, color=colors.lightgrey):
+        super().__init__()
+        self.thickness = thickness
+        self.color = color
+
+    def wrap(self, w, h):
+        return w, self.thickness
+
+    def draw(self):
+        self.canv.setStrokeColor(self.color)
+        self.canv.setLineWidth(self.thickness)
+        self.canv.line(0, 0, self.width, 0)
+
+
+def draw_watermark(c, doc):
+    c.saveState()
+    c.setFillColor(colors.lightgrey)
+    c.setFont("Helvetica-Bold", 60)
+    try:
+        c.setFillAlpha(0.12)
+    except:
+        pass
+    c.translate(A4[0] / 2, A4[1] / 2)
+    c.rotate(45)
+    c.drawCentredString(0, 0, "CONFIDENTIAL")
+    c.restoreState()
+
+
+# =====================================================
+# MAIN PDF GENERATOR
+# =====================================================
 
 def generate_payslip_pdf(payroll):
     buffer = BytesIO()
-    
-    # margins: top, bottom, left, right
-    doc = SimpleDocTemplate(buffer, pagesize=A4, 
-                            rightMargin=15*mm, leftMargin=15*mm, 
-                            topMargin=15*mm, bottomMargin=15*mm)
-    
-    elements = []
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=10 * mm,
+        leftMargin=10 * mm,
+        topMargin=10 * mm,
+        bottomMargin=10 * mm,
+        title=f"Payslip_{payroll.month.strftime('%b_%Y')}"
+    )
+
     styles = getSampleStyleSheet()
-    
-    # --- Custom Styles ---
-    styles.add(ParagraphStyle(name='CenterTitle', parent=styles['Heading1'], alignment=TA_CENTER, fontSize=16, spaceAfter=10))
-    styles.add(ParagraphStyle(name='RightBold', parent=styles['Normal'], alignment=TA_RIGHT, fontName='Helvetica-Bold'))
-    styles.add(ParagraphStyle(name='LeftBold', parent=styles['Normal'], alignment=TA_LEFT, fontName='Helvetica-Bold'))
-    
+    elements = []
+
+    # -------------------------------------------------
+    # STYLES
+    # -------------------------------------------------
+
+    styles.add(ParagraphStyle("CompTitle", fontSize=20, fontName="Helvetica-Bold", textColor=THEME_COLOR))
+    styles.add(ParagraphStyle(name="HospitalHeading",fontName="Helvetica-Bold",fontSize=18,textColor=colors.black,spaceAfter=4))
+    styles.add(ParagraphStyle("CompSub", fontSize=8, textColor=colors.grey))
+    styles.add(ParagraphStyle("PayslipTitle", fontSize=12, textColor=colors.white, alignment=TA_CENTER))
+    styles.add(ParagraphStyle("Label", fontSize=8, textColor=colors.grey))
+    styles.add(ParagraphStyle("Value", fontSize=9, fontName="Helvetica-Bold", textColor=THEME_COLOR))
+    styles.add(ParagraphStyle("Th", fontSize=9, fontName="Helvetica-Bold", textColor=colors.white))
+    styles.add(ParagraphStyle("Td", fontSize=9, textColor=TEXT_BODY))
+    styles.add(ParagraphStyle("TdMoney", fontSize=9, alignment=TA_RIGHT))
+    styles.add(ParagraphStyle("TdMoneyBold", fontSize=9, fontName="Helvetica-Bold", alignment=TA_RIGHT))
+    styles.add(
+        ParagraphStyle(
+            name="CompSubRight",
+            parent=styles["CompSub"],
+            alignment=TA_RIGHT
+        )
+    )
     emp = payroll.employee
     user = emp.user
 
-    # Colors
-    HEADER_BG = colors.Color(0.17, 0.24, 0.31) # Dark Blue/Grey
-    HEADER_TEXT = colors.whitesmoke
-    ROW_BG = colors.whitesmoke
+    # -------------------------------------------------
+    # HEADER
+    # -------------------------------------------------
 
-    # =====================================================
-    # 1. HEADER SECTION
-    # =====================================================
-    # Placeholder for Company Name - You can replace text with an Image() if you have a logo
-    company_name = "NELSON HOSPITAL" 
-    
-    header_data = [
-        [Paragraph(f"<b>{company_name}</b>", styles['Heading2']), Paragraph("<b>PAYSLIP</b>", styles['Heading2'])]
-    ]
-    
-    header_table = Table(header_data, colWidths=[100*mm, 80*mm])
-    header_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(header_table)
-    elements.append(Spacer(1, 5*mm))
-    
-    # Pay Period Subtitle
-    period_str = payroll.month.strftime('%B %Y')
-    elements.append(Paragraph(f"Payslip for the period of <b>{period_str}</b>", styles['Normal']))
-    elements.append(Spacer(1, 5*mm))
+    logo_box = Table(
+        [["NH"]],
+        colWidths=16 * mm,
+        rowHeights=16 * mm,
+        style=[
+            ('BACKGROUND', (0, 0), (-1, -1), THEME_COLOR),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 13),
+        ]
+    )
 
-    # =====================================================
-    # 2. EMPLOYEE DETAILS (Grid Layout)
-    # =====================================================
-    # Format: Label | Value | Label | Value
-    emp_data = [
-        ["Employee ID", emp.employee_id, "Role", emp.get_role_display()],
-        ["Name", user.get_full_name(), "Department", emp.department.name if emp.department else "-"],
+    company_text = Table(
         [
-            "Date of Joining",
-            emp.date_of_joining.strftime("%d-%m-%Y") if emp.date_of_joining else "-",
-            "Contact",
-            emp.phone_number or "-"
+            [Paragraph("NELSON HOSPITAL", styles["HospitalHeading"])],
+            [Paragraph(
+                "Reg. No: RMEE2227209<br/>"
+                "B1/37, Sector F, Kapoorthala,<br/>"
+                "Lucknow – 226024",
+                styles["CompSubRight"]   # ✅ right aligned
+            )]
         ],
-    ]
-    
-    emp_table = Table(emp_data, colWidths=[35*mm, 55*mm, 35*mm, 55*mm])
-    emp_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'), # First col bold
-        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'), # Third col bold
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
-        ('BACKGROUND', (0, 0), (-1, -1), colors.white),
-        ('PADDING', (0, 0), (-1, -1), 6),
-    ]))
-    elements.append(emp_table)
-    elements.append(Spacer(1, 8*mm))
+        style=[
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]
+    )
 
-    # =====================================================
-    # 3. ATTENDANCE SUMMARY (Modern Strip)
-    # =====================================================
-    # Calculate days
-    total_days = calendar.monthrange(payroll.month.year, payroll.month.month)[1]
-    working_days = (payroll.present_days + payroll.absent_days + payroll.paid_leave_days + payroll.unpaid_leave_days)
-    
-    att_data = [[
-        f"Total Days: {total_days}",
-        f"Present: {payroll.present_days}",
-        f"Paid Leave: {payroll.paid_leave_days}",
-        f"Absent: {payroll.absent_days}",
-        f"LOP: {payroll.unpaid_leave_days}"
-    ]]
-    
-    att_table = Table(att_data, colWidths=[36*mm]*5)
-    att_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.grey),
-        ('BACKGROUND', (0, 0), (-1, -1), ROW_BG),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('PADDING', (0, 0), (-1, -1), 4),
-    ]))
-    elements.append(Paragraph("Attendance Details", styles['LeftBold']))
-    elements.append(Spacer(1, 2*mm))
-    elements.append(att_table)
-    elements.append(Spacer(1, 8*mm))
 
-    # =====================================================
-    # 4. FINANCIALS (Earnings vs Deductions)
-    # =====================================================
-    
-    # Prepare Data
-    earnings_list = [
-        ("Basic Salary", format_currency(payroll.basic_pay)),
-        ("HRA & Allowances", format_currency(payroll.allowances)),
-        (f"Overtime ({payroll.overtime_hours} hrs)", getattr(payroll, 'overtime_amount', '0.00')),
-        # Add Bonus etc here if exists
-    ]
-    
-    deductions_list = [
-        ("Provident Fund", "0.00"), # Example place holders, replace with actual logic
-        ("Professional Tax", "0.00"),
-        ("TDS / Income Tax", "0.00"),
-        ("Other Deductions", format_currency(payroll.deductions)),
-    ]
+    header = Table(
+        [[logo_box, company_text]],
+        colWidths=[22 * mm, 148 * mm],
+        style=[
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]
+    )
 
-    # Normalize lengths (make lists same size for the table)
-    max_rows = max(len(earnings_list), len(deductions_list))
-    while len(earnings_list) < max_rows: earnings_list.append(("", ""))
-    while len(deductions_list) < max_rows: deductions_list.append(("", ""))
+    elements.append(header)
+    elements.append(Spacer(1, 4 * mm))
 
-    # Build Table Data
-    # Header Row
-    fin_data = [[
-        Paragraph("<b>EARNINGS</b>", styles['Normal']), 
-        Paragraph("<b>AMOUNT</b>", styles['RightBold']),
-        Paragraph("<b>DEDUCTIONS</b>", styles['Normal']), 
-        Paragraph("<b>AMOUNT</b>", styles['RightBold'])
-    ]]
 
-    # Content Rows
-    for i in range(max_rows):
-        fin_data.append([
-            earnings_list[i][0],
-            earnings_list[i][1],
-            deductions_list[i][0],
-            deductions_list[i][1]
-        ])
+    # -------------------------------------------------
+    # TITLE BAR
+    # -------------------------------------------------
 
-    # Footer Row (Totals)
-    # Note: You might need to sum these up dynamically or pull from payroll object
-    total_earnings = float(payroll.basic_pay) + float(payroll.allowances) # simplified
-    total_deductions = float(payroll.deductions)
-    
-    fin_data.append([
-        "Total Earnings", format_currency(total_earnings),
-        "Total Deductions", format_currency(total_deductions)
+    elements.append(Table(
+        [[Paragraph(f"PAYSLIP FOR {payroll.month.strftime('%B %Y').upper()}", styles["PayslipTitle"])]],
+        colWidths=[190 * mm],
+        style=[('BACKGROUND', (0, 0), (-1, -1), THEME_COLOR),
+               ('PADDING', (0, 0), (-1, -1), 6)]
+    ))
+    elements.append(Spacer(1, 6 * mm))
+
+    # -------------------------------------------------
+    # EMPLOYEE INFO
+    # -------------------------------------------------
+
+    def info(l1, v1, l2, v2):
+        return [
+            Paragraph(l1, styles["Label"]), Paragraph(str(v1), styles["Value"]),
+            Paragraph(l2, styles["Label"]), Paragraph(str(v2), styles["Value"])
+        ]
+
+    emp_table = Table([
+        info("Name", user.get_full_name().title(), "Employee ID", emp.employee_id),
+        info("Department", emp.department.name if emp.department else "-", "Designation", emp.get_role_display()),
+        info("Monthly Salary", f"Rs. {format_currency(payroll.basic_pay)}", "Salary Type", "Monthly"),
+        info("Date of Joining",
+             emp.date_of_joining.strftime("%d-%b-%Y") if emp.date_of_joining else "-",
+             "Bank Account", getattr(emp, "bank_account_number", "-"))
+    ], colWidths=[30 * mm, 65 * mm, 30 * mm, 65 * mm])
+
+    emp_table.setStyle([
+        ('LINEBELOW', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ('PADDING', (0, 0), (-1, -1), 5)
     ])
 
-    fin_table = Table(fin_data, colWidths=[65*mm, 25*mm, 65*mm, 25*mm])
-    
-    fin_table.setStyle(TableStyle([
-        # Header Style
-        ('BACKGROUND', (0, 0), (-1, 0), HEADER_BG),
-        ('TEXTCOLOR', (0, 0), (-1, 0), HEADER_TEXT),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('ALIGN', (1, 0), (1, -1), 'RIGHT'), # Align amounts right
-        ('ALIGN', (3, 0), (3, -1), 'RIGHT'), # Align amounts right
-        
-        # Grid
-        ('GRID', (0, 0), (-1, -2), 0.5, colors.lightgrey),
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        
-        # Totals Row Style
-        ('fontName', (0, -1), (-1, -1), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, -1), (-1, -1), ROW_BG),
-        ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
-        ('PADDING', (0, 0), (-1, -1), 8),
-    ]))
-    
-    elements.append(fin_table)
-    elements.append(Spacer(1, 5*mm))
+    elements.append(emp_table)
+    elements.append(Spacer(1, 8 * mm))
 
-    # =====================================================
-    # 5. NET PAY SECTION
-    # =====================================================
-    
-    net_pay_val = payroll.actual_paid_salary if payroll.actual_paid_salary else payroll.net_salary
-    
-    net_data = [[
-        "Net Pay (Rounded)", 
-        f"Rs. {format_currency(net_pay_val)}"
+    # -------------------------------------------------
+    # ATTENDANCE
+    # -------------------------------------------------
+
+    total_days = calendar.monthrange(payroll.month.year, payroll.month.month)[1]
+    paid_days = min(payroll.present_days or 0, total_days)
+    lop_days = max(total_days - paid_days, 0)
+
+    def metric(lbl, val):
+        return Table([[Paragraph(lbl, styles["Label"])],
+                      [Paragraph(str(val), styles["Value"])]],
+                     colWidths=40 * mm,
+                     style=[('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER')])
+
+    elements.append(Table([[
+        metric("TOTAL DAYS", total_days),
+        metric("PAID DAYS", paid_days),
+        metric("LOSS OF PAY", lop_days),
+        metric("OVERTIME (HRS)", payroll.overtime_hours or 0)
+    ]], colWidths=[47.5 * mm] * 4))
+
+    elements.append(Spacer(1, 8 * mm))
+
+    # -------------------------------------------------
+    # PAY CALCULATIONS
+    # -------------------------------------------------
+
+    daily_pay = money(payroll.basic_pay) / total_days if total_days else money(0)
+    paid_basic = money(daily_pay * paid_days)
+
+    ot_rate = getattr(getattr(emp, "work_rule", None), "overtime_rate", 0)
+    ot_amt = money((payroll.overtime_hours or 0) * ot_rate)
+
+    allowances = money(payroll.allowances)
+    deductions = money(payroll.deductions)
+
+    total_earn = paid_basic + allowances + ot_amt
+    total_ded = deductions
+
+    net_val = (
+        money(getattr(payroll, "actual_paid_salary", 0))
+        or money(getattr(payroll, "net_salary", 0))
+        or (total_earn - total_ded)
+    )
+
+    # -------------------------------------------------
+    # EARNINGS & DEDUCTIONS TABLE
+    # -------------------------------------------------
+
+    data = [[
+        Paragraph("EARNINGS", styles["Th"]), Paragraph("AMOUNT", styles["Th"]),
+        Paragraph("DEDUCTIONS", styles["Th"]), Paragraph("AMOUNT", styles["Th"])
     ]]
-    
-    net_table = Table(net_data, colWidths=[130*mm, 50*mm])
-    net_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.Color(0.9, 0.95, 1)), # Very light blue
-        ('BOX', (0, 0), (-1, -1), 1, colors.darkblue),
-        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (1, 0), (1, 0), 14), # Big font for money
-        ('PADDING', (0, 0), (-1, -1), 12),
-    ]))
-    
-    elements.append(net_table)
-    elements.append(Spacer(1, 15*mm))
 
-    # =====================================================
-    # 6. FOOTER / SIGNATURES
-    # =====================================================
-    
-    footer_data = [
-        ["________________________", "________________________"],
-        ["Employee Signature", "Authorized Signatory"]
+    rows = [
+        ("Basic Salary", paid_basic),
+        ("House Rent Allowance", allowances),
+        ("Overtime Pay", ot_amt),
+        ("Special Allowance", 0)
     ]
-    
-    foot_table = Table(footer_data, colWidths=[90*mm, 90*mm])
-    foot_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
-        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-    ]))
-    
-    elements.append(foot_table)
-    elements.append(Spacer(1, 10*mm))
-    
-    elements.append(Paragraph("<i>This is a system generated payslip.</i>", styles['Normal']))
 
-    # Build PDF
-    doc.build(elements)
+    ded_rows = [
+        ("Provident Fund", 0),
+        ("Professional Tax", 0),
+        ("Income Tax (TDS)", 0),
+        ("Other Deductions", deductions)
+    ]
+
+    for e, d in zip(rows, ded_rows):
+        data.append([
+            Paragraph(e[0], styles["Td"]), Paragraph(format_currency(e[1]), styles["TdMoney"]),
+            Paragraph(d[0], styles["Td"]), Paragraph(format_currency(d[1]), styles["TdMoney"])
+        ])
+
+    data.append([
+        Paragraph("TOTAL EARNINGS", styles["TdMoneyBold"]),
+        Paragraph(format_currency(total_earn), styles["TdMoneyBold"]),
+        Paragraph("TOTAL DEDUCTIONS", styles["TdMoneyBold"]),
+        Paragraph(format_currency(total_ded), styles["TdMoneyBold"])
+    ])
+
+    elements.append(Table(data, colWidths=[70 * mm, 25 * mm, 70 * mm, 25 * mm],
+                          style=[
+                              ('GRID', (0, 0), (-1, -1), 0.5, colors.lightgrey),
+                              ('BACKGROUND', (0, 0), (-1, 0), THEME_COLOR),
+                              ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, ACCENT_COLOR]),
+                              ('BACKGROUND', (0, -1), (-1, -1), colors.whitesmoke)
+                          ]))
+
+    elements.append(Spacer(1, 6 * mm))
+
+    # -------------------------------------------------
+    # NET PAY
+    # -------------------------------------------------
+
+    elements.append(Table([
+        [
+            Paragraph("NET PAYABLE AMOUNT", styles["Label"]),
+            Paragraph(f"Rs. {format_currency(net_val)}",
+                      ParagraphStyle("Net", fontSize=16, fontName="Helvetica-Bold", alignment=TA_RIGHT))
+        ],
+        [Paragraph(f"In Words: <i>{number_to_words(net_val)}</i>", styles["Label"]), ""]
+    ], colWidths=[100 * mm, 90 * mm],
+        style=[
+            ('BOX', (0, 0), (-1, -1), 1, THEME_COLOR),
+            ('SPAN', (0, 1), (1, 1)),
+            ('PADDING', (0, 0), (-1, -1), 8)
+        ]))
+
+    elements.append(Spacer(1, 15 * mm))
+
+    # -------------------------------------------------
+    # SIGNATURES
+    # -------------------------------------------------
+
+    elements.append(Table([
+        ["_______________________", "_______________________"],
+        ["Employee Signature", "Authorized Signatory"]
+    ], colWidths=[95 * mm, 95 * mm],
+        style=[('ALIGN', (1, 0), (1, -1), 'RIGHT')]))
+
+    elements.append(Spacer(1, 8 * mm))
+    elements.append(HorizontalLine())
+
+    elements.append(Paragraph(
+        "This is a computer-generated document and does not require a signature.",
+        ParagraphStyle("Footer", fontSize=7, alignment=TA_CENTER, textColor=colors.grey)
+    ))
+
+    doc.build(elements, onFirstPage=draw_watermark, onLaterPages=draw_watermark)
+
     buffer.seek(0)
-    
     filename = f"payslip_{emp.employee_id}_{payroll.month.strftime('%Y_%m')}.pdf"
     return buffer, filename

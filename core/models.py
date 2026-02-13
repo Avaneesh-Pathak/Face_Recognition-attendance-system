@@ -117,29 +117,43 @@ class Department(models.Model):
 # 💰 SALARY & PAYROLL
 # ============================================================
 
+
 class SalaryStructure(models.Model):
-    employee = models.OneToOneField(Employee, on_delete=models.CASCADE)
+    employee = models.OneToOneField(
+        "Employee",
+        on_delete=models.CASCADE,
+        related_name="salary_structure"
+    )
+
     base_salary = models.DecimalField(max_digits=10, decimal_places=2)
     hra = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     allowances = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
     effective_from = models.DateField(default=timezone.now)
-    hourly_override = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        null=True, blank=True,
-        help_text="Optional custom hourly rate"
-    )
+
+    def gross_monthly(self):
+        return self.base_salary + self.hra + self.allowances
+
     def total_salary(self):
-        return self.base_salary + self.hra + self.allowances - self.deductions
+        return (
+            self.base_salary +
+            self.hra +
+            self.allowances -
+            self.deductions
+        )
 
+    total_salary.short_description = "Total Salary"
     def __str__(self):
-        return f"Salary Structure for {self.employee}"
+        return f"SalaryStructure({self.employee})"
 
-def daterange(start_date: date, end_date: date):
-    d = start_date
-    while d <= end_date:
+def daterange(start: date, end: date):
+    d = start
+    while d <= end:
         yield d
         d += timedelta(days=1)
+
+
 
 def get_employee_rule(emp):
     rule = emp.work_rule
@@ -147,24 +161,30 @@ def get_employee_rule(emp):
         raise ValueError("Employee has no WorkRule assigned")
 
     return {
-        "working_days": rule.working_days,
-        "saturday_is_working": rule.saturday_is_working,
-        "sunday_is_working": rule.sunday_is_working,
+        # Working pattern
+        "working_days": getattr(rule, "working_days", "5_day"),
+        "saturday_is_working": getattr(rule, "saturday_is_working", False),
+        "sunday_is_working": getattr(rule, "sunday_is_working", False),
 
-        "shift_start": rule.shift_start_time,
-        "shift_end": rule.shift_end_time,
+        # Shift
+        "shift_start": getattr(rule, "shift_start_time", None),
+        "shift_end": getattr(rule, "shift_end_time", None),
 
-        "full_day_hours": Decimal(str(rule.full_day_hours)),
-        "half_day_hours": Decimal(str(rule.half_day_hours)),
+        # Day thresholds (USED BY SALARY)
+        "full_day_hours": Decimal(str(getattr(rule, "full_day_hours", 8.0))),
+        "half_day_hours": Decimal(str(getattr(rule, "half_day_hours", 4.0))),
 
-        "night_start": rule.night_shift_start,
-        "night_end": rule.night_shift_end,
-        "night_multiplier": Decimal(rule.night_bonus_multiplier),
+        # Night shift (OPTIONAL / FUTURE)
+        "night_start": getattr(rule, "night_shift_start", None),
+        "night_end": getattr(rule, "night_shift_end", None),
+        "night_multiplier": Decimal(str(getattr(rule, "night_bonus_multiplier", 0))),
 
-        "overtime_rate": Decimal(rule.overtime_rate),
-        "count_weekend_overtime": rule.count_weekend_overtime,
-        "count_holiday_overtime": rule.count_holiday_overtime,
+        # Overtime (USED)
+        "overtime_rate": Decimal(str(getattr(rule, "overtime_rate", 0))),
+        "count_weekend_overtime": getattr(rule, "count_weekend_overtime", True),
+        "count_holiday_overtime": getattr(rule, "count_holiday_overtime", True),
     }
+
 
 
 def is_working_day(day, rule):
@@ -178,15 +198,6 @@ def is_working_day(day, rule):
     if wd == 6:
         return rule["sunday_is_working"]
     return True
-
-
-def daterange(start, end):
-    d = start
-    while d <= end:
-        yield d
-        d += timedelta(days=1)
-
-
 
 def get_hours_worked(employee: 'Employee', day: date) -> float:
     """Compute hours from earliest check-in to latest check-out on a given date.
@@ -232,13 +243,13 @@ NIGHT_BONUS_MULTIPLIER = Decimal("0.20")  # 20%
 class PayrollManager(models.Manager):
 
     def generate_monthly_salary(self, year: int, month: int):
+        from decimal import Decimal, ROUND_HALF_UP
+        import calendar
+        from django.utils import timezone
+
         first_day = date(year, month, 1)
         last_day = date(year, month, calendar.monthrange(year, month)[1])
-
-        holidays = set(
-            Holiday.objects.filter(date__range=(first_day, last_day))
-            .values_list("date", flat=True)
-        )
+        days_in_month = Decimal(calendar.monthrange(year, month)[1])
 
         employees = Employee.objects.filter(
             is_active=True,
@@ -248,7 +259,7 @@ class PayrollManager(models.Manager):
         for emp in employees:
 
             if Payroll.objects.filter(employee=emp, month=first_day).exists():
-                continue  # 🔒 prevent duplicate payroll
+                continue
 
             try:
                 structure = SalaryStructure.objects.get(employee=emp)
@@ -257,32 +268,16 @@ class PayrollManager(models.Manager):
 
             rule = get_employee_rule(emp)
 
-            working_days = sum(
-                1 for d in daterange(first_day, last_day)
-                if is_working_day(d, rule) and d not in holidays
-            )
+            salary_per_day = (
+                structure.base_salary / days_in_month
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-            expected_hours = max(
-                Decimal(working_days) * rule["full_day_hours"],
-                Decimal("1.0")
-            )
-
-            gross_salary = structure.total_salary()
-
-            hourly_rate = (
-                structure.hourly_override
-                if structure.hourly_override
-                else (gross_salary / expected_hours).quantize(Decimal("0.01"))
-            )
-
-            total_hours = Decimal("0.00")
-            overtime_hours = Decimal("0.00")
-            night_hours = Decimal("0.00")
-            present_days = Decimal("0.00")
-            absent_days = Decimal("0.00")
+            full_days = Decimal("0.0")
+            half_days = Decimal("0.0")
+            lop_days = Decimal("0.0")
+            overtime_hours = Decimal("0.0")
 
             for day in daterange(first_day, last_day):
-                is_holiday = day in holidays or not is_working_day(day, rule)
 
                 logs = Attendance.objects.filter(
                     employee=emp,
@@ -290,140 +285,143 @@ class PayrollManager(models.Manager):
                 ).order_by("timestamp")
 
                 if not logs.exists():
-                    if not is_holiday:
-                        absent_days += 1
+                    lop_days += 1
                     continue
 
                 cin = logs.filter(attendance_type="check_in").first()
                 cout = logs.filter(attendance_type="check_out").last()
 
-                if not cin or not cout:
-                    absent_days += 1
+                if not cin or not cout or cout.timestamp <= cin.timestamp:
+                    lop_days += 1
                     continue
 
-                start = timezone.localtime(cin.timestamp)
-                end = timezone.localtime(cout.timestamp)
-
-                hours = Decimal(
-                    (end - start).total_seconds() / 3600
+                work_hours = Decimal(
+                    (cout.timestamp - cin.timestamp).total_seconds() / 3600
                 ).quantize(Decimal("0.01"))
 
-                if hours <= 0:
-                    absent_days += 1
+                # ---- Day classification ----
+                if work_hours >= rule["full_day_hours"]:
+                    full_days += 1
+                elif work_hours >= rule["half_day_hours"]:
+                    half_days += Decimal("0.5")
+                else:
+                    lop_days += 1
                     continue
 
-                present_days += 1
+                # ---- Overtime ----
+                if work_hours > rule["full_day_hours"]:
+                    overtime_hours += (
+                        work_hours - rule["full_day_hours"]
+                    )
 
-                if is_holiday:
-                    overtime_hours += hours
-                    continue
+            paid_days = full_days + half_days
 
-                total_hours += hours
+            basic_pay = (
+                salary_per_day * paid_days
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-                if hours > rule["full_day_hours"]:
-                    overtime_hours += (hours - rule["full_day_hours"])
-
-                # Night hours
-                cur = start
-                while cur < end:
-                    t = cur.time()
-                    ns, ne = rule["night_start"], rule["night_end"]
-                    if (ns <= ne and ns <= t <= ne) or (ns > ne and (t >= ns or t <= ne)):
-                        night_hours += Decimal("0.5")
-                    cur += timedelta(minutes=30)
-
-            normal_pay = (total_hours * hourly_rate).quantize(Decimal("0.01"))
-            overtime_pay = (overtime_hours * rule["overtime_rate"]).quantize(Decimal("0.01"))
-            night_bonus = (
-                night_hours * hourly_rate * rule["night_multiplier"]
-            ).quantize(Decimal("0.01"))
+            ot_pay = (
+                overtime_hours * rule["overtime_rate"]
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
             net_salary = (
-                normal_pay
-                + overtime_pay
-                + night_bonus
-                + structure.allowances
+                basic_pay
                 + structure.hra
+                + structure.allowances
+                + ot_pay
                 - structure.deductions
-            )
-
-            net_salary = max(net_salary, Decimal("0.00"))
+            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
             payroll = Payroll.objects.create(
                 employee=emp,
                 month=first_day,
-                basic_pay=structure.base_salary,
-                allowances=structure.allowances + structure.hra,
+                basic_pay=basic_pay,
+                allowances=structure.hra + structure.allowances,
                 deductions=structure.deductions,
                 calculated_salary=net_salary,
                 net_salary=net_salary,
-                present_days=present_days,
-                absent_days=absent_days,
+                present_days=paid_days,
+                half_days=half_days,
+                absent_days=lop_days,
                 overtime_hours=overtime_hours,
                 status="processed",
                 processed_at=timezone.now(),
             )
 
-            pdf, name = generate_payslip_pdf(payroll)
-            payroll.payslip_pdf.save(name, ContentFile(pdf.read()))
+            # Generate payslip
+            pdf, filename = generate_payslip_pdf(payroll)
+            payroll.payslip_pdf.save(filename, ContentFile(pdf.read()))
             email_payslip(payroll)
 
-        return True
 
+    def _daterange(self, start, end):
+        d = start
+        while d <= end:
+            yield d
+            d += timedelta(days=1)
 
 
 class Payroll(models.Model):
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
-    month = models.DateField(help_text="First day of the salary month")
+    employee = models.ForeignKey("Employee", on_delete=models.CASCADE)
+    month = models.DateField(help_text="First day of month")
+
     basic_pay = models.DecimalField(max_digits=10, decimal_places=2)
     allowances = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     deductions = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    net_salary = models.DecimalField(max_digits=10, decimal_places=2)
+
+    present_days = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    half_days = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    absent_days = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    overtime_hours = models.DecimalField(max_digits=7, decimal_places=2, default=0)
+
+    # 🔴 CRITICAL FIX: defaults added
+    calculated_salary = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+    net_salary = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+
     status = models.CharField(
         max_length=20,
-        choices=[('pending', 'Pending'), ('processed', 'Processed'), ('paid', 'Paid')],
-        default='pending'
+        choices=[
+            ("pending", "Pending"),
+            ("processed", "Processed"),
+            ("paid", "Paid"),
+        ],
+        default="pending",
     )
-    processed_at = models.DateTimeField(blank=True, null=True)
-    calculated_salary = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        help_text="System calculated salary before override",
-        null=True, blank=True
-    )
-    actual_paid_salary = models.DecimalField(
-        max_digits=10, decimal_places=2,
-        null=True, blank=True,
-        help_text="Actual salary paid after manual override (if any)",
-    )
-    # ✅ NEW FIELDS:
-    paid_date = models.DateField(null=True, blank=True)
-    next_pay_date = models.DateField(null=True, blank=True)
 
-    # ✅ Breakdown fields:
-    present_days = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))  # includes half-days as 0.5 if you prefer
-    half_days = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))
-    paid_leave_days = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))
-    unpaid_leave_days = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))
-    absent_days = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('0.00'))
-    overtime_hours = models.DecimalField(max_digits=7, decimal_places=2, default=Decimal('0.00'))
-    remarks = models.TextField(blank=True, null=True)
-    payslip_pdf = models.FileField(
-        upload_to="payslips/",
-        null=True,
-        blank=True
-    )
+    processed_at = models.DateTimeField(null=True, blank=True)
+    paid_date = models.DateField(null=True, blank=True)
+
     objects = PayrollManager()
 
+    @property
+    def paid_leave_days(self):
+        return Decimal("0.00")
+
+    @property
+    def unpaid_leave_days(self):
+        return self.absent_days
+
+    # ✅ HARDENED SAVE (NO NULL POSSIBLE)
     def save(self, *args, **kwargs):
-        if isinstance(self.paid_date, str):
-            self.paid_date = datetime.strptime(self.paid_date, "%Y-%m-%d").date()
+        self.calculated_salary = (
+            (self.basic_pay or Decimal("0"))
+            + (self.allowances or Decimal("0"))
+            - (self.deductions or Decimal("0"))
+        )
 
-        if self.status == 'paid' and self.paid_date and not self.next_pay_date:
-            next_month = self.paid_date + relativedelta(months=1)
-            self.next_pay_date = next_month.replace(day=1)
-
+        self.net_salary = self.calculated_salary
         super().save(*args, **kwargs)
 
+    def __str__(self):
+        return f"{self.employee} | {self.month.strftime('%b %Y')}"
 
 
 class PayrollSettings(models.Model):
@@ -452,16 +450,14 @@ class PayrollSettings(models.Model):
         verbose_name_plural = "Payroll Settings"
 
 class WorkRule(models.Model):
-    """
-    Office / Shift based working rules
-    """
-    name = models.CharField(max_length=100, unique=True)
-
     WORKING_DAYS_CHOICES = [
         ('5_day', 'Mon–Fri'),
         ('6_day', 'Mon–Sat'),
         ('custom', 'Custom'),
     ]
+
+    name = models.CharField(max_length=100, unique=True)
+
     working_days = models.CharField(
         max_length=10,
         choices=WORKING_DAYS_CHOICES,
@@ -471,35 +467,23 @@ class WorkRule(models.Model):
     saturday_is_working = models.BooleanField(default=False)
     sunday_is_working = models.BooleanField(default=False)
 
-    # Shift timing
-    shift_start_time = models.TimeField(default=time(9, 0))
-    shift_end_time = models.TimeField(default=time(18, 0))
+    shift_start_time = models.TimeField(default="09:00")
+    shift_end_time = models.TimeField(default="18:00")
 
-    # Hours
     full_day_hours = models.FloatField(default=8.0)
     half_day_hours = models.FloatField(default=4.0)
 
-    # Night shift
-    night_shift_start = models.TimeField(default=time(22, 0))
-    night_shift_end = models.TimeField(default=time(6, 0))
-    night_bonus_multiplier = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=Decimal("0.20")
-    )
-
-    # Overtime
     overtime_rate = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        default=Decimal('100.00')
+        default=Decimal("100.00")
     )
+
     count_weekend_overtime = models.BooleanField(default=True)
     count_holiday_overtime = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
-
 
 
 
@@ -637,7 +621,7 @@ class Attendance(models.Model):
     
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     attendance_type = models.CharField(max_length=10, choices=ATTENDANCE_TYPES)
-    timestamp = models.DateTimeField(default=timezone.now)
+    timestamp = models.DateTimeField(default=timezone.now,editable=True)
     location = models.CharField(max_length=100, blank=True, null=True)
     confidence_score = models.FloatField(blank=True, null=True)
     image_capture = models.ImageField(upload_to='attendance_captures/', blank=True, null=True)

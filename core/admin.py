@@ -107,7 +107,6 @@ class AttendanceAdmin(admin.ModelAdmin):
     list_display = ('employee', 'attendance_type', 'timestamp', 'location', 'confidence_score')
     list_filter = ('attendance_type', 'timestamp', 'location')
     search_fields = ('employee__user__first_name', 'employee__user__last_name', 'employee__employee_id')
-    readonly_fields = ('timestamp',)
     date_hierarchy = 'timestamp'
     
     def get_queryset(self, request):
@@ -151,12 +150,20 @@ class DepartmentAdmin(admin.ModelAdmin):
 
 @admin.register(SalaryStructure)
 class SalaryStructureAdmin(admin.ModelAdmin):
-    list_display = ('employee', 'base_salary', 'hra', 'allowances', 'deductions', 'total_salary', 'effective_from')
-    list_filter = ('effective_from',)
-    search_fields = ('employee__user__first_name', 'employee__user__last_name', 'employee__employee_id')
-    
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('employee__user')
+    list_display = (
+        'employee',
+        'base_salary',
+        'hra',
+        'allowances',
+        'deductions',
+        'total_salary_display'
+    )
+
+    def total_salary_display(self, obj):
+        return obj.total_salary()
+
+    total_salary_display.short_description = "Total Salary"
+
 
 
 class PayrollMonthFilter(admin.SimpleListFilter):
@@ -183,11 +190,15 @@ class PayrollMonthFilter(admin.SimpleListFilter):
 @admin.register(Payroll)
 class PayrollAdmin(admin.ModelAdmin):
     list_display = (
-        'employee', 'month_display', 'net_salary', 'status',
-        'present_days', 'half_days', 'paid_leave_days',
-        'unpaid_leave_days', 'absent_days', 'overtime_hours',
-        'processed_at', 'paid_date'
+        'employee',
+        'month',
+        'present_days',
+        'absent_days',
+        'overtime_hours',
+        'net_salary',
+        'status'
     )
+
     list_filter = (PayrollMonthFilter, 'status')
     search_fields = ('employee__employee_id', 'employee__user__first_name')
     readonly_fields = ('processed_at',)

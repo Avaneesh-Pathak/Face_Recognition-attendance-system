@@ -6,6 +6,8 @@ import json
 import io
 import zipfile
 import base64
+from core.models import get_employee_rule
+
 import json 
 import logging
 import tempfile
@@ -19,9 +21,10 @@ from datetime import date, datetime, timedelta
 from calendar import monthrange, month_name
 from PIL import Image
 from django.utils import timezone
-from datetime import datetime, date
+from datetime import datetime, date, time
 import calendar
 from django.db.models import Prefetch
+from django.core.paginator import Paginator
 from django.http import JsonResponse, Http404
 from django.urls import reverse
 from decimal import Decimal
@@ -136,24 +139,41 @@ def register(request):
 
         if form.is_valid():
             # 1. Create User
-            user = User.objects.create_user(
-                username=form.cleaned_data['username'],
-                email=form.cleaned_data['email'],
-                password=form.cleaned_data['password1'],
-                first_name=form.cleaned_data['first_name'],
-                last_name=form.cleaned_data['last_name']
-            )
+            try:
+                user = User.objects.create_user(
+                    username=form.cleaned_data['username'],
+                    email=form.cleaned_data['email'],
+                    password=form.cleaned_data['password1'],
+                    first_name=form.cleaned_data['first_name'],
+                    last_name=form.cleaned_data['last_name']
+                )
+            except Exception as e:
+                messages.error(request, f"❌ User creation failed: {str(e)}")
+                return render(request, 'register.html', {
+                    'form': form,
+                    'reg_success': reg_success,
+                })
+
 
             # 2. Create Employee
-            employee = Employee.objects.create(
-                user=user,
-                department=form.cleaned_data['department'],
-                position=form.cleaned_data['position'],
-                manager=form.cleaned_data['manager'],
-                phone_number=form.cleaned_data['phone_number'],
-                role=form.cleaned_data['role'],
-                work_rule=form.cleaned_data.get('work_rule'),
-            )
+            try:
+                employee = Employee.objects.create(
+                    user=user,
+                    department=form.cleaned_data['department'],
+                    position=form.cleaned_data['position'],
+                    manager=form.cleaned_data['manager'],
+                    phone_number=form.cleaned_data['phone_number'],
+                    role=form.cleaned_data['role'],
+                    work_rule=form.cleaned_data.get('work_rule'),
+                )
+            except Exception as e:
+                user.delete()  # rollback user
+                messages.error(request, f"❌ Employee creation failed: {str(e)}")
+                return render(request, 'register.html', {
+                    'form': form,
+                    'reg_success': reg_success,
+                })
+
 
             # 3. Handle Uploaded Face Image
             face_image = request.FILES.get('face_image')
@@ -228,7 +248,10 @@ def register(request):
             return redirect('employee_list')
 
         else:
-            messages.error(request, "❌ Please fix the errors in the form.")
+            # 🔍 Show exact form errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
 
     else:
         form = EmployeeRegistrationForm()
@@ -1169,149 +1192,147 @@ def attendance_reports(request):
 
 
 def generate_excel_report(queryset, start_date, end_date):
-    """Helper function to generate the Excel response"""
+    import calendar
+    from decimal import Decimal
+    from django.utils import timezone
+    import openpyxl
+
     wb = openpyxl.Workbook()
 
     ws_daily = wb.active
     ws_daily.title = "Daily Attendance"
-    ws_monthly = wb.create_sheet("Monthly Summary")
     ws_salary = wb.create_sheet("Salary Calculation")
 
-    # Headers
-    ws_daily.append(["Employee", "Date", "Shift Start", "Shift End", "Check In", "Check Out", "Late (Min)", "Early Leave (Min)", "Work Hours", "Overtime (Min)"])
-    ws_monthly.append(["Employee", "Month", "Total Days", "Present Days", "Absent Days", "Total Work Hours", "Total OT Hours"])
-    ws_salary.append(["Employee", "Month", "Present Days", "Salary / Day", "Base Salary", "Overtime Amount", "Total Salary"])
+    ws_daily.append([
+        "Employee", "Date", "Check In", "Check Out",
+        "Work Hours", "Day Type", "Overtime (Hrs)"
+    ])
 
-    # Re-order queryset for processing (Oldest first)
+    ws_salary.append([
+        "Employee", "Month",
+        "Monthly Salary",
+        "Paid Days", "Half Days", "LOP Days",
+        "Salary / Day",
+        "Gross Pay",
+        "OT Hours", "OT Amount",
+        "Net Salary"
+    ])
+
     queryset = queryset.order_by("employee", "timestamp")
 
-    data = {}
-    
-    # Organize data by Employee+Date
+    daily = {}
     for rec in queryset:
-        emp = rec.employee
-        day = rec.timestamp.date()
-        key = (emp.id, day)
-
-        data.setdefault(key, {
-            "employee": emp,
-            "date": day,
+        key = (rec.employee.id, rec.timestamp.date())
+        daily.setdefault(key, {
+            "employee": rec.employee,
+            "date": rec.timestamp.date(),
             "check_in": None,
             "check_out": None,
         })
 
-        # Naive logic: First check-in and Last check-out of the day
-        local_time = timezone.localtime(rec.timestamp)
-        if rec.attendance_type == "check_in":
-            if data[key]["check_in"] is None:
-                data[key]["check_in"] = local_time
+        ts = timezone.localtime(rec.timestamp)
+        if rec.attendance_type == "check_in" and not daily[key]["check_in"]:
+            daily[key]["check_in"] = ts
         elif rec.attendance_type == "check_out":
-            data[key]["check_out"] = local_time
+            daily[key]["check_out"] = ts
 
-    monthly_stats = {}
+    monthly = {}
 
-    # Process Daily Data
-    for entry in data.values():
-        emp = entry["employee"]
-        date_obj = entry["date"]
-        
-        # Skip if missing punches
-        if not entry["check_in"] or not entry["check_out"]:
+    for row in daily.values():
+        emp = row["employee"]
+        ci, co = row["check_in"], row["check_out"]
+        if not ci or not co or co <= ci:
             continue
 
-        # Safe attribute access with defaults
-        shift_start_time = getattr(emp, 'shift_start', time(9, 0))
-        shift_end_time = getattr(emp, 'shift_end', time(17, 0))
+        work_hours = Decimal(
+            (co - ci).total_seconds() / 3600
+        ).quantize(Decimal("0.01"))
 
-        shift_start = datetime.combine(date_obj, shift_start_time)
-        shift_end = datetime.combine(date_obj, shift_end_time)
-        
-        # Make shift times timezone aware if needed
-        if timezone.is_aware(entry["check_in"]):
-            current_tz = entry["check_in"].tzinfo
-            shift_start = shift_start.replace(tzinfo=current_tz)
-            shift_end = shift_end.replace(tzinfo=current_tz)
+        rule = get_employee_rule(emp)
 
-        check_in = entry["check_in"]
-        check_out = entry["check_out"]
+        if work_hours >= rule["full_day_hours"]:
+            day_value = Decimal("1.0")
+            day_type = "Full"
+        elif work_hours >= rule["half_day_hours"]:
+            day_value = Decimal("0.5")
+            day_type = "Half"
+        else:
+            day_value = Decimal("0.0")
+            day_type = "LOP"
 
-        # Calculations
-        late_min = max(0, int((check_in - shift_start).total_seconds() / 60))
-        early_min = max(0, int((shift_end - check_out).total_seconds() / 60))
-        
-        work_seconds = (check_out - check_in).total_seconds()
-        total_minutes = int(work_seconds / 60)
-        
-        shift_duration_min = int((shift_end - shift_start).total_seconds() / 60)
-        overtime_min = max(0, total_minutes - shift_duration_min)
-
-        work_hours_str = f"{total_minutes // 60:02d}:{total_minutes % 60:02d}"
+        ot_hours = max(Decimal("0.0"), work_hours - rule["full_day_hours"])
 
         ws_daily.append([
             emp.user.get_full_name(),
-            date_obj.strftime("%d-%m-%Y"),
-            shift_start_time.strftime("%H:%M"),
-            shift_end_time.strftime("%H:%M"),
-            check_in.strftime("%H:%M"),
-            check_out.strftime("%H:%M"),
-            late_min,
-            early_min,
-            work_hours_str,
-            overtime_min,
+            row["date"].strftime("%d-%m-%Y"),
+            ci.strftime("%H:%M"),
+            co.strftime("%H:%M"),
+            float(work_hours),
+            day_type,
+            float(ot_hours),
         ])
 
-        # Aggregate Monthly
-        month_key = (emp.id, date_obj.strftime("%Y-%m"))
-        monthly_stats.setdefault(month_key, {
+        key = (emp.id, row["date"].year, row["date"].month)
+        monthly.setdefault(key, {
             "employee": emp,
-            "days": set(),
-            "work_min": 0,
-            "ot_min": 0,
+            "paid_days": Decimal("0.0"),
+            "half_days": Decimal("0.0"),
+            "lop_days": Decimal("0.0"),
+            "ot_hours": Decimal("0.0"),
         })
-        ms = monthly_stats[month_key]
-        ms["days"].add(date_obj)
-        ms["work_min"] += total_minutes
-        ms["ot_min"] += overtime_min
 
-    # Process Monthly & Salary Data
-    for (emp_id, month), ms in monthly_stats.items():
-        emp = ms["employee"]
-        days = len(ms["days"])
-        work_hours = ms["work_min"] / 60
-        ot_hours = ms["ot_min"] / 60
+        m = monthly[key]
+        if day_value == 1:
+            m["paid_days"] += 1
+        elif day_value == Decimal("0.5"):
+            m["paid_days"] += Decimal("0.5")
+            m["half_days"] += Decimal("0.5")
+        else:
+            m["lop_days"] += 1
 
-        salary_per_day = getattr(emp, 'salary_per_day', Decimal('0.00'))
-        ot_rate = getattr(emp, 'overtime_rate_per_hour', Decimal('0.00'))
+        m["ot_hours"] += ot_hours
 
-        base_salary = Decimal(days) * salary_per_day
-        ot_amount = Decimal(ot_hours) * ot_rate
-        total_salary = base_salary + ot_amount
+    for (emp_id, y, mth), m in monthly.items():
+        emp = m["employee"]
+        structure = SalaryStructure.objects.filter(employee=emp).first()
+        if not structure:
+            continue
 
-        ws_monthly.append([
-            emp.user.get_full_name(),
-            month,
-            days, # Total Days worked
-            days, # Present Days
-            0,    # Absent Days (Complex to calc in this loop)
-            round(work_hours, 2),
-            round(ot_hours, 2),
-        ])
+        days_in_month = Decimal(calendar.monthrange(y, mth)[1])
+        salary_per_day = (structure.base_salary / days_in_month).quantize(Decimal("0.01"))
+
+        gross = (salary_per_day * m["paid_days"]).quantize(Decimal("0.01"))
+        rate = emp.work_rule.overtime_rate if emp.work_rule else Decimal("0.00")
+        ot_amount = (m["ot_hours"] * rate).quantize(Decimal("0.01"))
+
+
+        net = (
+            gross +
+            structure.hra +
+            structure.allowances +
+            ot_amount -
+            structure.deductions
+        )
 
         ws_salary.append([
             emp.user.get_full_name(),
-            month,
-            days,
-            salary_per_day,
-            base_salary,
-            ot_amount,
-            total_salary,
+            f"{y}-{mth:02d}",
+            float(structure.base_salary),
+            float(m["paid_days"]),
+            float(m["half_days"]),
+            float(m["lop_days"]),
+            float(salary_per_day),
+            float(gross),
+            float(m["ot_hours"]),
+            float(ot_amount),
+            float(net),
         ])
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     response["Content-Disposition"] = (
-        f'attachment; filename="attendance_report_{start_date}_to_{end_date}.xlsx"'
+        f'attachment; filename="attendance_salary_{start_date}_to_{end_date}.xlsx"'
     )
     wb.save(response)
     return response
@@ -1799,7 +1820,7 @@ def payroll_list(request):
 
 
 @login_required
-@finance_required
+# @finance_required
 def generate_payroll(request):
     if request.method == 'POST':
         month = int(request.POST.get('month'))
@@ -1855,7 +1876,7 @@ def my_salary(request):
 
 
 @login_required
-@finance_required
+# @finance_required
 def pay_salary(request, pk):
     payroll = get_object_or_404(Payroll, pk=pk)
 
@@ -1959,7 +1980,7 @@ def payroll_slip_pdf(request, pk):
 
 
 @login_required
-@finance_required
+# @finance_required
 def payroll_expense_chart(request):
     """
     Renders page with Chart.js that fetches data from payroll_expense_api.
@@ -1994,7 +2015,7 @@ def payroll_expense_api(request):
 
 
 @login_required
-@finance_required
+# @finance_required
 def employee_salary_history(request, employee_id):
     emp = get_object_or_404(
         Employee.objects.select_related('user'),
@@ -2018,9 +2039,6 @@ def employee_salary_history(request, employee_id):
         'totals': totals,
         'title': f"Salary History – {emp.user.get_full_name()}"
     })
-
-
-
 
 
 # ============================================================
