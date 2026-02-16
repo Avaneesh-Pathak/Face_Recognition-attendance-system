@@ -64,9 +64,7 @@ from .forms import ( UserRegistrationForm, EmployeeRegistrationForm, AttendanceS
     LeaveTypeForm, LeaveApplicationForm, LeaveApprovalForm, LeaveWorkflowStageForm,
     JoiningDetailForm, ResignationForm, NotificationForm,PayrollFilterForm
     )
-from .face_system import get_face_system
-from core.liveness import LivenessDetector
-from core.face_recognition_utils import get_face_embedding
+
 # ============================================================
 # 💰 SALARY & PAYROLL VIEWS (UPDATED)
 # ============================================================
@@ -91,6 +89,7 @@ from .decorators import finance_required
 
 from core.utils.payslip_pdf import generate_payslip_pdf
 from core.utils.payslip_email import email_payslip
+from core.face_system import get_face_system
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -103,7 +102,7 @@ if not logger.hasHandlers():
 logger.setLevel(logging.INFO)
 
 # Initialize face system (lazy init inside register also)
-face_system = get_face_system()
+
 
 
 try:
@@ -111,16 +110,9 @@ try:
 except Exception:
     get_if_system = lambda: None
 
-try:
-    from core.face_recognition import get_face_system as get_fr_system
-except Exception:
-    get_fr_system = lambda: None
 
 # Liveness (your module is named livenss.py)
-try:
-    from core.liveness import LivenessDetector
-except Exception:
-    LivenessDetector = None
+
 
 
 def home(request):
@@ -726,146 +718,187 @@ def _recognize_employee(frame_bgr):
 
     return None, 0.0, None, "none"
 
+@login_required
+def attendance_heartbeat(request):
+    return JsonResponse({
+        "ok": True,
+        "ts": time.time()
+    })
 
 # ------------------ ✅ Final mark_attendance Endpoint ------------------
 @login_required
 def mark_attendance(request):
-    if request.method == "POST" and request.FILES.get("capture"):
-        try:
-            # ---- 1) Decode frame ----
-            file_bytes = np.frombuffer(request.FILES["capture"].read(), np.uint8)
-            frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-            if frame is None:
-                return JsonResponse({"success": False, "message": "Invalid image data."})
+    logger.info("➡️ mark_attendance called")
 
-            # ---- 2) Face Recognition (with fallback + migration-safe) ----
-            try:
-                emp, score, bbox, backend = _recognize_employee(frame)
-            except (ProgrammingError, OperationalError):
-                return JsonResponse({
-                    "success": False,
-                    "message": "Database is not ready yet. Please finish migrations and retry.",
-                    "color": "red"
-                })
+    if request.method != "POST":
+        logger.warning("❌ Invalid method: %s", request.method)
+        return JsonResponse({"success": False, "message": "Invalid method"}, status=400)
 
-            if backend == "db-not-ready":
-                return JsonResponse({
-                    "success": False,
-                    "message": "Database is not ready yet. Please finish migrations and retry.",
-                    "color": "red"
-                })
+    if "capture" not in request.FILES:
+        logger.warning("❌ No capture file in request")
+        return JsonResponse({"success": False, "message": "No image"}, status=400)
 
-            if not emp:
-                return JsonResponse({
-                    "success": False,
-                    "message": "Face not recognized",
-                    "color": "red",
-                    "backend": backend
-                })
+    try:
+        # --------------------------------------------------
+        # 1. Decode image
+        # --------------------------------------------------
+        logger.debug("📷 Reading image bytes")
+        file_bytes = np.frombuffer(request.FILES["capture"].read(), np.uint8)
+        frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
-            # ---- 3) Liveness Detection ----
-            detector = _get_liveness(request.session.session_key or str(emp.employee_id))
-            if detector is None:
-                # If mediapipe is unavailable, allow attendance but tag as not-checked
-                liveness_data = {"ear": 0.0, "blink": False, "motion": False, "live": True, "face_detected": True}
-            else:
-                lres = detector.detect_detail(frame)
-                # bring to native types and include dynamic threshold if available
-                dynamic_thr = getattr(detector, "dynamic_threshold", None)
-                liveness_data = {
-                    "ear": float(lres.get("ear", 0.0)),
-                    "blink": bool(lres.get("blink", False)),
-                    "motion": bool(lres.get("motion", False)),
-                    "live": bool(lres.get("live", False)),
-                    "face_detected": bool(lres.get("face_detected", False)),
-                    "threshold": float(dynamic_thr) if dynamic_thr is not None else None
-                }
+        if frame is None:
+            logger.error("❌ OpenCV failed to decode image")
+            return JsonResponse({"success": False, "message": "Invalid image"})
 
-                # If motion present, treat as live (your original rule)
-                if liveness_data["motion"]:
-                    liveness_data["blink"] = True
-                    liveness_data["live"] = True
+        h, w = frame.shape[:2]
+        logger.debug("📐 Frame size: %dx%d", w, h)
 
-                if not liveness_data["live"]:
-                    return JsonResponse({
-                        "success": False,
-                        "message": (
-                            f"Liveness failed — Blink:{liveness_data['blink']} | "
-                            f"Motion:{liveness_data['motion']} | EAR:{round(liveness_data['ear'],3)}"
-                        ),
-                        "liveness": to_native(liveness_data),
-                        "color": "yellow"
-                    })
+        # Resize for speed
+        if w > 640:
+            scale = 640 / w
+            frame = cv2.resize(frame, (640, int(h * scale)))
+            logger.debug("⚡ Frame resized for speed")
 
-            # ---- 4) Attendance Logic (pairs map to hours → payroll later) ----
-            now = timezone.now()
-            settings_obj = AttendanceSettings.objects.first()
-            min_hours = float(getattr(settings_obj, "min_hours_before_checkout", 3.0))
+        # --------------------------------------------------
+        # 2. Face system
+        # --------------------------------------------------
+        logger.debug("🤖 Fetching face system")
+        face_system = get_face_system()
 
-            last_att = Attendance.objects.filter(employee=emp).order_by("-timestamp").first()
+        if face_system is None:
+            logger.error("❌ Face system not initialized")
+            return JsonResponse({"success": False, "message": "System not ready"})
 
-            # Already has a record today?
-            if last_att and timezone.localtime(last_att.timestamp).date() == now.date():
-                if last_att.attendance_type == "check_in":
-                    elapsed = (now - last_att.timestamp).total_seconds() / 3600.0
-                    if elapsed < min_hours:
-                        remain_min = int((min_hours - elapsed) * 60)
-                        return JsonResponse({
-                            "success": False,
-                            "message": f"Wait {remain_min} minutes before checkout.",
-                            "liveness": to_native(liveness_data),
-                            "color": "yellow"
-                        })
+        logger.debug("🧠 Running recognition")
+        emp_id, score, info = face_system.recognize_from_frame(frame)
 
-                    Attendance.objects.create(
-                        employee=emp,
-                        attendance_type="check_out",
-                        confidence_score=score
-                    )
-                    return JsonResponse({
-                        "success": True,
-                        "attendance_type": "Check-Out",
-                        "name": emp.user.get_full_name(),
-                        "confidence": round(score * 100, 2),
-                        "liveness": to_native(liveness_data),
-                        "backend": backend,
-                        "color": "green",
-                        "message": f"✅ Checked-Out at {now.strftime('%H:%M:%S')}"
-                    })
-                else:
-                    # already checked out today
-                    return JsonResponse({
-                        "success": False,
-                        "message": "✅ Already checked out today",
-                        "liveness": to_native(liveness_data),
-                        "backend": backend,
-                        "color": "yellow"
-                    })
+        logger.debug("🧪 Recognition output → emp_id=%s score=%s info=%s",
+                     emp_id, score, info)
 
-            # First check-in today
-            Attendance.objects.create(
-                employee=emp,
-                attendance_type="check_in",
-                confidence_score=score
-            )
+        if isinstance(info, dict) and info.get("type") == "liveness":
+            logger.warning("⚠️ Liveness failed: %s", info.get("reason"))
             return JsonResponse({
-                "success": True,
-                "attendance_type": "Check-In",
-                "name": emp.user.get_full_name(),
-                "confidence": round(score * 100, 2),
-                "liveness": to_native(liveness_data),
-                "backend": backend,
-                "color": "green",
-                "message": f"✅ Checked-In at {now.strftime('%H:%M:%S')}"
+                "success": False,
+                "message": info.get("reason", "Liveness failed"),
+                "color": "yellow",
             })
 
-        except Exception as e:
-            import traceback, logging
-            logging.getLogger(__name__).error("Error in mark_attendance: %s", traceback.format_exc())
-            return JsonResponse({"success": False, "message": f"Internal Error: {e}", "color": "red"})
+        if not emp_id:
+            logger.info("👤 Face detected but not recognized")
+            return JsonResponse({
+                "success": False,
+                "message": "Face not recognized",
+                "color": "red",
+            })
 
-    return JsonResponse({"success": False, "message": "Invalid Request Method"})
+        # --------------------------------------------------
+        # 3. Fetch employee
+        # --------------------------------------------------
+        logger.debug("🔎 Fetching employee from DB: %s", emp_id)
+        employee = Employee.objects.filter(
+            employee_id=emp_id,
+            is_active=True
+        ).select_related("user").first()
 
+        if not employee:
+            logger.warning("❌ Employee not active or not found")
+            return JsonResponse({
+                "success": False,
+                "message": "Employee inactive",
+                "color": "red",
+            })
+
+        logger.info("✅ Employee matched: %s", employee.user.get_full_name())
+
+        # --------------------------------------------------
+        # 4. Attendance logic
+        # --------------------------------------------------
+        now = timezone.now()
+        logger.debug("⏰ Current time: %s", now)
+
+        last_att = Attendance.objects.filter(
+            employee=employee
+        ).order_by("-timestamp").first()
+
+        settings_obj = AttendanceSettings.objects.first()
+        min_hours = float(
+            getattr(settings_obj, "min_hours_before_checkout", 3.0)
+        )
+
+        logger.debug("⚙️ Min hours before checkout: %.2f", min_hours)
+
+        if last_att:
+            logger.debug(
+                "📄 Last attendance → %s at %s",
+                last_att.attendance_type,
+                last_att.timestamp
+            )
+
+        # ---- Same day logic
+        if last_att and timezone.localtime(last_att.timestamp).date() == now.date():
+
+            if last_att.attendance_type == "check_in":
+                elapsed = (now - last_att.timestamp).total_seconds() / 3600
+                logger.debug("⏳ Elapsed since check-in: %.2f hours", elapsed)
+
+                if elapsed < min_hours:
+                    logger.warning("⏸ Checkout blocked (too early)")
+                    return JsonResponse({
+                        "success": False,
+                        "message": f"Wait {int((min_hours - elapsed) * 60)} minutes before checkout",
+                        "color": "yellow",
+                    })
+
+                Attendance.objects.create(
+                    employee=employee,
+                    attendance_type="check_out",
+                    confidence_score=score,
+                )
+
+                logger.info("🚪 CHECK-OUT recorded")
+                return JsonResponse({
+                    "success": True,
+                    "attendance_type": "Check-Out",
+                    "name": employee.user.get_full_name(),
+                    "confidence": round(score * 100, 2),
+                    "message": "Checked out successfully",
+                    "color": "green",
+                })
+
+            logger.info("ℹ️ Already checked out today")
+            return JsonResponse({
+                "success": False,
+                "message": "Already checked out today",
+                "color": "yellow",
+            })
+
+        # --------------------------------------------------
+        # 5. First check-in
+        # --------------------------------------------------
+        Attendance.objects.create(
+            employee=employee,
+            attendance_type="check_in",
+            confidence_score=score,
+        )
+
+        logger.info("🟢 CHECK-IN recorded")
+
+        return JsonResponse({
+            "success": True,
+            "attendance_type": "Check-In",
+            "name": employee.user.get_full_name(),
+            "confidence": round(score * 100, 2),
+            "message": "Checked in successfully",
+            "color": "green",
+        })
+
+    except Exception:
+        logger.exception("🔥 mark_attendance crashed")
+        return JsonResponse({
+            "success": False,
+            "message": "Internal error",
+            "color": "red",
+        }, status=500)
 
 @login_required
 def attendance_log_api(request):
@@ -2623,7 +2656,3 @@ def workrule_delete(request, pk):
         "rule": rule,
         "title": "Delete Work Rule"
     })
-
-
-
-

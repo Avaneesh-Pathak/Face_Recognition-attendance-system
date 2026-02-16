@@ -90,6 +90,7 @@ urlpatterns = [
     path("workrules/<int:pk>/edit/", views.workrule_update, name="workrule_update"),
     path("workrules/<int:pk>/delete/", views.workrule_delete, name="workrule_delete"),
 
+    path("attendance/heartbeat/", views.attendance_heartbeat, name="attendance_heartbeat"),
 
 
 

@@ -29,9 +29,9 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_bootstrap5',
     'django_htmx',
-
+    "django_extensions",
     # Local apps
-    'core',
+    'core.apps.CoreConfig',
 ]
 
 # -------------------------------------------------------------------
@@ -156,27 +156,30 @@ CORS_ALLOW_ALL_ORIGINS = True
 # -------------------------------------------------------------------
 # FACE RECOGNITION SETTINGS
 # -------------------------------------------------------------------
-FACE_RECOGNITION_MODEL = config('FACE_RECOGNITION_MODEL', default='cnn')  # 'cnn' or 'hog'
-FACE_ENCODINGS_PATH = MEDIA_ROOT / 'face_encodings'
-FACE_ENCODINGS_PATH.mkdir(parents=True, exist_ok=True)
-INSIGHTFACE_CTX_ID = 0                 # -1 for CPU, >=0 for GPU
-FACE_RECOGNITION_THRESHOLD = 0.35
-FACE_EUCLIDEAN_MAX = 1.25
-FR_MIN_DET_INTERVAL = 0.25
+# ================= FACE RECOGNITION =================
+INSIGHTFACE_MODEL = "buffalo_l"
+INSIGHTFACE_DET_SIZE = (640, 640)
+INSIGHTFACE_CTX_ID = -1        # CPU only (Hostinger)
+
+FACE_RECOGNITION_THRESHOLD = 0.58   # cosine similarity
+FACE_EUCLIDEAN_MAX = 1.15           # for 512-dim embeddings
+
+FR_MIN_DET_INTERVAL = 0.35           # seconds
 COOLDOWN_SECONDS = 600
 
-
+# ================= LIVENESS =================
 LIVENESS = {
-  "BLINK_THRESHOLD": 0.22,     # Eye aspect ratio threshold
-  "CONSEC_FRAMES": 3,          # Frames below threshold to count blink
-  "BLINK_REQUIRED": 1,         # Number of blinks required
-  "MOTION_THRESHOLD": 0.002,   # Head movement threshold
-  "HISTORY": 6,
-  "REQUIRE_BOTH": False,       # Liveness requires both blink AND motion?
-  "MIN_FACE_SIZE": 120,
-  "COOLDOWN_SECONDS": 10,
-  "DEBUG": False
+    "BLINK_THRESHOLD": 0.22,
+    "CONSEC_FRAMES": 3,
+    "BLINK_REQUIRED": 1,
+    "MOTION_THRESHOLD": 0.002,
+    "HISTORY": 6,
+    "REQUIRE_BOTH": False,
+    "MIN_FACE_SIZE": 120,
+    "COOLDOWN_SECONDS": 10,
+    "DEBUG": False,
 }
+
 
 
 # -------------------------------------------------------------------

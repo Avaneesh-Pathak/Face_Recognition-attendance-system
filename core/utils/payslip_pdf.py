@@ -196,11 +196,11 @@ def generate_payslip_pdf(payroll):
             Paragraph(l1, styles["Label"]), Paragraph(str(v1), styles["Value"]),
             Paragraph(l2, styles["Label"]), Paragraph(str(v2), styles["Value"])
         ]
-
+    structure = emp.salary_structure
     emp_table = Table([
         info("Name", user.get_full_name().title(), "Employee ID", emp.employee_id),
         info("Department", emp.department.name if emp.department else "-", "Designation", emp.get_role_display()),
-        info("Monthly Salary", f"Rs. {format_currency(payroll.basic_pay)}", "Salary Type", "Monthly"),
+        info("Monthly Salary", f"Rs. {format_currency(structure.base_salary)}", "Salary Type", "Monthly"),
         info("Date of Joining",
              emp.date_of_joining.strftime("%d-%b-%Y") if emp.date_of_joining else "-",
              "Bank Account", getattr(emp, "bank_account_number", "-"))
@@ -242,8 +242,7 @@ def generate_payslip_pdf(payroll):
     # PAY CALCULATIONS
     # -------------------------------------------------
 
-    daily_pay = money(payroll.basic_pay) / total_days if total_days else money(0)
-    paid_basic = money(daily_pay * paid_days)
+    paid_basic = money(payroll.basic_pay)
 
     ot_rate = getattr(getattr(emp, "work_rule", None), "overtime_rate", 0)
     ot_amt = money((payroll.overtime_hours or 0) * ot_rate)
@@ -251,14 +250,12 @@ def generate_payslip_pdf(payroll):
     allowances = money(payroll.allowances)
     deductions = money(payroll.deductions)
 
-    total_earn = paid_basic + allowances + ot_amt
+    total_earn = paid_basic + ot_amt + allowances
+
     total_ded = deductions
 
-    net_val = (
-        money(getattr(payroll, "actual_paid_salary", 0))
-        or money(getattr(payroll, "net_salary", 0))
-        or (total_earn - total_ded)
-    )
+    net_val = money(payroll.net_salary)
+
 
     # -------------------------------------------------
     # EARNINGS & DEDUCTIONS TABLE
@@ -270,7 +267,7 @@ def generate_payslip_pdf(payroll):
     ]]
 
     rows = [
-        ("Basic Salary", paid_basic),
+        ("Basic Earned", paid_basic),
         ("House Rent Allowance", allowances),
         ("Overtime Pay", ot_amt),
         ("Special Allowance", 0)

@@ -373,7 +373,11 @@ class Payroll(models.Model):
     half_days = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     absent_days = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     overtime_hours = models.DecimalField(max_digits=7, decimal_places=2, default=0)
-
+    payslip_pdf = models.FileField(
+        upload_to="payslips/",
+        blank=True,
+        null=True
+    )
     # 🔴 CRITICAL FIX: defaults added
     calculated_salary = models.DecimalField(
         max_digits=10,
@@ -409,15 +413,9 @@ class Payroll(models.Model):
     def unpaid_leave_days(self):
         return self.absent_days
 
-    # ✅ HARDENED SAVE (NO NULL POSSIBLE)
     def save(self, *args, **kwargs):
-        self.calculated_salary = (
-            (self.basic_pay or Decimal("0"))
-            + (self.allowances or Decimal("0"))
-            - (self.deductions or Decimal("0"))
-        )
-
-        self.net_salary = self.calculated_salary
+        # Do NOT recompute salary here.
+        # PayrollManager is the single source of truth.
         super().save(*args, **kwargs)
 
     def __str__(self):

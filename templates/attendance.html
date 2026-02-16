@@ -483,237 +483,180 @@
     </div>
   </div>
 
-  <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const video = document.getElementById("camera");
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    
-    const fsVideo = document.getElementById("fullscreenCamera");
-    const fsCanvas = document.getElementById("fullscreenCanvas");
-    
-    const statusText = document.getElementById("statusText");
-    const statusDot = document.getElementById("statusDot");
-    const fsStatusText = document.getElementById("fsStatusText");
-    
-    const alertBox = document.getElementById("alertBox");
-    const beep = document.getElementById("successBeep");
-    
-    const attendanceList = document.getElementById("attendanceList");
-    const fsAttendanceList = document.getElementById("fsAttendanceList");
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const video = document.getElementById("camera");
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
 
-    // Message elements
-    const successBox = document.getElementById("successBox");
-    const errorBox = document.getElementById("errorBox");
-    const fsSuccessBox = document.getElementById("fsSuccessBox");
-    const fsErrorBox = document.getElementById("fsErrorBox");
+  const fsVideo = document.getElementById("fullscreenCamera");
 
-    let isProcessing = false;
-    let lastMarkedName = null;
+  const statusText = document.getElementById("statusText");
+  const statusDot = document.getElementById("statusDot");
+  const fsStatusText = document.getElementById("fsStatusText");
 
-    // --- Camera Init ---
-    navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
-      .then(stream => {
-        video.srcObject = stream;
-        fsVideo.srcObject = stream;
-      })
-      .catch(err => {
-        showAlert("Camera Error: " + err.message, "danger");
-        showKioskMessage("Camera access denied. Please allow camera permissions.", false);
+  const alertBox = document.getElementById("alertBox");
+  const beep = document.getElementById("successBeep");
+
+  const attendanceList = document.getElementById("attendanceList");
+  const fsAttendanceList = document.getElementById("fsAttendanceList");
+
+  const successBox = document.getElementById("successBox");
+  const errorBox = document.getElementById("errorBox");
+  const fsSuccessBox = document.getElementById("fsSuccessBox");
+  const fsErrorBox = document.getElementById("fsErrorBox");
+
+  let isProcessing = false;
+  let lastMarkedName = null;
+
+  // ==============================
+  // CAMERA INIT / RESTART
+  // ==============================
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720 }
+      });
+      video.srcObject = stream;
+      fsVideo.srcObject = stream;
+      console.log("📷 Camera started");
+    } catch (err) {
+      console.error("Camera error:", err);
+      showKioskMessage("Camera access denied", false);
+    }
+  }
+
+  startCamera();
+
+  // Restart camera if frozen
+  setInterval(() => {
+    if (!video.srcObject || video.readyState < 2) {
+      console.warn("⚠ Camera frozen → restarting");
+      startCamera();
+    }
+  }, 10000);
+
+  // Reactivate on tab visible
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      console.log("👀 Page active again");
+      lastFrameTs = 0;
+      startCamera();
+    }
+  });
+
+  // ==============================
+  // UI HELPERS
+  // ==============================
+  function showKioskMessage(msg, success = true, fullscreen = false) {
+    const okBox = fullscreen ? fsSuccessBox : successBox;
+    const errBox = fullscreen ? fsErrorBox : errorBox;
+
+    if (success) {
+      okBox.innerHTML = msg;
+      okBox.style.display = "block";
+      errBox.style.display = "none";
+    } else {
+      errBox.innerHTML = msg;
+      errBox.style.display = "block";
+      okBox.style.display = "none";
+    }
+
+    setTimeout(() => {
+      okBox.style.display = "none";
+      errBox.style.display = "none";
+    }, 5000);
+  }
+
+  function addRecord(name, type, time, confidence) {
+    const cls = type.toLowerCase().includes("in") ? "check-in" : "check-out";
+    const html = `
+      <div class="attendance-item ${cls}">
+        <div class="avatar-circle">${name[0]}</div>
+        <div class="user-info">
+          <h6>${name}</h6>
+          <small>${type} (${confidence}%)</small>
+        </div>
+        <div class="time-badge">${time}</div>
+      </div>
+    `;
+    attendanceList.insertAdjacentHTML("afterbegin", html);
+    fsAttendanceList.insertAdjacentHTML("afterbegin", html);
+  }
+
+  // ==============================
+  // FRAME PROCESSING
+  // ==============================
+  async function processFrame() {
+    if (isProcessing || video.readyState < 2) return;
+    isProcessing = true;
+
+    try {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+
+      const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.7));
+      const fd = new FormData();
+      fd.append("capture", blob, "frame.jpg");
+
+      const res = await fetch("{% url 'mark_attendance' %}", {
+        method: "POST",
+        headers: { "X-CSRFToken": "{{ csrf_token }}" },
+        body: fd
       });
 
-    // --- Alert System ---
-    function showAlert(msg, type = "success") {
-      alertBox.className = `alert alert-float shadow-lg border-0 alert-${type}`;
-      alertBox.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>${msg}`;
-      alertBox.style.display = "block";
-      setTimeout(() => alertBox.style.display = "none", 4000);
-    }
+      const data = await res.json();
 
-    // --- Kiosk Message System ---
-    function showKioskMessage(message, isSuccess = true, fullscreen = false) {
-      const targetSuccess = fullscreen ? fsSuccessBox : successBox;
-      const targetError = fullscreen ? fsErrorBox : errorBox;
-      
-      if (isSuccess) {
-        targetSuccess.innerHTML = `<i class="fas fa-check-circle me-2"></i>${message}`;
-        targetSuccess.style.display = "block";
-        targetError.style.display = "none";
-      } else {
-        targetError.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>${message}`;
-        targetError.style.display = "block";
-        targetSuccess.style.display = "none";
-      }
-      
-      // Auto-hide after 5 seconds
-      setTimeout(() => {
-        targetSuccess.style.display = "none";
-        targetError.style.display = "none";
-      }, 5000);
-    }
-
-    // --- Add Record to List ---
-    function addRecord(name, type, time, confidence) {
-      const typeClass = type.toLowerCase().includes('in') ? 'check-in' : 'check-out';
-      const typeIcon = type.toLowerCase().includes('in') ? 'fa-sign-in-alt text-success' : 'fa-sign-out-alt text-warning';
-      const initial = name.charAt(0).toUpperCase();
-
-      const html = `
-        <div class="attendance-item ${typeClass}">
-          <div class="avatar-circle">${initial}</div>
-          <div class="user-info">
-            <h6>${name}</h6>
-            <small><i class="fas ${typeIcon} me-1"></i>${type} (${confidence}%)</small>
-          </div>
-          <div class="time-badge">${time}</div>
-        </div>
-      `;
-
-      // Remove empty state if exists
-      const emptyState = attendanceList.querySelector('.text-muted');
-      const fsEmptyState = fsAttendanceList.querySelector('.text-white-50');
-      
-      if (emptyState) {
-        attendanceList.innerHTML = '';
-      }
-      if (fsEmptyState) {
-        fsAttendanceList.innerHTML = '';
-      }
-
-      attendanceList.insertAdjacentHTML('afterbegin', html);
-      fsAttendanceList.insertAdjacentHTML('afterbegin', html);
-      
-      // Keep list length manageable
-      if (attendanceList.children.length > 20) attendanceList.lastElementChild.remove();
-      if (fsAttendanceList.children.length > 20) fsAttendanceList.lastElementChild.remove();
-    }
-
-    // --- Capture & Process ---
-    async function processFrame() {
-      if (isProcessing) return;
-      isProcessing = true;
-
-      try {
-        // Draw current frame to canvas
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-        const formData = new FormData();
-        formData.append("capture", blob, "frame.jpg");
-
-        const res = await fetch("{% url 'mark_attendance' %}", {
-          method: "POST",
-          headers: { "X-CSRFToken": "{{ csrf_token }}" },
-          body: formData
-        });
-
-        const data = await res.json();
-
-        if (data.success) {
-    if (data.name !== lastMarkedName) {
-
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (data.success && data.name !== lastMarkedName) {
+        const time = new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});
         addRecord(data.name, data.attendance_type, time, data.confidence);
 
-        const successMessage = `Welcome, ${data.name}! ${data.attendance_type} successful.`;
+        showKioskMessage(`Welcome ${data.name}`, true);
+        showKioskMessage(`Welcome ${data.name}`, true, true);
 
-        showKioskMessage(successMessage, true, false);
-        showKioskMessage(successMessage, true, true);
-        showAlert(`Welcome, ${data.name}!`, "success");
-
-        // Play the new reliable beep
-        beep.volume = 1.0;
         beep.currentTime = 0;
-        beep.play().catch(e => console.warn("Sound will work after first tap."));
+        beep.play().catch(()=>{});
 
         lastMarkedName = data.name;
         setTimeout(() => lastMarkedName = null, 10000);
+      } else if (data.message && data.message.includes("Liveness")) {
+        showKioskMessage(data.message, false);
+        showKioskMessage(data.message, false, true);
+      }
 
-        statusText.innerText = `Marked: ${data.name}`;
-        fsStatusText.innerHTML = `<i class="fas fa-check-circle text-success me-2"></i>Marked: ${data.name}`;
-
-        // Reset back after 3 sec
-        setTimeout(() => {
-            statusText.innerText = "System Active & Scanning...";
-            fsStatusText.innerHTML = `<i class="fas fa-video me-2 text-success"></i>Scanning...`;
-        }, 3000);
+    } catch (e) {
+      console.error("Process error:", e);
+    } finally {
+      isProcessing = false;
     }
-}
- else {
-          // Handle different types of errors
-          if (data.message) {
-            if (data.message.includes("Wait")) {
-              // Wait time message - show as warning
-              showKioskMessage(data.message, false, false);
-              showKioskMessage(data.message, false, true);
-            } else if (!data.message.includes("No face") && !data.message.includes("Face not recognized")) {
-              // Other important messages (liveness failed, database issues, etc.)
-              showKioskMessage(data.message, false, false);
-              showKioskMessage(data.message, false, true);
-              
-              if (data.message.includes("Database is not ready")) {
-                showAlert("System Initializing...", "warning");
-              }
-            }
-            // Silent handling for "No face" and "Face not recognized" to avoid spam
-          }
-        }
+  }
 
-      } catch (err) {
-        console.error("Processing error:", err);
-        showKioskMessage("System error - please try again", false, false);
-        showKioskMessage("System error - please try again", false, true);
-      } finally {
-        isProcessing = false;
-      }
+  // ==============================
+  // 🔥 NEVER-SLEEP LOOP (KEY FIX)
+  // ==============================
+  let lastFrameTs = 0;
+  const FRAME_INTERVAL = 1000;
+
+  function frameLoop(ts) {
+    if (!lastFrameTs || ts - lastFrameTs > FRAME_INTERVAL) {
+      processFrame();
+      lastFrameTs = ts;
     }
+    requestAnimationFrame(frameLoop);
+  }
 
-    // Start processing frames
-    setInterval(processFrame, 1000);
+  requestAnimationFrame(frameLoop);
 
-    // --- Fullscreen Logic ---
-    const fsOverlay = document.getElementById("fullscreenOverlay");
-    const normalMode = document.getElementById("normalMode");
+  // ==============================
+  // 💓 BACKEND HEARTBEAT
+  // ==============================
+  setInterval(() => {
+    fetch("{% url 'attendance_heartbeat' %}")
+      .catch(()=>{});
+  }, 60000);
+});
+</script>
 
-    // Unlock audio playback after first user interaction
-    function unlockAudio() {
-        beep.play().then(() => {
-            beep.pause();
-            beep.currentTime = 0;
-            document.removeEventListener("click", unlockAudio);
-            document.removeEventListener("touchstart", unlockAudio);
-        }).catch(() => {});
-    }
-    document.addEventListener("click", unlockAudio);
-    document.addEventListener("touchstart", unlockAudio);
-
-
-    document.getElementById("fullscreenBtn").addEventListener("click", () => {
-      fsOverlay.classList.add("active");
-      normalMode.style.display = "none";
-      if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen();
-      }
-    });
-
-    document.getElementById("exitFullscreenBtn").addEventListener("click", () => {
-      fsOverlay.classList.remove("active");
-      normalMode.style.display = "flex";
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-    });
-
-    // Handle ESC key to exit fullscreen
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && fsOverlay.classList.contains('active')) {
-        fsOverlay.classList.remove("active");
-        normalMode.style.display = "flex";
-      }
-    });
-  });
-  </script>
 </body>
 </html>

@@ -6,9 +6,16 @@ class CoreConfig(AppConfig):
     name = 'core'
 
     def ready(self):
-        # ✅ Load Face Recognition System (already present in your code)
-        from .face_recognition import FaceRecognitionSystem
-        self.face_system = FaceRecognitionSystem()
+        # 🔥 PRELOAD FaceRecognitionSystem SINGLETON
+        try:
+            from .face_system import get_face_system
+            get_face_system()   # this warms InsightFace model
+        except Exception:
+            # Never crash Django startup
+            pass
 
-        # ✅ Load Signals (SalaryStructure → Auto Payroll)
-        import core.signals  # Ensure this file exists
+        # ✅ Load signals
+        try:
+            import core.signals
+        except Exception:
+            pass

@@ -213,7 +213,7 @@ class PayrollAdmin(admin.ModelAdmin):
         import datetime
         from .models import Payroll
         today = datetime.date.today()
-        Payroll.objects.generate_monthly_salary(today.month, today.year)
+        Payroll.objects.generate_monthly_salary(today.year, today.month)
         self.message_user(request, "✅ Payroll successfully generated!")
 
 
