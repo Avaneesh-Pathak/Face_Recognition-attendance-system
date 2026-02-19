@@ -3,65 +3,83 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">{{ title }}</h5>
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 fw-bold">{{ title }}</h5>
             </div>
+
             <div class="card-body">
-                <form method="post">
+                <form method="post" enctype="multipart/form-data">
                     {% csrf_token %}
-                    
+
+                    <!-- FORM FIELDS -->
                     {% for field in form %}
-                    <div class="mb-3">
-                        <label for="{{ field.id_for_label }}" class="form-label">
-                            {{ field.label }}
-                            {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
-                        </label>
-                        {{ field }}
-                        {% if field.help_text %}
-                        <div class="form-text">{{ field.help_text }}</div>
-                        {% endif %}
-                        {% for error in field.errors %}
-                        <div class="invalid-feedback d-block">{{ error }}</div>
-                        {% endfor %}
-                    </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-medium">
+                                {{ field.label }}
+                                {% if field.field.required %}
+                                    <span class="text-danger">*</span>
+                                {% endif %}
+                            </label>
+
+                            {{ field }}
+
+                            {% if field.help_text %}
+                                <div class="form-text">{{ field.help_text }}</div>
+                            {% endif %}
+
+                            {% for error in field.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
                     {% endfor %}
-                    
-                    <div class="d-flex justify-content-between">
-                        <a href="{% url 'joining_detail_list' %}" class="btn btn-secondary">Cancel</a>
-                        <button type="submit" class="btn btn-primary">Save Details</button>
+
+                    <!-- DOCUMENT UPLOAD (NOT PART OF MODEL FORM) -->
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">
+                            Upload Documents
+                        </label>
+                        <input type="file"
+                               name="documents"
+                               class="form-control"
+                               multiple>
+                        <div class="form-text">
+                            You can upload multiple files (PDF, JPG, PNG, etc.)
+                        </div>
+                    </div>
+
+                    <!-- ACTIONS -->
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'joining_detail_list' %}" class="btn btn-outline-secondary">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            Save Details
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
+<!-- AUTO CALCULATE CONFIRMATION DATE -->
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const inputs = document.querySelectorAll('input, select, textarea');
-        inputs.forEach(input => {
-            input.classList.add('form-control');
-        });
+document.addEventListener('DOMContentLoaded', function () {
+    const doj = document.getElementById('id_date_of_joining');
+    const probation = document.getElementById('id_probation_period_months');
+    const confirm = document.getElementById('id_confirmation_date');
 
-        // Auto-calculate confirmation date based on probation period
-        const joiningDateField = document.querySelector('#id_date_of_joining');
-        const probationField = document.querySelector('#id_probation_period_months');
-        const confirmationField = document.querySelector('#id_confirmation_date');
-
-        function calculateConfirmationDate() {
-            if (joiningDateField.value && probationField.value) {
-                const joiningDate = new Date(joiningDateField.value);
-                const probationMonths = parseInt(probationField.value);
-                joiningDate.setMonth(joiningDate.getMonth() + probationMonths);
-                confirmationField.value = joiningDate.toISOString().split('T')[0];
-            }
+    function calculateConfirmationDate() {
+        if (doj && probation && confirm && doj.value && probation.value) {
+            const date = new Date(doj.value);
+            date.setMonth(date.getMonth() + parseInt(probation.value));
+            confirm.value = date.toISOString().split('T')[0];
         }
+    }
 
-        joiningDateField.addEventListener('change', calculateConfirmationDate);
-        probationField.addEventListener('input', calculateConfirmationDate);
-    });
+    if (doj) doj.addEventListener('change', calculateConfirmationDate);
+    if (probation) probation.addEventListener('input', calculateConfirmationDate);
+});
 </script>
 {% endblock %}

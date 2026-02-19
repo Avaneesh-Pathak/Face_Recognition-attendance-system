@@ -493,7 +493,12 @@ class LeaveWorkflowStageForm(forms.ModelForm):
 class JoiningDetailForm(forms.ModelForm):
     class Meta:
         model = JoiningDetail
-        fields = ['employee', 'date_of_joining', 'probation_period_months', 'confirmation_date', 'documents']
+        fields = [
+            'employee',
+            'date_of_joining',
+            'probation_period_months',
+            'confirmation_date',
+        ]
         widgets = {
             'employee': forms.Select(attrs={
                 'class': 'form-control select2',
@@ -515,28 +520,13 @@ class JoiningDetailForm(forms.ModelForm):
                 'type': 'date',
                 'readonly': 'readonly'
             }),
-            'documents': MultiFileInput(attrs={                   # ✅ Fixed widget
-                'class': 'form-control',
-                'multiple': True
-            }),
         }
         labels = {
             'probation_period_months': 'Probation Period (Months)',
-            'documents': 'Upload Documents (PDF/JPG/PNG etc.)'
         }
         help_texts = {
             'confirmation_date': 'Automatically calculated based on joining date + probation period'
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        existing_employees = JoiningDetail.objects.values_list('employee_id', flat=True)
-        if self.instance.pk:
-            existing_employees = existing_employees.exclude(employee_id=self.instance.employee_id)
-
-        self.fields['employee'].queryset = Employee.objects.filter(
-            employment_status='active'
-        ).exclude(id__in=existing_employees).select_related('user')
 
     def clean_probation_period_months(self):
         probation_months = self.cleaned_data.get('probation_period_months')
@@ -551,9 +541,12 @@ class JoiningDetailForm(forms.ModelForm):
 
         if date_of_joining and probation_months:
             from dateutil.relativedelta import relativedelta
-            cleaned_data['confirmation_date'] = date_of_joining + relativedelta(months=+probation_months)
-
+            cleaned_data['confirmation_date'] = (
+                date_of_joining + relativedelta(months=probation_months)
+            )
         return cleaned_data
+
+
 
 class ResignationForm(forms.ModelForm):
     class Meta:

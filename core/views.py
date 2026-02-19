@@ -213,20 +213,31 @@ def register(request):
                 doc = JoiningDocument.objects.create(joining=joining, file=file)
                 docs.append({'name': file.name, 'url': doc.file.url})
 
-            # 8. Extract & Save Face Embedding using our new system
+            # 8. Extract & Save Face Embedding using InsightFace system
+            # 8. Extract & Save Face Embedding
             if employee.face_image:
                 try:
                     img_path = employee.face_image.path
+
+                    face_sys = get_face_system()  # ALWAYS fetch fresh singleton
+
                     emb = face_sys.get_embedding(img_path)
 
-                    if emb is not None:
-                        # Save as list of vectors (for future multi-embedding support)
-                        employee.face_encoding = json.dumps([emb.tolist()])
-                        employee.save(update_fields=['face_encoding'])
+                    if emb is None:
+                        messages.warning(
+                            request,
+                            "⚠ No clear face detected. Please upload a frontal, well-lit photo."
+                        )
                     else:
-                        messages.warning(request, "⚠ No recognizable face found in the image.")
+                        employee.face_encoding = json.dumps([emb.tolist()])
+                        employee.save(update_fields=["face_encoding"])
+
+                        # 🔁 refresh in-memory DB embeddings
+                        face_sys.load_from_db()
+
                 except Exception as e:
-                    messages.warning(request, f"⚠ Face encoding failed: {e}")
+                    messages.error(request, f"⚠ Face encoding failed: {e}")
+
 
             request.session['reg_success'] = {
                 "employee_id": employee.employee_id,
@@ -718,134 +729,93 @@ def _recognize_employee(frame_bgr):
 
     return None, 0.0, None, "none"
 
-@login_required
+import time
+
 def attendance_heartbeat(request):
     return JsonResponse({
-        "ok": True,
+        "status": "ok",
         "ts": time.time()
     })
 
 # ------------------ ✅ Final mark_attendance Endpoint ------------------
 @login_required
 def mark_attendance(request):
-    logger.info("➡️ mark_attendance called")
+    logger.info("mark_attendance called")
 
     if request.method != "POST":
-        logger.warning("❌ Invalid method: %s", request.method)
         return JsonResponse({"success": False, "message": "Invalid method"}, status=400)
 
     if "capture" not in request.FILES:
-        logger.warning("❌ No capture file in request")
         return JsonResponse({"success": False, "message": "No image"}, status=400)
 
     try:
-        # --------------------------------------------------
-        # 1. Decode image
-        # --------------------------------------------------
-        logger.debug("📷 Reading image bytes")
         file_bytes = np.frombuffer(request.FILES["capture"].read(), np.uint8)
         frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
         if frame is None:
-            logger.error("❌ OpenCV failed to decode image")
-            return JsonResponse({"success": False, "message": "Invalid image"})
-
-        h, w = frame.shape[:2]
-        logger.debug("📐 Frame size: %dx%d", w, h)
-
-        # Resize for speed
-        if w > 640:
-            scale = 640 / w
-            frame = cv2.resize(frame, (640, int(h * scale)))
-            logger.debug("⚡ Frame resized for speed")
-
-        # --------------------------------------------------
-        # 2. Face system
-        # --------------------------------------------------
-        logger.debug("🤖 Fetching face system")
-        face_system = get_face_system()
-
-        if face_system is None:
-            logger.error("❌ Face system not initialized")
-            return JsonResponse({"success": False, "message": "System not ready"})
-
-        logger.debug("🧠 Running recognition")
-        emp_id, score, info = face_system.recognize_from_frame(frame)
-
-        logger.debug("🧪 Recognition output → emp_id=%s score=%s info=%s",
-                     emp_id, score, info)
-
-        if isinstance(info, dict) and info.get("type") == "liveness":
-            logger.warning("⚠️ Liveness failed: %s", info.get("reason"))
             return JsonResponse({
                 "success": False,
-                "message": info.get("reason", "Liveness failed"),
-                "color": "yellow",
+                "message": "Invalid image",
+                "color": "red",
             })
 
+        h, w = frame.shape[:2]
+        if w > 640:
+            frame = cv2.resize(frame, (640, int(h * 640 / w)))
+
+        face_system = get_face_system()
+        emp_id, score, meta = face_system.recognize_from_frame(frame)
+        reason = meta.get("reason") if meta else None
+
+        logger.debug("Recognition: emp=%s score=%.3f reason=%s", emp_id, score, reason)
+
+        # ------------------ FACE FAILURES ------------------
         if not emp_id:
-            logger.info("👤 Face detected but not recognized")
+            if reason == "UNSTABLE":
+                return JsonResponse({
+                    "success": False,
+                    "message": "Hold still for a moment",
+                    "color": "yellow",
+                })
+
             return JsonResponse({
                 "success": False,
                 "message": "Face not recognized",
                 "color": "red",
             })
 
-        # --------------------------------------------------
-        # 3. Fetch employee
-        # --------------------------------------------------
-        logger.debug("🔎 Fetching employee from DB: %s", emp_id)
         employee = Employee.objects.filter(
             employee_id=emp_id,
             is_active=True
         ).select_related("user").first()
 
         if not employee:
-            logger.warning("❌ Employee not active or not found")
             return JsonResponse({
                 "success": False,
                 "message": "Employee inactive",
                 "color": "red",
             })
 
-        logger.info("✅ Employee matched: %s", employee.user.get_full_name())
-
-        # --------------------------------------------------
-        # 4. Attendance logic
-        # --------------------------------------------------
         now = timezone.now()
-        logger.debug("⏰ Current time: %s", now)
 
         last_att = Attendance.objects.filter(
             employee=employee
         ).order_by("-timestamp").first()
 
         settings_obj = AttendanceSettings.objects.first()
-        min_hours = float(
-            getattr(settings_obj, "min_hours_before_checkout", 3.0)
-        )
+        min_hours = float(getattr(settings_obj, "min_hours_before_checkout", 3.0))
 
-        logger.debug("⚙️ Min hours before checkout: %.2f", min_hours)
-
-        if last_att:
-            logger.debug(
-                "📄 Last attendance → %s at %s",
-                last_att.attendance_type,
-                last_att.timestamp
-            )
-
-        # ---- Same day logic
+        # ------------------ SAME DAY LOGIC ------------------
         if last_att and timezone.localtime(last_att.timestamp).date() == now.date():
 
             if last_att.attendance_type == "check_in":
                 elapsed = (now - last_att.timestamp).total_seconds() / 3600
-                logger.debug("⏳ Elapsed since check-in: %.2f hours", elapsed)
+                remaining_minutes = int((min_hours - elapsed) * 60)
 
                 if elapsed < min_hours:
-                    logger.warning("⏸ Checkout blocked (too early)")
                     return JsonResponse({
                         "success": False,
-                        "message": f"Wait {int((min_hours - elapsed) * 60)} minutes before checkout",
+                        "message": f"Attendance already marked. Wait {remaining_minutes} minutes for checkout",
                         "color": "yellow",
                     })
 
@@ -855,7 +825,6 @@ def mark_attendance(request):
                     confidence_score=score,
                 )
 
-                logger.info("🚪 CHECK-OUT recorded")
                 return JsonResponse({
                     "success": True,
                     "attendance_type": "Check-Out",
@@ -865,23 +834,18 @@ def mark_attendance(request):
                     "color": "green",
                 })
 
-            logger.info("ℹ️ Already checked out today")
             return JsonResponse({
                 "success": False,
                 "message": "Already checked out today",
                 "color": "yellow",
             })
 
-        # --------------------------------------------------
-        # 5. First check-in
-        # --------------------------------------------------
+        # ------------------ FIRST CHECK-IN ------------------
         Attendance.objects.create(
             employee=employee,
             attendance_type="check_in",
             confidence_score=score,
         )
-
-        logger.info("🟢 CHECK-IN recorded")
 
         return JsonResponse({
             "success": True,
@@ -893,7 +857,7 @@ def mark_attendance(request):
         })
 
     except Exception:
-        logger.exception("🔥 mark_attendance crashed")
+        logger.exception("mark_attendance crashed")
         return JsonResponse({
             "success": False,
             "message": "Internal error",
@@ -2362,12 +2326,16 @@ def leave_application_detail(request, pk):
 
 @login_required
 def joining_detail_list(request):
-    joining_details = JoiningDetail.objects.select_related('employee__user').prefetch_related('joining_documents')
+    joining_details = (
+        JoiningDetail.objects
+        .select_related('employee__user')
+        .prefetch_related('joining_documents')  # correct related_name
+    )
+
     return render(request, 'ems/joining_detail_list.html', {
         'joining_details': joining_details,
         'title': 'Joining Details'
     })
-
 
 # ✅ Download Individual Document
 @login_required
@@ -2424,16 +2392,46 @@ def joining_detail_create(request):
     if request.method == 'POST':
         form = JoiningDetailForm(request.POST)
         if form.is_valid():
-            form.save()
+            joining = form.save()
+
+            # 📎 Handle document upload
+            for file in request.FILES.getlist('documents'):
+                JoiningDocument.objects.create(
+                    joining=joining,
+                    file=file
+                )
+
             messages.success(request, 'Joining details added successfully!')
             return redirect('joining_detail_list')
     else:
         form = JoiningDetailForm()
-    
+
     return render(request, 'ems/joining_detail_form.html', {
         'form': form,
         'title': 'Add Joining Details'
     })
+
+@login_required
+def upload_joining_documents(request, detail_id):
+    joining = get_object_or_404(JoiningDetail, id=detail_id)
+
+    if request.method == 'POST':
+        files = request.FILES.getlist('documents')
+
+        if not files:
+            messages.warning(request, "No documents selected.")
+            return redirect('joining_detail_list')
+
+        for file in files:
+            JoiningDocument.objects.create(
+                joining=joining,
+                file=file
+            )
+
+        messages.success(request, "Documents uploaded successfully.")
+
+    return redirect('joining_detail_list')
+
 
 @login_required
 def resignation_list(request):

@@ -15,7 +15,7 @@ try:
 except Exception:
     mp = None
     MP_AVAILABLE = False
-    logger.warning("⚠️ MediaPipe not available — liveness will be bypassed")
+    logger.warning("MediaPipe not available — liveness will be bypassed")
 
 
 # -------------------------------------------------
@@ -55,9 +55,9 @@ class LivenessGuard:
                 min_detection_confidence=0.5,
                 min_tracking_confidence=0.5,
             )
-            logger.info("✅ LivenessGuard initialized (MediaPipe)")
+            logger.info("LivenessGuard initialized (MediaPipe)")
         else:
-            logger.warning("⚠️ LivenessGuard disabled (MediaPipe missing)")
+            logger.warning("LivenessGuard disabled (MediaPipe missing)")
 
     # -------------------------------------------------
     # Eye Aspect Ratio (FAST)
@@ -123,7 +123,7 @@ class LivenessGuard:
         else:
             if self.blink_frames >= self.consec_frames:
                 self.total_blinks += 1
-                logger.debug("👁️ Blink detected (total=%d)", self.total_blinks)
+                logger.debug("Blink detected (total=%d)", self.total_blinks)
             self.blink_frames = 0
 
         blink_ok = self.total_blinks >= self.blink_required
@@ -152,7 +152,7 @@ class LivenessGuard:
         )
 
         if live:
-            logger.info("✅ Liveness confirmed")
+            logger.info("Liveness confirmed")
             self.total_blinks = 0
             self.blink_frames = 0
             self.centroids.clear()

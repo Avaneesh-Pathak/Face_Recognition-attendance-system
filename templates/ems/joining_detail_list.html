@@ -115,8 +115,7 @@
                                                         class="text-decoration-none text-dark fw-medium">
                                                         {{ doc.file.name|basename }}
                                                     </a>
-                                                    <small class="text-muted d-block">{{ doc.uploaded_at|date:"M d, Y
-                                                        h:i A" }}</small>
+                                                    <small class="text-muted d-block">{{ doc.uploaded_at|date:"M d, Y h:i A" }}</small>
                                                 </div>
                                             </div>
                                             <a href="{% url 'delete_document' doc.id %}"

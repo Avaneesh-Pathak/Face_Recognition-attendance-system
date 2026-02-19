@@ -10,8 +10,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='your-secret-key-here')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
-
+ALLOWED_HOSTS = [
+    "ems.nelsonhospital.org",
+    "www.ems.nelsonhospital.org",
+    "148.135.136.159",
+    "localhost",
+    "127.0.0.1",
+]
+CSRF_TRUSTED_ORIGINS = [
+    "https://ems.nelsonhospital.org",
+]
 # -------------------------------------------------------------------
 # APPLICATIONS
 # -------------------------------------------------------------------
@@ -161,8 +169,11 @@ INSIGHTFACE_MODEL = "buffalo_l"
 INSIGHTFACE_DET_SIZE = (640, 640)
 INSIGHTFACE_CTX_ID = -1        # CPU only (Hostinger)
 
-FACE_RECOGNITION_THRESHOLD = 0.58   # cosine similarity
-FACE_EUCLIDEAN_MAX = 1.15           # for 512-dim embeddings
+FACE_RECOGNITION_THRESHOLD = 0.70   # cosine similarity
+FACE_EUCLIDEAN_MAX = 1.45           # for 512-dim embeddings
+# ================= TEMPORAL SMOOTHING =================
+FACE_STABLE_VOTES = 3      # required matches
+FACE_VOTE_WINDOW = 5       # total frames considered
 
 FR_MIN_DET_INTERVAL = 0.35           # seconds
 COOLDOWN_SECONDS = 600
@@ -171,7 +182,7 @@ COOLDOWN_SECONDS = 600
 LIVENESS = {
     "BLINK_THRESHOLD": 0.22,
     "CONSEC_FRAMES": 3,
-    "BLINK_REQUIRED": 1,
+    "BLINK_REQUIRED": 0,
     "MOTION_THRESHOLD": 0.002,
     "HISTORY": 6,
     "REQUIRE_BOTH": False,
@@ -213,6 +224,12 @@ LOGGING = {
         'django': {'handlers': ['console', 'file', 'error_file'], 'level': 'INFO', 'propagate': True},
         'core': {'handlers': ['console', 'file', 'error_file'], 'level': 'DEBUG', 'propagate': False},
     },
+    'face_match': {
+        'handlers': ['console', 'file'],
+        'level': 'INFO',
+        'propagate': False,
+    },
+
 }
 
 # -------------------------------------------------------------------

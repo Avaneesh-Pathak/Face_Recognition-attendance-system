@@ -101,6 +101,10 @@ class Department(models.Model):
         ('Finance', 'Finance / Accounts'),
         ('IT', 'IT / Technical'),
         ('Operations', 'Operations'),
+        ('Pharmacy', 'Pharmacy'),
+        ('House Keeping', 'House Keeping'),
+        ('Nursing', 'Nursing'),
+        ('Reception', 'Reception'),
         ('Sales', 'Sales & Marketing'),
         ('Other', 'Other'),
     ]
@@ -557,7 +561,7 @@ class Holiday(models.Model):
 class JoiningDetail(models.Model):
     employee = models.OneToOneField(Employee, on_delete=models.CASCADE)
     date_of_joining = models.DateField(default=timezone.now)
-    documents = models.FileField(upload_to="joining_documents/", blank=True, null=True)
+    
     probation_period_months = models.PositiveIntegerField(default=3)
     confirmation_date = models.DateField(blank=True, null=True)
 
@@ -666,5 +670,24 @@ class DailyReport(models.Model):
     def __str__(self):
         return f"Report for {self.date}"
     
+
+class FaceMatchStats(models.Model):
+    employee_id = models.CharField(max_length=20, unique=True)
+    false_rejects = models.IntegerField(default=0)
+    false_accepts = models.IntegerField(default=0)
+    total_attempts = models.IntegerField(default=0)
+
+class AttendanceMatchLog(models.Model):
+    employee_id = models.CharField(max_length=20)
+    cosine = models.FloatField()
+    euclidean = models.FloatField()
+    confidence = models.CharField(max_length=10)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class EmployeeThreshold(models.Model):
+    employee_id = models.CharField(max_length=20, unique=True)
+    cos_max = models.FloatField(default=0.85)
+    euc_max = models.FloatField(default=1.40)
 
 

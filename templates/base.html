@@ -301,6 +301,12 @@
             <a href="{% url 'attendance_settings' %}" class="nav-link {% if 'settings' in request.path %}active{% endif %}">
                 <i class="fas fa-cog"></i> <span>Settings</span>
             </a>
+            {% if request.user.is_staff %}
+            <a href="{% url 'admin:index' %}" 
+            class="nav-link {% if request.path|slice:":6" == '/admin' %}active{% endif %}">
+                <i class="fas fa-user-shield"></i> <span>Admin Panel</span>
+            </a>
+            {% endif %}
             {% endif %}
         </div>
     </aside>

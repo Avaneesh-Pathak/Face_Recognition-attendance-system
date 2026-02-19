@@ -75,6 +75,11 @@ urlpatterns = [
     path('download-document/<int:doc_id>/', views.download_document, name='download_document'),
     path('delete-document/<int:doc_id>/', views.delete_document, name='delete_document'),
     path('download-all-documents/<int:detail_id>/', views.download_all_documents, name='download_all_documents'),
+    path(
+        'joining-details/<int:detail_id>/upload-documents/',
+        views.upload_joining_documents,
+        name='upload_joining_documents'
+    ),
     
     # 🔔 Notification URLs
     path('notifications/', views.notification_list, name='notification_list'),

@@ -13,7 +13,7 @@ try:
 except Exception:
     mp = None
     MP_AVAILABLE = False
-    logger.warning("⚠ MediaPipe not found — Liveness detection disabled")
+    logger.warning("MediaPipe not found — Liveness detection disabled")
 
 
 class LivenessDetector:
@@ -65,9 +65,9 @@ class LivenessDetector:
                     min_detection_confidence=0.5,
                     min_tracking_confidence=0.5
                 )
-                logger.info("✅ MediaPipe FaceMesh initialized successfully")
+                logger.info("MediaPipe FaceMesh initialized successfully")
             except Exception:
-                logger.exception("❌ MediaPipe FaceMesh failed to initialize")
+                logger.exception("MediaPipe FaceMesh failed to initialize")
 
     def _euclid(self, p1, p2):
         return np.linalg.norm(np.array(p1) - np.array(p2))
@@ -87,7 +87,7 @@ class LivenessDetector:
             avg_ear = np.mean(self.ear_samples)
             self.dynamic_threshold = max(0.18, min(avg_ear * 0.6, 0.25))
             logger.debug(
-                f"📊 EAR: {ear:.3f}, Avg: {avg_ear:.3f}, Thr: {self.dynamic_threshold:.3f}"
+                f"EAR: {ear:.3f}, Avg: {avg_ear:.3f}, Thr: {self.dynamic_threshold:.3f}"
             )
 
     def detect_detail(self, frame):
@@ -153,7 +153,7 @@ class LivenessDetector:
         )
 
         if result['live']:
-            logger.info("✅ Liveness confirmed - resetting counters")
+            logger.info("Liveness confirmed - resetting counters")
             self.reset()
 
         return result
