@@ -137,19 +137,36 @@
                             style="cursor:pointer;">
                             <!-- Name & ID Column -->
                             <td class="ps-4">
-                                <div class="d-flex px-2 py-1">
-                                    <div class="avatar-circle me-3">
+                                <div class="d-flex px-2 py-1 align-items-center">
+
+                                    <!-- PROFILE IMAGE / FALLBACK -->
+                                    <div class="me-3">
+                                    {% if e.face_image %}
+                                        <img
+                                        src="{{ e.face_image.url }}"
+                                        alt="{{ e.user.get_full_name }}"
+                                        class="rounded-circle"
+                                        style="width:42px; height:42px; object-fit:cover;"
+                                        >
+                                    {% else %}
+                                        <div class="avatar-circle">
                                         {{ e.user.first_name|slice:":1" }}{{ e.user.last_name|slice:":1" }}
+                                        </div>
+                                    {% endif %}
                                     </div>
+
+                                    <!-- NAME + EMPLOYEE ID -->
                                     <div class="d-flex flex-column justify-content-center">
-                                        <h6 class="mb-0 text-sm fw-bold text-dark">{{ e.user.get_full_name }}</h6>
-                                        <p class="text-xs text-secondary mb-0">
-                                            <i class="fas fa-id-badge me-1"></i>{{ e.employee_id }}
-                                        </p>
+                                    <h6 class="mb-0 text-sm fw-bold text-dark">
+                                        {{ e.user.get_full_name }}
+                                    </h6>
+                                    <p class="text-xs text-secondary mb-0">
+                                        <i class="fas fa-id-badge me-1"></i>{{ e.employee_id }}
+                                    </p>
                                     </div>
+
                                 </div>
-                            </td>
-                            
+                            </td>                                               
                             <!-- Department -->
                             <td>
                                 <p class="text-sm font-weight-bold mb-0 text-dark">{{ e.department|default:"-" }}</p>

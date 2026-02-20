@@ -16,6 +16,7 @@ import openpyxl
 from django import forms
 import numpy as np
 from django.forms import ModelForm
+from django.utils import timezone
 from io import BytesIO
 from datetime import date, datetime, timedelta
 from calendar import monthrange, month_name
@@ -61,7 +62,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.utils import ProgrammingError, OperationalError
 from .models import (Employee, Attendance, AttendanceSettings, DailyReport,Department, SalaryStructure, Payroll, LeaveType, 
     LeaveApplication, LeaveWorkflowStage, LeaveApproval,
-    JoiningDetail, Resignation, Notification,JoiningDocument,WorkRule)
+    JoiningDetail, Resignation, Notification,JoiningDocument,WorkRule,OfficeLocation)
 
 from .forms import ( UserRegistrationForm, EmployeeRegistrationForm, AttendanceSettingsForm,DepartmentForm, SalaryStructureForm, PayrollFilterForm,
     LeaveTypeForm, LeaveApplicationForm, LeaveApprovalForm, LeaveWorkflowStageForm,
@@ -112,7 +113,8 @@ from django.contrib.auth.decorators import login_required
 from core.utils.payslip_pdf import generate_payslip_pdf
 from core.utils.payslip_email import email_payslip
 from core.face_system import get_face_system
-
+from core.models import OfficeLocation
+from core.utils.location import is_inside_office
 # Setup logging
 logger = logging.getLogger(__name__)
 handler = logging.FileHandler('registration.log')
@@ -170,6 +172,8 @@ def register(request):
                     phone_number=form.cleaned_data["phone_number"],
                     role=form.cleaned_data["role"],
                     work_rule=form.cleaned_data.get("work_rule"),
+                    location_type=form.cleaned_data["location_type"],
+                    assigned_location=form.cleaned_data.get("assigned_location"),
                 )
 
                 face_image = request.FILES.get("face_image")
@@ -213,7 +217,6 @@ def register(request):
         form = EmployeeRegistrationForm()
 
     return render(request, "register.html", {"form": form})
-
 
 
 # --- Real-time AJAX validators ---
@@ -881,19 +884,26 @@ def attendance_heartbeat(request):
 
 # ------------------ ✅ Final mark_attendance Endpoint ------------------
 # ============================================================
-# 🔁 SHIFT WINDOW (DAY + NIGHT SAFE)
+# 🔁 SHIFT WINDOW (DAY + NIGHT SAFE + BUFFER FIX)
 # ============================================================
-def get_shift_window(now, rule):
+def get_shift_window(time_ref, rule):
+    """
+    time_ref: Can be a `datetime` (from mark_attendance) or `date` (from Payroll).
+    Includes a buffer so early check-ins and late check-outs are caught!
+    """
     start_time = rule.shift_start_time
     end_time = rule.shift_end_time
-    today = now.date()
+    
+    # Safely extract the date whether time_ref is datetime or date
+    today = time_ref.date() if isinstance(time_ref, datetime) else time_ref
 
-    # Night shift (crosses midnight)
     if end_time <= start_time:
+        # Night shift (crosses midnight)
         shift_start = datetime.combine(today, start_time)
         shift_end = datetime.combine(today + timedelta(days=1), end_time)
 
-        if now.time() < end_time:
+        # If we are checking during the early AMs of a night shift
+        if isinstance(time_ref, datetime) and time_ref.time() < end_time:
             shift_start -= timedelta(days=1)
             shift_end -= timedelta(days=1)
     else:
@@ -901,15 +911,21 @@ def get_shift_window(now, rule):
         shift_start = datetime.combine(today, start_time)
         shift_end = datetime.combine(today, end_time)
 
-    return (
-        timezone.make_aware(shift_start),
-        timezone.make_aware(shift_end),
-    )
+    # 🚨 CRITICAL FIX: Add Buffer Time 🚨
+    # Look for records 3 hours early and up to 8 hours late (for overtime)
+    shift_start -= timedelta(hours=3)
+    shift_end += timedelta(hours=8)
 
+    # Ensure datetimes are timezone aware
+    if timezone.is_naive(shift_start):
+        shift_start = timezone.make_aware(shift_start)
+    if timezone.is_naive(shift_end):
+        shift_end = timezone.make_aware(shift_end)
+
+    return shift_start, shift_end
 
 # ============================================================
 # 📸 MARK ATTENDANCE
-# ============================================================
 @csrf_exempt
 @login_required
 def mark_attendance(request):
@@ -963,75 +979,145 @@ def mark_attendance(request):
         employee = Employee.objects.filter(
             employee_id=emp_id,
             is_active=True
-        ).select_related("work_rule", "user").first()
+        ).select_related(
+            "work_rule",
+            "user",
+            "assigned_location"
+        ).first()
 
-        if not employee:
+        if not employee or not employee.work_rule:
             return JsonResponse({
                 "success": False,
-                "message": "Employee inactive or not found",
-                "color": "red"
-            })
-
-        if not employee.work_rule:
-            return JsonResponse({
-                "success": False,
-                "message": "Work rule not assigned",
+                "message": "Employee invalid or work rule missing",
                 "color": "red"
             })
 
         # ----------------------------------------------------
-        # 4️⃣ Shift-Aware Attendance Logic
+        # 📍 LOCATION VALIDATION (UNCHANGED)
         # ----------------------------------------------------
-        now = timezone.now()
-        user_name = employee.user.get_full_name()
+        lat = request.POST.get("latitude")
+        lng = request.POST.get("longitude")
 
-        settings_obj = AttendanceSettings.objects.first()
-        min_hours = settings_obj.min_hours_before_checkout if settings_obj else 0.5
+        if not lat or not lng:
+            return JsonResponse({
+                "success": False,
+                "message": "Location permission required",
+                "color": "red"
+            })
 
-        shift_start, shift_end = get_shift_window(now, employee.work_rule)
+        lat = float(lat)
+        lng = float(lng)
 
-        last_att = Attendance.objects.filter(
-            employee=employee,
-            timestamp__range=(shift_start, shift_end)
-        ).order_by("-timestamp").first()
+        active_offices = OfficeLocation.objects.filter(is_active=True)
+        matched_office = next(
+            (o for o in active_offices if is_inside_office(lat, lng, o)),
+            None
+        )
 
-        att_type = "check_in"
+        if not matched_office:
+            return JsonResponse({
+                "success": False,
+                "message": "You are not inside any authorized office location",
+                "color": "red"
+            })
 
-        if last_att:
-            elapsed_hours = (now - last_att.timestamp).total_seconds() / 3600
+        if employee.location_type == "INDOOR":
+            if not employee.assigned_location or employee.assigned_location_id != matched_office.id:
+                return JsonResponse({
+                    "success": False,
+                    "message": "Attendance allowed only at your assigned office",
+                    "color": "red"
+                })
 
-            # ⏱ Cooldown (2 minutes)
-            if elapsed_hours < (2 / 60):
+        # ----------------------------------------------------
+        # 🔒 SHIFT LOGIC (DB LOCKED)
+        # ----------------------------------------------------
+        with transaction.atomic():
+            now = timezone.now()
+            user_name = employee.user.get_full_name()
+
+            settings_obj = AttendanceSettings.objects.first()
+            min_hours = settings_obj.min_hours_before_checkout if settings_obj else 0
+
+            shift_start, shift_end = get_shift_window(now, employee.work_rule)
+
+            shift_logs = Attendance.objects.select_for_update().filter(
+                employee=employee,
+                timestamp__range=(shift_start, shift_end)
+            ).order_by("timestamp")
+
+            check_in = shift_logs.filter(attendance_type="check_in").first()
+            check_out = shift_logs.filter(attendance_type="check_out").first()
+
+            # 🚫 Shift already completed
+            if check_in and check_out:
                 return JsonResponse({
                     "success": True,
-                    "status": "duplicate",
-                    "message": f"Already Marked: {user_name}",
+                    "status": "completed",
+                    "message": f"Shift already completed: {user_name}",
                     "name": user_name,
-                    "attendance_type": last_att.get_attendance_type_display(),
+                    "attendance_type": "Completed",
                     "confidence": int(score * 100),
                     "color": "green"
                 })
 
-            # 🔁 Checkout logic
-            if last_att.attendance_type == "check_in":
-                if elapsed_hours < min_hours:
-                    mins_left = int((min_hours - elapsed_hours) * 60)
+            # ⏱ Anti-spam (camera protection)
+            last_att = shift_logs.last()
+            if last_att:
+                elapsed_seconds = (now - last_att.timestamp).total_seconds()
+                if elapsed_seconds < 120:
+                    return JsonResponse({
+                        "success": True,
+                        "status": "duplicate",
+                        "message": f"Already Marked: {user_name}",
+                        "name": user_name,
+                        "attendance_type": last_att.get_attendance_type_display(),
+                        "confidence": int(score * 100),
+                        "color": "green"
+                    })
+
+            # ------------------------------------------------
+            # ✅ DECISION LOGIC (CORRECT)
+            # ------------------------------------------------
+            if not check_in:
+                # ✅ FIRST AND ONLY CHECK-IN
+                att_type = "check_in"
+
+            else:
+                # ❌ No second check-in allowed
+                if check_out:
+                    return JsonResponse({
+                        "success": True,
+                        "status": "completed",
+                        "message": f"Shift already completed: {user_name}",
+                        "name": user_name,
+                        "attendance_type": "Completed",
+                        "confidence": int(score * 100),
+                        "color": "green"
+                    })
+
+                # ⏳ MIN HOURS CHECK — ONLY FOR CHECKOUT
+                worked_hours = (now - check_in.timestamp).total_seconds() / 3600
+                if worked_hours < min_hours:
+                    mins_left = int((min_hours - worked_hours) * 60)
                     return JsonResponse({
                         "success": False,
                         "message": f"Wait {mins_left}m to checkout",
                         "color": "yellow"
                     })
+
                 att_type = "check_out"
 
-        # ----------------------------------------------------
-        # 5️⃣ Create Attendance Record
-        # ----------------------------------------------------
-        Attendance.objects.create(
-            employee=employee,
-            attendance_type=att_type,
-            confidence_score=score
-        )
-
+            # ------------------------------------------------
+            # 📝 CREATE RECORD
+            # ------------------------------------------------
+            Attendance.objects.create(
+                employee=employee,
+                attendance_type=att_type,
+                confidence_score=score,
+                location=matched_office.name
+            )
+        local_time = timezone.localtime(now)
         return JsonResponse({
             "success": True,
             "status": "new",
@@ -1039,16 +1125,19 @@ def mark_attendance(request):
             "name": user_name,
             "attendance_type": att_type.replace("_", " ").title(),
             "confidence": int(score * 100),
+            "time": local_time.strftime("%I:%M %p"),
             "color": "green"
         })
 
-    except Exception as e:
+    except Exception:
         logger.exception("Attendance Error")
         return JsonResponse({
             "success": False,
             "message": "Server Error"
         }, status=500)
-        
+
+
+
 @login_required
 def attendance_log_api(request):
     today = timezone.now().date()
@@ -1828,6 +1917,76 @@ def create_attendance(request):
     )
 
     return JsonResponse({'success': True})
+
+class OfficeLocationForm(forms.ModelForm):
+    class Meta:
+        model = OfficeLocation
+        fields = [
+            "name",
+            "latitude",
+            "longitude",
+            "radius_meters",
+            "is_active",
+        ]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control"}),
+            "latitude": forms.NumberInput(attrs={"class": "form-control", "step": "any"}),
+            "longitude": forms.NumberInput(attrs={"class": "form-control", "step": "any"}),
+            "radius_meters": forms.NumberInput(attrs={"class": "form-control"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+
+@login_required
+def office_location_list(request):
+    locations = OfficeLocation.objects.all().order_by("name")
+    # We pass an empty form so the "Add Modal" can render the fields
+    form = OfficeLocationForm()
+    
+    return render(request, "office_location/list.html", {
+        "locations": locations,
+        "form": form
+    })
+
+@login_required
+def office_location_create(request):
+    if request.method == "POST":
+        form = OfficeLocationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Office location added successfully.")
+            return redirect("office_location_list")
+        else:
+            # In a real modal implementation, handling validation errors 
+            # usually requires AJAX. For simplicity here, if error, 
+            # we redirect to the standalone form or reload list with errors.
+            messages.error(request, "Error adding location. Please check inputs.")
+            return redirect("office_location_list")
+    return redirect("office_location_list")
+
+@login_required
+def office_location_update(request, pk):
+    location = get_object_or_404(OfficeLocation, pk=pk)
+    if request.method == "POST":
+        form = OfficeLocationForm(request.POST, instance=location)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Office location updated successfully.")
+            return redirect("office_location_list")
+        else:
+            messages.error(request, "Error updating location.")
+    
+    return redirect("office_location_list")
+
+@login_required
+def office_location_delete(request, pk):
+    location = get_object_or_404(OfficeLocation, pk=pk)
+    if request.method == "POST":
+        location.delete()
+        messages.success(request, "Office location deleted successfully.")
+    return redirect("office_location_list")
+
+
 # ============================================================
 # 🏢 ORGANISATION STRUCTURE VIEWS
 # ============================================================

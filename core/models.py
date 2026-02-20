@@ -21,6 +21,16 @@ from core.utils.payslip_pdf import generate_payslip_pdf
 from core.utils.payslip_email import email_payslip
 
 
+class OfficeLocation(models.Model):
+    name = models.CharField(max_length=100)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    radius_meters = models.PositiveIntegerField(default=100)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
 # ============================================================
 # 👤 EMPLOYEE MASTER
 # ============================================================
@@ -33,6 +43,7 @@ class Employee(models.Model):
         ('Manager', 'Manager'),
         ('Employee', 'Employee'),
     ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     employee_id = models.CharField(max_length=20, unique=True)
     
@@ -58,7 +69,23 @@ class Employee(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     work_rule = models.ForeignKey('WorkRule', on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
-    
+    LOCATION_TYPE_CHOICES = [
+        ("INDOOR", "Indoor Only"),
+        ("OUTDOOR", "Outdoor / Multi Office"),
+    ]
+
+    location_type = models.CharField(
+        max_length=10,
+        choices=LOCATION_TYPE_CHOICES,
+        default="INDOOR"
+    )
+ 
+    assigned_location = models.ForeignKey(
+        OfficeLocation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
     def __str__(self):
         return f"{self.user.get_full_name()} ({self.employee_id})"
 
@@ -123,8 +150,6 @@ class Department(models.Model):
 
     def __str__(self):
         return self.get_name_display()
-
-
 
 # ============================================================
 # 💰 SALARY & PAYROLL

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NovaFace | AI Attendance Kiosk</title>
+  <title>Nelson | AI Attendance Kiosk</title>
 
   <!-- Fonts & Icons -->
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -785,27 +785,33 @@
           </div>
         </div>
       </div>
+        <!-- Activity Column (Tablet Optimized) -->
+        <div class="col-12 col-lg-5 col-xl-4">
 
-      <!-- Activity Column -->
-      <div class="col-lg-5 col-xl-4">
-        <div class="glass-card">
-          <div class="d-flex align-items-center justify-content-between mb-4">
-            <h5 class="mb-0">
-              <i class="fas fa-history me-2" style="color: var(--primary);"></i>
-              Live Activity Feed
-            </h5>
-            <span class="badge" style="background: var(--primary-light); color: var(--primary); padding: 0.5rem 1rem; border-radius: 30px;" id="activityCount">0</span>
-          </div>
+          <div class="glass-card" style="height: calc(100vh - 220px);">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <h5 class="mb-0">
+                <i class="fas fa-calendar-check me-2" style="color: var(--primary);"></i>
+                Attendance Records
+              </h5>
+              <span class="badge"
+                    style="background: var(--primary-light); color: var(--primary); padding: 0.4rem 0.9rem; border-radius: 30px;">
+                Latest First
+              </span>
+            </div>
 
-          <div id="attendanceList" class="attendance-list">
-            <!-- Items injected via JS -->
-            <div class="text-center py-5" style="color: var(--gray-400);">
-              <i class="fas fa-clock fa-3x mb-3" style="opacity: 0.5;"></i>
-              <p>Waiting for first scan...</p>
+            <div id="historyList"
+                class="attendance-list"
+                style="max-height: calc(100vh - 300px); overflow-y: auto;">
+              <div class="text-center py-4" style="color: var(--gray-400);">
+                <i class="fas fa-spinner fa-spin mb-2"></i>
+                <p>Loading records...</p>
+              </div>
             </div>
           </div>
+
         </div>
-      </div>
+      
     </div>
   </div>
 
@@ -873,402 +879,249 @@
       </div>
     </div>
   </div>
+<input type="hidden" name="latitude" id="lat">
+<input type="hidden" name="longitude" id="lng">
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
 
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // ==================== ELEMENTS ====================
-      const video = document.getElementById("camera");
-      const canvas = document.getElementById("canvas");
-      const fsVideo = document.getElementById("fullscreenCamera");
-      const fsCanvas = document.getElementById("fullscreenCanvas");
-      
-      const statusLed = document.getElementById("statusLed");
-      const statusText = document.getElementById("statusText");
-      
-      const successMsg = document.getElementById("successMessage");
-      const errorMsg = document.getElementById("errorMessage");
-      const warningMsg = document.getElementById("warningMessage");
-      const infoMsg = document.getElementById("infoMessage");
-      
-      const fsSuccessMsg = document.getElementById("fsSuccessMessage");
-      const fsErrorMsg = document.getElementById("fsErrorMessage");
-      const fsWarningMsg = document.getElementById("fsWarningMessage");
-      const fsInfoMsg = document.getElementById("fsInfoMessage");
-      
-      const attendanceList = document.getElementById("attendanceList");
-      const fsAttendanceList = document.getElementById("fsAttendanceList");
-      const activityCount = document.getElementById("activityCount");
-      const todayCount = document.getElementById("todayCount");
-      const checkIns = document.getElementById("checkIns");
-      const checkOuts = document.getElementById("checkOuts");
-      
-      const currentTime = document.getElementById("currentTime");
-      const currentDate = document.getElementById("currentDate");
-      const fsCurrentTime = document.getElementById("fsCurrentTime");
-      const fsCurrentDate = document.getElementById("fsCurrentDate");
-      
-      const fullscreenBtn = document.getElementById("fullscreenBtn");
-      const exitFullscreenBtn = document.getElementById("exitFullscreenBtn");
-      const fullscreenMode = document.getElementById("fullscreenMode");
-      const normalMode = document.getElementById("normalMode");
-      
-      const successBeep = document.getElementById("successBeep");
-      const errorBeep = document.getElementById("errorBeep");
-      const scanBeep = document.getElementById("scanBeep");
-      
-      // ==================== STATE ====================
-      let isProcessing = false;
-      let attendanceRecords = [];
-      let cameraStream = null;
-      let messageTimeouts = {};
-      let frameCount = 0;
-      let lastFpsUpdate = performance.now();
-      let fps = 30;
-      
-      // ==================== INIT ====================
-      function init() {
-        updateDateTime();
-        setInterval(updateDateTime, 1000);
-        createParticles();
-        startCamera();
-        startFrameLoop();
-      }
-      
-      // ==================== PARTICLES ====================
-      function createParticles() {
-        const particlesContainer = document.getElementById("particles");
-        for (let i = 0; i < 30; i++) {
-          const particle = document.createElement("div");
-          particle.className = "particle";
-          particle.style.left = Math.random() * 100 + "%";
-          particle.style.animationDuration = (10 + Math.random() * 20) + "s";
-          particle.style.animationDelay = Math.random() * 5 + "s";
-          particle.style.background = i % 2 === 0 ? "var(--primary)" : "var(--secondary)";
-          particlesContainer.appendChild(particle);
-        }
-      }
-      
-      // ==================== DATE/TIME ====================
-      function updateDateTime() {
-        const now = new Date();
-        
-        const timeStr = now.toLocaleTimeString('en-US', { 
-          hour: '2-digit', 
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false 
-        });
-        
-        const dateStr = now.toLocaleDateString('en-US', { 
-          weekday: 'long',
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        });
-        
-        if (currentTime) currentTime.textContent = timeStr;
-        if (fsCurrentTime) fsCurrentTime.textContent = timeStr;
-        if (currentDate) currentDate.textContent = dateStr;
-        if (fsCurrentDate) fsCurrentDate.textContent = dateStr;
-      }
-      
-      // ==================== CAMERA ====================
-      async function startCamera() {
-        try {
-          if (cameraStream) {
-            cameraStream.getTracks().forEach(t => t.stop());
-          }
-          
-          cameraStream = await navigator.mediaDevices.getUserMedia({
-            video: { 
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              facingMode: "user",
-              frameRate: { ideal: 30 }
-            }
-          });
-          
-          if (video) video.srcObject = cameraStream;
-          if (fsVideo) fsVideo.srcObject = cameraStream;
-          
-          updateStatus("online", "System Online • Scanning");
-          
-        } catch (e) {
-          console.error("Camera error:", e);
-          updateStatus("error", "Camera Error - Check Permissions");
-          showMessage("Camera access denied. Please check permissions.", "error", false);
-        }
-      }
-      
-      // ==================== STATUS ====================
-      function updateStatus(state, text) {
-        if (!statusLed || !statusText) return;
-        
-        statusLed.className = "status-led";
-        statusText.textContent = text;
-        
-        if (state === "online") {
-          statusLed.classList.add("active");
-        } else if (state === "error") {
-          statusLed.classList.add("error");
-        } else {
-          statusLed.classList.add("idle");
-        }
-      }
-      
-      // ==================== MESSAGE SYSTEM ====================
-      function hideMessages(fullscreen = false) {
-        const msgs = fullscreen 
-          ? [fsSuccessMsg, fsErrorMsg, fsWarningMsg, fsInfoMsg]
-          : [successMsg, errorMsg, warningMsg, infoMsg];
-        msgs.forEach(m => m && (m.style.display = "none"));
-      }
-      
-      function showMessage(text, type = "info", fullscreen = false) {
-        hideMessages(fullscreen);
-        
-        let el;
-        if (fullscreen) {
-          el = type === "success" ? fsSuccessMsg :
-               type === "warning" ? fsWarningMsg :
-               type === "error" ? fsErrorMsg : fsInfoMsg;
-        } else {
-          el = type === "success" ? successMsg :
-               type === "warning" ? warningMsg :
-               type === "error" ? errorMsg : infoMsg;
-        }
-        
-        if (!el) return;
-        
-        el.textContent = text;
-        el.style.display = "block";
-        
-        // Play sounds
-        if (type === "success") {
-          successBeep.play().catch(() => {});
-        } else if (type === "error" || type === "warning") {
-          errorBeep.play().catch(() => {});
-        } else {
-          scanBeep.play().catch(() => {});
-        }
-        
-        // Auto hide after duration
-        const duration = type === "warning" ? 8000 : 5000;
-        clearTimeout(messageTimeouts[fullscreen + type]);
-        messageTimeouts[fullscreen + type] = setTimeout(() => {
-          el.style.display = "none";
-        }, duration);
-      }
-      
-      // ==================== ATTENDANCE RECORD ====================
-      function addAttendanceRecord(data) {
-  // Remove placeholders
-  attendanceList.innerHTML = "";
-  fsAttendanceList.innerHTML = "";
+  /* =====================================================
+     GLOBAL STATE
+  ===================================================== */
+  window.CURRENT_LAT = null;
+  window.CURRENT_LNG = null;
 
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit"
-  });
+  let AUDIO_UNLOCKED = false;
+  let isProcessing = false;
+  let cameraStream = null;
 
-  const initials = data.name
-    .split(" ")
-    .map(n => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  /* =====================================================
+     AUDIO
+  ===================================================== */
+  const successBeep = document.getElementById("successBeep");
+  const errorBeep   = document.getElementById("errorBeep");
+  const scanBeep    = document.getElementById("scanBeep");
 
-  const typeClass = data.attendance_type.toLowerCase().includes("in")
-    ? "type-check-in"
-    : "type-check-out";
+  function unlockAudio() {
+    if (AUDIO_UNLOCKED) return;
 
-  const html = `
-    <div class="attendance-item animate__animated animate__fadeInRight">
-      <div class="attendance-avatar">${initials}</div>
-      <div class="attendance-info">
-        <div class="attendance-name">${data.name}</div>
-        <div class="attendance-meta">
-          <span class="attendance-type ${typeClass}">
-            ${data.attendance_type}
-          </span>
-          <span class="attendance-time">${timeStr}</span>
+    [successBeep, errorBeep, scanBeep].forEach(a => {
+      if (!a) return;
+      a.muted = true;
+      a.play().then(() => {
+        a.pause();
+        a.currentTime = 0;
+        a.muted = false;
+      }).catch(() => {});
+    });
+
+    AUDIO_UNLOCKED = true;
+    console.log("🔓 Audio unlocked");
+  }
+
+  function playSound(audio) {
+    if (!AUDIO_UNLOCKED || !audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
+
+  /* =====================================================
+     ELEMENTS
+  ===================================================== */
+  const video  = document.getElementById("camera");
+  const canvas = document.getElementById("canvas");
+
+  const successMsg = document.getElementById("successMessage");
+  const errorMsg   = document.getElementById("errorMessage");
+  const warningMsg = document.getElementById("warningMessage");
+  const infoMsg    = document.getElementById("infoMessage");
+
+  const historyList = document.getElementById("historyList");
+
+  /* =====================================================
+     UI MESSAGES
+  ===================================================== */
+  function hideMessages() {
+    [successMsg, errorMsg, warningMsg, infoMsg].forEach(m => {
+      if (m) m.style.display = "none";
+    });
+  }
+
+  function showMessage(text, type) {
+    hideMessages();
+
+    const el =
+      type === "success" ? successMsg :
+      type === "warning" ? warningMsg :
+      type === "error"   ? errorMsg   : infoMsg;
+
+    if (!el) return;
+
+    el.textContent = text;
+    el.style.display = "block";
+
+    if (type === "success") playSound(successBeep);
+    else if (type === "warning" || type === "error") playSound(errorBeep);
+    else playSound(scanBeep);
+
+    setTimeout(() => el.style.display = "none", 5000);
+  }
+
+  /* =====================================================
+     LOCATION (REQUIRED)
+  ===================================================== */
+  async function getLocation() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject("Geolocation not supported");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          window.CURRENT_LAT = pos.coords.latitude;
+          window.CURRENT_LNG = pos.coords.longitude;
+          console.log("📍 Location OK:", CURRENT_LAT, CURRENT_LNG);
+          resolve();
+        },
+        err => {
+          console.error("GPS error:", err);
+          showMessage("Location permission required", "error");
+          reject(err);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        }
+      );
+    });
+  }
+
+  /* =====================================================
+     CAMERA (AUDIO UNLOCKS HERE)
+  ===================================================== */
+  async function startCamera() {
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 1280, height: 720, facingMode: "user" }
+      });
+
+      video.srcObject = cameraStream;
+
+      // 🔑 Permission click unlocks audio
+      unlockAudio();
+
+      console.log("📷 Camera started");
+
+    } catch (err) {
+      console.error("Camera error:", err);
+      showMessage("Camera permission required", "error");
+    }
+  }
+
+  /* =====================================================
+     ATTENDANCE UI
+  ===================================================== */
+  function addAttendanceRecord(data) {
+    const typeClass = data.attendance_type.toLowerCase().includes("in")
+      ? "type-check-in"
+      : "type-check-out";
+
+    const html = `
+      <div class="attendance-item">
+        <div class="attendance-avatar">
+          ${data.attendance_type.includes("In") ? "IN" : "OUT"}
+        </div>
+        <div class="attendance-info">
+          <div class="attendance-name">${data.name}</div>
+          <div class="attendance-meta">
+            <span class="attendance-type ${typeClass}">
+              ${data.attendance_type}
+            </span>
+            <span class="attendance-time">${data.time}</span>
+          </div>
+        </div>
+        <div class="text-end">
+          <small>${data.confidence}%</small>
         </div>
       </div>
-      <div class="text-end">
-        <small style="color: var(--success); font-weight:600;">
-          ${data.confidence}%
-        </small>
-      </div>
-    </div>
-  `;
+    `;
 
-  // Main list
-  const d1 = document.createElement("div");
-  d1.innerHTML = html;
-  attendanceList.prepend(d1.firstElementChild);
-
-  // Side panel
-  const d2 = document.createElement("div");
-  d2.innerHTML = html;
-  fsAttendanceList.prepend(d2.firstElementChild);
-
-  attendanceRecords.unshift({
-    ...data,
-    timestamp: now.toISOString()
-  });
-
-  // Keep max 20 records
-  while (attendanceList.children.length > 20) {
-    attendanceList.removeChild(attendanceList.lastElementChild);
-  }
-  while (fsAttendanceList.children.length > 20) {
-    fsAttendanceList.removeChild(fsAttendanceList.lastElementChild);
+    historyList.insertAdjacentHTML("afterbegin", html);
   }
 
-  updateStats();
-}
-      function updateStats() {
-        const today = new Date().toDateString();
-        const todayRecords = attendanceRecords.filter(r => 
-          new Date(r.timestamp).toDateString() === today
-        );
-        
-        const checkInCount = todayRecords.filter(r => 
-          r.attendance_type?.toLowerCase().includes("in")
-        ).length;
-        
-        const checkOutCount = todayRecords.filter(r => 
-          r.attendance_type?.toLowerCase().includes("out")
-        ).length;
-        
-        if (activityCount) activityCount.textContent = attendanceRecords.length;
-        if (todayCount) todayCount.textContent = todayRecords.length;
-        if (checkIns) checkIns.textContent = checkInCount;
-        if (checkOuts) checkOuts.textContent = checkOutCount;
-      }
-      
-      // ==================== FRAME PROCESSING ====================
-      async function processFrame() {
-        if (isProcessing) return;
-        
-        const activeVideo = fullscreenMode.classList.contains("active") ? fsVideo : video;
-        const activeCanvas = fullscreenMode.classList.contains("active") ? fsCanvas : canvas;
-        
-        if (!activeVideo || activeVideo.readyState < 2) return;
-        
-        isProcessing = true;
-        
-        try {
-          // Draw frame to canvas
-          activeCanvas.width = activeVideo.videoWidth;
-          activeCanvas.height = activeVideo.videoHeight;
-          const ctx = activeCanvas.getContext("2d");
-          ctx.drawImage(activeVideo, 0, 0);
-          
-          // Convert to blob
-          const blob = await new Promise(r => activeCanvas.toBlob(r, "image/jpeg", 0.8));
-          
-          // Send to server
-          const formData = new FormData();
-          formData.append("capture", blob, "frame.jpg");
-          
-          const response = await fetch("{% url 'mark_attendance' %}", {
-            method: "POST",
-            headers: {
-              "X-CSRFToken": "{{ csrf_token }}"
-            },
-            body: formData
-          });
-          
-          const data = await response.json();
-          
-          // Update FPS
-          frameCount++;
-          const now = performance.now();
-          if (now - lastFpsUpdate > 1000) {
-            fps = frameCount;
-            document.getElementById("fps").textContent = fps + " fps";
-            frameCount = 0;
-            lastFpsUpdate = now;
-          }
-          
-          // Handle response
-          if (data.success) {
+  /* =====================================================
+     FRAME PROCESS
+  ===================================================== */
+  async function processFrame() {
+    if (
+      isProcessing ||
+      video.readyState < 2 ||
+      CURRENT_LAT === null ||
+      CURRENT_LNG === null
+    ) return;
 
-  // ✅ ADD TO HISTORY ONLY IF NEW
-  if (data.status === "new" && data.name) {
-    addAttendanceRecord({
-      name: data.name,
-      attendance_type: data.attendance_type,
-      confidence: data.confidence
-    });
+    isProcessing = true;
+
+    try {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0);
+
+      const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.8));
+      const fd = new FormData();
+      fd.append("capture", blob, "frame.jpg");
+      fd.append("latitude", CURRENT_LAT);
+      fd.append("longitude", CURRENT_LNG);
+
+      const res = await fetch("{% url 'mark_attendance' %}", {
+        method: "POST",
+        headers: { "X-CSRFToken": "{{ csrf_token }}" },
+        body: fd
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+
+        if (data.status === "new") {
+          addAttendanceRecord(data);
+          playSound(successBeep);   // ✅ FIRST CHECK-IN BEEP
+        }
+
+        showMessage(data.message, "success");
+
+      } else {
+        const type =
+          data.color === "yellow" ? "warning" :
+          data.color === "blue"   ? "info"    : "error";
+        showMessage(data.message, type);
+      }
+
+    } catch (e) {
+      console.error("Frame error:", e);
+    } finally {
+      isProcessing = false;
+    }
   }
 
-  // ✅ SHOW MESSAGE FOR BOTH new & duplicate
-  showMessage(data.message || "Attendance processed", "success", false);
-  showMessage(data.message || "Attendance processed", "success", true);
+  /* =====================================================
+     LOOP
+  ===================================================== */
+  function loop() {
+    processFrame();
+    setTimeout(loop, 700);
+  }
 
-  // 🔔 SUCCESS BEEP (both cases)
-  successBeep.currentTime = 0;
-  successBeep.play().catch(() => {});
-}
+  /* =====================================================
+     START ORDER (IMPORTANT)
+  ===================================================== */
+  await getLocation();   // 📍 user clicks permission
+  await startCamera();   // 📷 user clicks permission → audio unlocks
+  loop();                // ▶ auto scanning
 
-else if (!data.success && data.message) {
-  const type =
-    data.color === "yellow" ? "warning" :
-    data.color === "blue" ? "info" : "error";
-
-  showMessage(data.message, type, false);
-  showMessage(data.message, type, true);
-}
-          
-        } catch (e) {
-          console.error("Frame processing error:", e);
-        } finally {
-          isProcessing = false;
-        }
-      }
-      
-      // ==================== FRAME LOOP ====================
-      function startFrameLoop() {
-        let lastFrame = 0;
-        
-        function loop(timestamp) {
-          if (timestamp - lastFrame > 500) { // Process every 500ms
-            processFrame();
-            lastFrame = timestamp;
-          }
-          requestAnimationFrame(loop);
-        }
-        
-        requestAnimationFrame(loop);
-      }
-      
-      // ==================== FULLSCREEN MODE ====================
-      fullscreenBtn?.addEventListener("click", () => {
-        fullscreenMode.classList.add("active");
-        normalMode.style.display = "none";
-        document.body.style.overflow = "hidden";
-      });
-      
-      exitFullscreenBtn?.addEventListener("click", () => {
-        fullscreenMode.classList.remove("active");
-        normalMode.style.display = "block";
-        document.body.style.overflow = "auto";
-      });
-      
-      // ==================== ESC KEY ====================
-      document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && fullscreenMode.classList.contains("active")) {
-          exitFullscreenBtn.click();
-        }
-      });
-      
-      // ==================== INITIALIZE ====================
-      init();
-    });
-  </script>
+});
+</script>
 </body>
 </html>

@@ -291,7 +291,14 @@
                 </div>
             </div>
             {% endif %}
-
+            {% if request.user.is_superuser or request.user.employee.role in "Admin HR" %}
+<li class="nav-item">
+    <a href="{% url 'office_location_list' %}" class="nav-link">
+        <i class="fas fa-map-marker-alt me-2"></i>
+        <span>Office Locations</span>
+    </a>
+</li>
+{% endif %}
             <!-- ADMIN -->
             {% if user.is_staff %}
             <div class="nav-section">Admin</div>

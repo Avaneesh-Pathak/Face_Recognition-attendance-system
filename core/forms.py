@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from datetime import datetime, date
 from .models import (Employee, AttendanceSettings,Department, SalaryStructure, Payroll, LeaveType, 
     LeaveApplication, LeaveWorkflowStage, LeaveApproval,
-    JoiningDetail, Resignation, Notification,WorkRule)
+    JoiningDetail, Resignation, Notification,WorkRule,OfficeLocation)
 from django.forms.widgets import ClearableFileInput
 
 # ✅ Custom Multi-File Input
@@ -29,9 +29,6 @@ class UserRegistrationForm(UserCreationForm):
         if email and User.objects.filter(email__iexact=email).exclude(pk=getattr(self.instance, 'pk', None)).exists():
             raise ValidationError("A user with this email already exists.")
         return email
-
-
-
 
 class EmployeeRegistrationForm(forms.Form):
     # --- 👤 User Info ---
@@ -66,13 +63,30 @@ class EmployeeRegistrationForm(forms.Form):
     date_of_joining = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}), label="Date of Joining")
     probation_period_months = forms.IntegerField(min_value=0, max_value=24, initial=3, label="Probation Period (Months)")
     confirmation_date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date', 'readonly': 'readonly'}), required=False,label="Confirmation Date")
-    
+    location_type = forms.ChoiceField(
+        choices=Employee.LOCATION_TYPE_CHOICES,
+        widget=forms.Select(attrs={"class": "form-select"}),
+        initial="INDOOR",
+        required=True
+    )
+
+    assigned_location = forms.ModelChoiceField(
+        queryset=OfficeLocation.objects.filter(is_active=True),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"})
+    )
     def clean(self):
         cleaned = super().clean()
+        location_type = cleaned.get("location_type")
+        assigned_location = cleaned.get("assigned_location")
+        if location_type == "INDOOR" and not assigned_location:
+            raise forms.ValidationError(
+                "Assigned office location is required for Indoor employees."
+            )
+
         if cleaned.get('password1') != cleaned.get('password2'):
             raise ValidationError("Passwords do not match")
         return cleaned
-
     
 
 class AttendanceSettingsForm(forms.ModelForm):
@@ -99,7 +113,6 @@ class AttendanceSettingsForm(forms.ModelForm):
         if max_daily is not None and val > max_daily:
             raise ValidationError("Minimum hours before checkout cannot exceed maximum daily hours.")
         return val
-    
 
 # ============================================================
 # 🏢 ORGANISATION STRUCTURE FORMS
@@ -547,7 +560,6 @@ class JoiningDetailForm(forms.ModelForm):
         return cleaned_data
 
 
-
 class ResignationForm(forms.ModelForm):
     class Meta:
         model = Resignation
@@ -745,7 +757,6 @@ class LeaveReportFilterForm(DateRangeFilterForm):
             'class': 'form-control'
         })
     )
-
 
 STATUS_CHOICES = (
     ('', 'All'),

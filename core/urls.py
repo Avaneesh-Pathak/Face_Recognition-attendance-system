@@ -96,5 +96,10 @@ urlpatterns = [
     path('attendance/update/<int:att_id>/', views.update_attendance, name='attendance_update'),
     path('attendance/delete/<int:att_id>/', views.delete_attendance, name='attendance_delete'),
 
+    # Office Location URLs
+    path("office-locations/", views.office_location_list, name="office_location_list"),
+    path("office-locations/create/", views.office_location_create, name="office_location_create"),
+    path("office-locations/<int:pk>/edit/", views.office_location_update, name="office_location_update"),
+    path("office-locations/<int:pk>/delete/", views.office_location_delete, name="office_location_delete"),
 
 ]

@@ -6,7 +6,7 @@ from .models import (
     Employee, Attendance, AttendanceSettings, DailyReport, Department,
     SalaryStructure, Payroll, LeaveType, LeaveApplication, 
     LeaveWorkflowStage, LeaveApproval, JoiningDetail, Resignation, Notification,JoiningDocument,
-     WorkRule, PayrollSettings
+     WorkRule, PayrollSettings,OfficeLocation
 )
 
 
@@ -58,32 +58,95 @@ class CustomUserAdmin(UserAdmin):
     def get_department(self, obj):
         return obj.employee.department if hasattr(obj, 'employee') else '-'
     get_department.short_description = 'Department'
-
+ 
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ('employee_id', 'user_full_name', 'department', 'position', 'employment_status', 'is_active', 'date_of_joining','role')
-    list_filter = ('department', 'position', 'employment_status', 'is_active', 'date_of_joining')
-    search_fields = ('employee_id', 'user__first_name', 'user__last_name', 'user__email', 'department')
+    list_display = (
+        'employee_id',
+        'user_full_name',
+        'department',
+        'position',
+        'employment_status',
+        'is_active',
+        'date_of_joining',
+        'role',
+        'location_type',
+        'assigned_location',
+    )
+
+    list_filter = (
+        'department',
+        'position',
+        'employment_status',
+        'is_active',
+        'date_of_joining',
+        'role',
+        'location_type',
+        'assigned_location',
+    )
+
+    search_fields = (
+        'employee_id',
+        'user__first_name',
+        'user__last_name',
+        'user__email',
+        'department__name',
+        'assigned_location__name',
+    )
+
     readonly_fields = ('created_at', 'face_encoding_preview')
+
     fieldsets = (
         ('Personal Information', {
-            'fields': ('user', 'employee_id', 'phone_number')
+            'fields': (
+                'user',
+                'employee_id',
+                'phone_number',
+            )
         }),
         ('Employment Details', {
-            'fields': ('department', 'position', 'manager', 'date_of_joining', 'date_of_resignation', 'employment_status')
+            'fields': (
+                'department',
+                'position',
+                'manager',
+                'date_of_joining',
+                'date_of_resignation',
+                'employment_status',
+                'role',
+            )
+        }),
+        ('📍 Location Access Control', {
+            'fields': (
+                'location_type',
+                'assigned_location',
+            ),
+            'description': (
+                'INDOOR: Employee can mark attendance ONLY at assigned office.<br>'
+                'OUTDOOR: Employee can mark attendance at ANY office location.'
+            )
         }),
         ('Face Recognition', {
-            'fields': ('face_image', 'face_encoding_preview'),
+            'fields': (
+                'face_image',
+                'face_encoding_preview',
+            ),
             'classes': ('collapse',)
         }),
         ('System', {
-            'fields': ('is_active', 'created_at'),
+            'fields': (
+                'is_active',
+                'created_at',
+            ),
             'classes': ('collapse',)
         }),
     )
+
     actions = [make_employees_active, make_employees_inactive]
 
+    # ------------------------------
+    # Custom Display Helpers
+    # ------------------------------
     def user_full_name(self, obj):
         return obj.user.get_full_name()
     user_full_name.short_description = 'Full Name'
@@ -91,13 +154,13 @@ class EmployeeAdmin(admin.ModelAdmin):
     def face_encoding_preview(self, obj):
         if obj.face_encoding:
             return format_html(
-                '<div style="max-height: 100px; overflow-y: auto; background: #f5f5f5; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 10px;">{}</div>',
+                '<div style="max-height: 100px; overflow-y: auto; '
+                'background: #f5f5f5; padding: 10px; border-radius: 5px; '
+                'font-family: monospace; font-size: 10px;">{}</div>',
                 obj.face_encoding[:200] + '...' if len(obj.face_encoding) > 200 else obj.face_encoding
             )
         return "No encoding"
     face_encoding_preview.short_description = 'Face Encoding Preview'
-
-
 # ============================================================
 # 🕒 ATTENDANCE ADMIN
 # ============================================================
@@ -216,6 +279,11 @@ class PayrollAdmin(admin.ModelAdmin):
         Payroll.objects.generate_monthly_salary(today.year, today.month)
         self.message_user(request, "✅ Payroll successfully generated!")
 
+@admin.register(OfficeLocation)
+class OfficeLocationAdmin(admin.ModelAdmin):
+    list_display = ("name", "latitude", "longitude", "radius_meters", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
 
 
 @admin.register(WorkRule)

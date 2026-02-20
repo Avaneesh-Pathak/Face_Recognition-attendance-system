@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Office Locations</h3>
+            <p class="text-muted small mb-0">Manage geofencing and office coordinates</p>
+        </div>
+        <button type="button" class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addModal">
+            <i class="fas fa-plus me-2"></i>Add Location
+        </button>
+    </div>
+    <!-- Data Table Card -->
+    <div class="card shadow border-0 rounded-3">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light text-secondary">
+                        <tr>
+                            <th class="ps-4 text-uppercase small fw-bold">Name</th>
+                            <th class="text-uppercase small fw-bold">Coordinates</th>
+                            <th class="text-uppercase small fw-bold">Radius</th>
+                            <th class="text-uppercase small fw-bold">Status</th>
+                            <th class="text-end pe-4 text-uppercase small fw-bold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for loc in locations %}
+                        <tr>
+                            <td class="ps-4">
+                                <span class="fw-semibold text-dark">{{ loc.name }}</span>
+                            </td>
+                            <td>
+                                <div class="d-flex flex-column small">
+                                    <span class="text-muted">Lat: <span class="text-dark">{{ loc.latitude }}</span></span>
+                                    <span class="text-muted">Lng: <span class="text-dark">{{ loc.longitude }}</span></span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border">{{ loc.radius_meters }} m</span>
+                            </td>
+                            <td>
+                                {% if loc.is_active %}
+                                    <span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger bg-opacity-10 text-danger px-3 py-2 rounded-pill">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <!-- Edit Button: Stores row data in data attributes -->
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-secondary me-1 edit-btn"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#editModal"
+                                        data-id="{{ loc.id }}"
+                                        data-name="{{ loc.name }}"
+                                        data-lat="{{ loc.latitude }}"
+                                        data-lng="{{ loc.longitude }}"
+                                        data-radius="{{ loc.radius_meters }}"
+                                        data-active="{{ loc.is_active|yesno:'true,false' }}"
+                                        data-url="{% url 'office_location_update' loc.id %}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+
+                                <!-- Delete Button -->
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-danger delete-btn"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteModal"
+                                        data-name="{{ loc.name }}"
+                                        data-url="{% url 'office_location_delete' loc.id %}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="fas fa-map-marker-alt fa-3x mb-3 text-secondary opacity-25"></i>
+                                <p>No office locations found.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =========================
+     MODAL: ADD LOCATION
+========================= -->
+<div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold">Add Office Location</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'office_location_create' %}">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">Office Name</label>
+                        {{ form.name }}
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small text-muted">Latitude</label>
+                            {{ form.latitude }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small text-muted">Longitude</label>
+                            {{ form.longitude }}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small text-muted">Radius (Meters)</label>
+                            {{ form.radius_meters }}
+                        </div>
+                        <div class="col-md-6 mb-3 d-flex align-items-end">
+                            <div class="form-check form-switch pb-2">
+                                {{ form.is_active }}
+                                <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active Status</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4">Save Location</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =========================
+     MODAL: EDIT LOCATION
+========================= -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title fw-bold">Edit Office Location</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" id="editForm">
+                {% csrf_token %}
+                <div class="modal-body p-4">
+                    <!-- We manually render inputs here to avoid ID conflicts and allow JS population -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">Office Name</label>
+                        <input type="text" name="name" id="edit-name" class="form-control" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small text-muted">Latitude</label>
+                            <input type="number" step="any" name="latitude" id="edit-latitude" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small text-muted">Longitude</label>
+                            <input type="number" step="any" name="longitude" id="edit-longitude" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold small text-muted">Radius (Meters)</label>
+                            <input type="number" name="radius_meters" id="edit-radius" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3 d-flex align-items-end">
+                            <div class="form-check form-switch pb-2">
+                                <input type="checkbox" name="is_active" id="edit-active" class="form-check-input">
+                                <label class="form-check-label" for="edit-active">Active Status</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-link text-secondary text-decoration-none" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning px-4">Update Location</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =========================
+     MODAL: DELETE LOCATION
+========================= -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-body text-center p-4">
+                <div class="text-danger mb-3">
+                    <i class="fas fa-exclamation-circle fa-3x"></i>
+                </div>
+                <h5 class="fw-bold mb-2">Are you sure?</h5>
+                <p class="text-muted small mb-4">Do you really want to delete <span id="delete-name" class="fw-bold text-dark"></span>? This process cannot be undone.</p>
+                
+                <form method="post" id="deleteForm">
+                    {% csrf_token %}
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                        <button type="button" class="btn btn-light text-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =========================
+     JAVASCRIPT LOGIC
+========================= -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        
+        // Handle Edit Button Click
+        const editButtons = document.querySelectorAll('.edit-btn');
+        editButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                // Get data from data-attributes
+                const url = this.getAttribute('data-url');
+                const name = this.getAttribute('data-name');
+                const lat = this.getAttribute('data-lat');
+                const lng = this.getAttribute('data-lng');
+                const radius = this.getAttribute('data-radius');
+                const isActive = this.getAttribute('data-active') === 'true';
+
+                // Populate Modal Fields
+                document.getElementById('editForm').action = url;
+                document.getElementById('edit-name').value = name;
+                document.getElementById('edit-latitude').value = lat;
+                document.getElementById('edit-longitude').value = lng;
+                document.getElementById('edit-radius').value = radius;
+                document.getElementById('edit-active').checked = isActive;
+            });
+        });
+
+        // Handle Delete Button Click
+        const deleteButtons = document.querySelectorAll('.delete-btn');
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function () {
+                const url = this.getAttribute('data-url');
+                const name = this.getAttribute('data-name');
+
+                document.getElementById('deleteForm').action = url;
+                document.getElementById('delete-name').textContent = name;
+            });
+        });
+    });
+</script>
+
+{% endblock %}
