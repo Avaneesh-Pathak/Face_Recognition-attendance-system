@@ -261,10 +261,10 @@
             </a>
 
             <!-- ATTENDANCE -->
-            <div class="nav-section">Attendance</div>
+            <!-- <div class="nav-section">Attendance</div>
             <a href="{% url 'attendance_history_all' %}" class="nav-link {% if 'history' in request.path %}active{% endif %}">
                 <i class="fas fa-history"></i> <span>History</span>
-            </a>
+            </a> -->
             <a href="{% url 'leave_application_list' %}" class="nav-link {% if 'leaves' in request.path %}active{% endif %}">
                 <i class="fas fa-calendar-check"></i> <span>Leaves</span>
             </a>
@@ -274,9 +274,9 @@
             <a href="{% url 'payroll_list' %}" class="nav-link {% if 'payroll' in request.path %}active{% endif %}">
                 <i class="fas fa-money-bill-wave"></i> <span>Payroll</span>
             </a>
-            <a href="{% url 'salary_structure_list' %}" class="nav-link {% if 'salary' in request.path %}active{% endif %}">
+            <!-- <a href="{% url 'salary_structure_list' %}" class="nav-link {% if 'salary' in request.path %}active{% endif %}">
                 <i class="fas fa-file-invoice-dollar"></i> <span>Structures</span>
-            </a>
+            </a> -->
 
             {% if user.employee.role in "Finance Admin" %}
             <div>

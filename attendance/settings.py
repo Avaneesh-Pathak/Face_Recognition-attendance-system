@@ -169,7 +169,7 @@ INSIGHTFACE_MODEL = "buffalo_l"
 INSIGHTFACE_DET_SIZE = (640, 640)
 INSIGHTFACE_CTX_ID = -1        # CPU only (Hostinger)
 
-FACE_RECOGNITION_THRESHOLD = 0.70   # cosine similarity
+FACE_RECOGNITION_THRESHOLD = 0.50   # cosine similarity
 FACE_EUCLIDEAN_MAX = 1.45           # for 512-dim embeddings
 # ================= TEMPORAL SMOOTHING =================
 FACE_STABLE_VOTES = 3      # required matches

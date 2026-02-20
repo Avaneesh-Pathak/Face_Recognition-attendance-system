@@ -7,26 +7,16 @@
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-white py-3">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-      <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-sitemap me-2 text-primary"></i>Interactive Chart</h5>
+      <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-sitemap me-2 text-primary"></i>My Org Chart</h5>
 
       <div class="d-flex flex-wrap gap-2">
         <!-- View switch -->
         <div class="btn-group shadow-sm" role="group">
-          <button class="btn btn-outline-primary active" id="btnViewPath">
-            <i class="fas fa-road me-1"></i>My Path
+          <button class="btn btn-outline-primary active" id="btnViewFull">
+            <i class="fas fa-sitemap me-1"></i>Full View
           </button>
           <button class="btn btn-outline-primary" id="btnViewTeam">
-            <i class="fas fa-users me-1"></i>My Team
-          </button>
-        </div>
-
-        <!-- Layout switch -->
-        <div class="btn-group shadow-sm" role="group">
-          <button class="btn btn-outline-secondary active" id="btnVertical" title="Vertical Layout">
-            <i class="fas fa-arrow-down"></i>
-          </button>
-          <button class="btn btn-outline-secondary" id="btnHorizontal" title="Horizontal Layout">
-            <i class="fas fa-arrow-right"></i>
+            <i class="fas fa-users me-1"></i>Only My Team
           </button>
         </div>
 
@@ -38,214 +28,159 @@
     </div>
   </div>
 
-  <div class="card-body bg-light min-vh-100 position-relative overflow-auto">
+  <div class="card-body bg-light position-relative overflow-auto" style="min-height: 75vh;">
     <div class="alert alert-info border-0 shadow-sm d-inline-flex align-items-center py-2 px-3 mb-4">
       <i class="fas fa-info-circle me-2"></i>
-      <small>Click on any employee card to expand/collapse their team.</small>
+      <small>Click the arrow on an employee card to expand/collapse their team.</small>
     </div>
 
     <!-- Chart container -->
-    <div id="orgRoot" class="org-viewport vertical mx-auto">
-      <!-- JS will render here -->
-      <div class="text-center py-5">
+    <div id="orgRoot" class="org-viewport mx-auto pb-5">
+      <div class="text-center py-5" id="loadingState">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Loading...</span>
         </div>
-        <p class="mt-2 text-muted">Loading organization structure...</p>
+        <p class="mt-2 text-muted">Loading your organization structure...</p>
       </div>
     </div>
   </div>
 </div>
 
 <style>
-  /* Viewport toggles */
-  .org-viewport.vertical {
+  /* Viewport */
+  .org-viewport {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2rem;
-    padding: 2rem;
-  }
-
-  .org-viewport.horizontal {
-    display: flex;
-    align-items: flex-start;
-    gap: 2rem;
+    justify-content: center;
     padding: 2rem;
     min-width: max-content;
   }
 
-  /* Node card */
-  .org-node {
+  /* Tree Nodes Wrapper */
+  .org-node-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    padding: 20px 10px 0 10px;
+    transition: all 0.3s ease;
+  }
+
+  /* Card Styles */
+  .org-card {
     background: white;
-    border-radius: 16px;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid rgba(0, 0, 0, 0.05);
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    width: 280px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0,0,0,0.05);
+    width: 260px;
     padding: 1.25rem;
     position: relative;
     z-index: 2;
+    transition: transform 0.2s;
   }
-
-  .org-node:hover {
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--primary);
+  .org-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    border-color: #cbd5e1;
   }
-
-  .org-node.toggleable {
-    cursor: pointer;
+  
+  /* Highlight Logged-in User */
+  .org-card.is-current {
+    border: 2px solid #3b82f6;
+    background-color: #f0f7ff;
   }
 
   /* Node Content */
-  .org-head {
+  .org-head { display: flex; align-items: center; gap: 1rem; }
+  .org-avatar { width: 55px; height: 55px; border-radius: 50%; object-fit: cover; border: 3px solid #f1f5f9; }
+  .org-info .name { font-weight: 700; color: #1e293b; font-size: 0.95rem; margin-bottom: 0.1rem; }
+  .org-info .position { font-size: 0.8rem; color: #64748b; font-weight: 500; }
+  .org-info .dept { font-size: 0.7rem; color: #3b82f6; font-weight: 600; text-transform: uppercase; }
+
+  /* Tree Connecting Lines (Pure CSS Magic) */
+  .org-children {
     display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-
-  .org-avatar {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid #f1f5f9;
-    box-shadow: var(--shadow-sm);
-  }
-
-  .org-info .name {
-    font-weight: 700;
-    color: var(--dark);
-    font-size: 1rem;
-    margin-bottom: 0.2rem;
-  }
-
-  .org-info .position {
-    font-size: 0.85rem;
-    color: var(--secondary);
-    font-weight: 500;
-  }
-
-  .org-info .dept {
-    font-size: 0.75rem;
-    color: var(--primary);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-top: 0.25rem;
-  }
-
-  /* Connectors */
-  .connector-down {
-    width: 2px;
-    height: 2rem;
-    background: #cbd5e1;
-    margin: 0 auto;
-    position: relative;
-  }
-
-  /* Children container */
-  .children {
-    display: none;
-    gap: 2rem;
     justify-content: center;
-    margin-top: 2rem;
+    padding-top: 20px;
     position: relative;
   }
 
-  .children.show {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  /* Connector Lines Logic (Simplified for CSS) */
-  .node-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .horizontal .children {
-    flex-direction: column;
-    align-items: flex-start;
-    margin-top: 0;
-    margin-left: 2rem;
+  /* Top down line from parent */
+  .org-children::before {
+    content: ''; position: absolute; top: 0; left: 50%;
     border-left: 2px solid #cbd5e1;
-    padding-left: 2rem;
+    width: 0; height: 20px; transform: translateX(-50%);
+  }
+  /* Vertical line rising from child */
+  .org-node-wrapper::before {
+    content: ''; position: absolute; top: 0; left: 50%;
+    border-left: 2px solid #cbd5e1;
+    width: 0; height: 20px; transform: translateX(-50%);
+  }
+  /* Horizontal line connecting siblings */
+  .org-node-wrapper::after {
+    content: ''; position: absolute; top: 0; left: 0;
+    border-top: 2px solid #cbd5e1;
+    width: 100%; height: 0;
+  }
+  .org-viewport:has(> .org-node-wrapper:only-child) {
+    justify-content: center;
+  }
+  /* Adjust horizontal lines for first and last children */
+  .org-children > .org-node-wrapper:first-child::after { left: 50%; width: 50%; }
+  .org-children > .org-node-wrapper:last-child::after { left: 0; width: 50%; }
+  /* No horizontal line if there's only one child */
+  .org-children > .org-node-wrapper:only-child::after { display: none; }
+
+  /* Remove top lines for root node */
+  .org-viewport > .org-node-wrapper { padding-top: 0; }
+  .org-viewport > .org-node-wrapper::before,
+  .org-viewport > .org-node-wrapper::after { display: none; }
+
+  /* Dropdown line coming out of the bottom of parent card */
+  .org-card.has-children::after {
+    content: ''; position: absolute; bottom: -20px; left: 50%;
+    border-left: 2px solid #cbd5e1;
+    width: 0; height: 20px; transform: translateX(-50%);
   }
 
-  .horizontal .org-node {
-    margin-bottom: 1rem;
+  /* Toggle Button */
+  .org-toggle-btn {
+    position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
+    background: #fff; border: 1px solid #cbd5e1; color: #64748b; border-radius: 50%;
+    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; cursor: pointer; z-index: 10;
   }
+  .org-toggle-btn:hover { background: #f8fafc; color: #3b82f6; border-color: #3b82f6; }
+  .org-node-wrapper.collapsed > .org-children { display: none; }
 
-  /* Print Styles */
   @media print {
-
-    .sidebar,
-    .top-header,
-    .btn-group,
-    .alert {
-      display: none !important;
-    }
-
-    .main-content {
-      margin: 0 !important;
-    }
-
-    .card {
-      border: none !important;
-      shadow: none !important;
-    }
+    .sidebar, .top-header, .btn-group, .alert, .org-toggle-btn { display: none !important; }
+    .main-content { margin: 0 !important; }
+    .card { border: none !important; box-shadow: none !important; }
+    .org-viewport { padding: 0; display: block; overflow: visible; }
   }
 </style>
 
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
     const rootEl = document.getElementById('orgRoot');
-    const btnPath = document.getElementById('btnViewPath');
+    const btnFull = document.getElementById('btnViewFull');
     const btnTeam = document.getElementById('btnViewTeam');
-    const btnVertical = document.getElementById('btnVertical');
-    const btnHorizontal = document.getElementById('btnHorizontal');
     const btnPrint = document.getElementById('btnPrint');
+    
+    let rawTreeData = [];
 
-    // Load JSON from API (current user)
     async function fetchData() {
       try {
-        const res = await fetch("{% url 'org_tree_api_me' %}", { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        // CHANGED: Now points to the 'me' endpoint correctly mapped in urls.py
+        const res = await fetch("{% url 'org_tree_api_me' %}");
         const data = await res.json();
-        if (!data.ok) throw new Error('Failed to load org tree');
-        return data;
+        if (!data.ok) throw new Error("Failed");
+        return data.tree;
       } catch (e) {
-        rootEl.innerHTML = `<div class="text-center text-danger py-5"><i class="fas fa-exclamation-circle fa-2x mb-2"></i><p>Failed to load data</p></div>`;
-        throw e;
+        rootEl.innerHTML = `<div class="text-center text-danger py-5"><i class="fas fa-exclamation-triangle fa-2x mb-3"></i><p>Failed to load structure data.</p></div>`;
+        return null;
       }
-    }
-
-    // Utilities
-    function createNodeCard(node, { toggleable = false }) {
-      const card = document.createElement('div');
-      card.className = 'org-node' + (toggleable ? ' toggleable' : '');
-
-      const avatarUrl = node.image || '{% static "images/default_profile.png" %}';
-
-      card.innerHTML = `
-      <div class="org-head">
-        <img class="org-avatar" src="${avatarUrl}" alt="avatar" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(node.name)}&background=random'">
-        <div class="org-info">
-          <div class="name">${escapeHtml(node.name || 'Unknown')}</div>
-          <div class="position">${escapeHtml(node.position || '-')}</div>
-          <div class="dept">${escapeHtml(node.department || '-')}</div>
-        </div>
-      </div>
-      ${node.profile_url ? `
-      <div class="mt-3 pt-3 border-top d-flex justify-content-end">
-        <a class="btn btn-sm btn-light text-primary fw-medium rounded-pill px-3" href="${node.profile_url}">
-          Profile <i class="fas fa-arrow-right ms-1"></i>
-        </a>
-      </div>` : ''}
-    `;
-      return card;
     }
 
     function escapeHtml(str) {
@@ -254,106 +189,122 @@
       }[s]));
     }
 
-    // PATH VIEW (CEO -> ... -> You)
-    function renderPath(path) {
-      rootEl.classList.remove('horizontal');
-      rootEl.classList.add('vertical');
-      rootEl.innerHTML = '';
+    function createNodeCard(node) {
+      const card = document.createElement('div');
+      card.className = 'org-card' + (node.is_current ? ' is-current' : '');
 
-      path.forEach((n, idx) => {
-        const card = createNodeCard(n, { toggleable: false });
-        rootEl.appendChild(card);
-        if (idx < path.length - 1) {
-          const c = document.createElement('div');
-          c.className = 'connector-down';
-          rootEl.appendChild(c);
-        }
+      const avatarUrl = node.image || '{% static "images/default_profile.png" %}';
+
+      card.innerHTML = `
+        <div class="org-head">
+          <img class="org-avatar" src="${avatarUrl}" alt="avatar" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(node.name)}&background=random'">
+          <div class="org-info">
+            <div class="name">${escapeHtml(node.name || 'Unknown')}</div>
+            <div class="position">${escapeHtml(node.position || '-')}</div>
+            <div class="dept">${escapeHtml(node.department || '-')}</div>
+          </div>
+        </div>
+        ${node.profile_url ? `
+        <div class="mt-3 pt-2 border-top d-flex justify-content-end">
+          <a class="btn btn-sm btn-light text-primary fw-medium rounded-pill px-3" href="${node.profile_url}" style="font-size: 0.75rem;">
+            Profile <i class="fas fa-arrow-right ms-1"></i>
+          </a>
+        </div>` : ''}
+      `;
+      return card;
+    }
+
+    function renderNode(node) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'org-node-wrapper';
+
+      const card = createNodeCard(node);
+      wrapper.appendChild(card);
+
+      if (node.children && node.children.length > 0) {
+        card.classList.add('has-children');
+
+        // Collapse/Expand button
+        const toggleBtn = document.createElement('div');
+        toggleBtn.className = 'org-toggle-btn';
+        toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i>';
+        card.appendChild(toggleBtn);
+
+        const childrenWrap = document.createElement('div');
+        childrenWrap.className = 'org-children';
+
+        node.children.forEach(child => {
+          childrenWrap.appendChild(renderNode(child));
+        });
+
+        wrapper.appendChild(childrenWrap);
+
+        // Click event to toggle team visibility
+        toggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          wrapper.classList.toggle('collapsed');
+          const icon = toggleBtn.querySelector('i');
+          icon.className = wrapper.classList.contains('collapsed') ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+        });
+      }
+      return wrapper;
+    }
+
+    function renderTree(treeArray) {
+      rootEl.innerHTML = '';
+      if (!treeArray || treeArray.length === 0) {
+        rootEl.innerHTML = '<div class="alert alert-warning">No organization chart data found.</div>';
+        return;
+      }
+      treeArray.forEach(rootNode => {
+        rootEl.appendChild(renderNode(rootNode));
       });
     }
 
-    // TEAM TREE (You -> all subordinates)
-    function renderTeam(root) {
-      rootEl.innerHTML = '';
-
-      function renderNode(node) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'node-wrapper';
-
-        const card = createNodeCard(node, { toggleable: true });
-        wrapper.appendChild(card);
-
-        const childrenWrap = document.createElement('div');
-        childrenWrap.className = 'children';
-        wrapper.appendChild(childrenWrap);
-
-        card.addEventListener('click', (e) => {
-          if (e.target.closest('a')) return;
-          childrenWrap.classList.toggle('show');
-        });
-
-        if (Array.isArray(node.children) && node.children.length > 0) {
-          // Add connector if there are children
-          if (rootEl.classList.contains('vertical')) {
-            // Logic for visual connectors would go here, simplified for now
-          }
-
-          node.children.forEach(child => {
-            const childBlock = renderNode(child);
-            childrenWrap.appendChild(childBlock);
-          });
-
-          // Auto-expand first level
-          childrenWrap.classList.add('show');
+    // Helper to find just the current logged in user to isolate "My Team"
+    function findCurrentUserNode(nodes) {
+      for (const node of nodes) {
+        if (node.is_current) return node;
+        if (node.children) {
+          const found = findCurrentUserNode(node.children);
+          if (found) return found;
         }
-        return wrapper;
       }
+      return null;
+    }
 
-      if (root) {
-        const block = renderNode(root);
-        rootEl.appendChild(block);
-      } else {
-        rootEl.innerHTML = '<div class="text-center text-muted">No team data available</div>';
+    // Init process
+    rawTreeData = await fetchData();
+
+    if (rawTreeData) {
+      // 🔒 Normalize: force array even for single node
+      if (!Array.isArray(rawTreeData)) {
+        rawTreeData = [rawTreeData];
       }
+      renderTree(rawTreeData);
     }
 
-    function setVertical() {
-      rootEl.classList.remove('horizontal');
-      rootEl.classList.add('vertical');
-      btnVertical.classList.add('active');
-      btnHorizontal.classList.remove('active');
-    }
-    function setHorizontal() {
-      rootEl.classList.remove('vertical');
-      rootEl.classList.add('horizontal');
-      btnHorizontal.classList.add('active');
-      btnVertical.classList.remove('active');
-    }
-
-    btnPrint.addEventListener('click', () => {
-      window.print();
-    });
-
-    const data = await fetchData();
-
-    // Default view: Path
-    if (data.path) renderPath(data.path);
-
-    btnPath.addEventListener('click', () => {
-      btnPath.classList.add('active');
+    // Button Logic
+    btnFull.addEventListener('click', () => {
+      btnFull.classList.add('active');
       btnTeam.classList.remove('active');
-      setVertical();
-      if (data.path) renderPath(data.path);
+      renderTree(rawTreeData); // Renders CEO down to User down to Subordinates
     });
 
     btnTeam.addEventListener('click', () => {
       btnTeam.classList.add('active');
-      btnPath.classList.remove('active');
-      setVertical();
-      if (data.team) renderTeam(data.team);
+      btnFull.classList.remove('active');
+      
+      // Isolates tree so it ONLY starts from the logged in user downwards
+      const myNode = findCurrentUserNode(rawTreeData);
+      if (myNode) {
+        renderTree([myNode]); 
+      } else {
+        renderTree(rawTreeData); // Fallback
+      }
     });
 
-    btnVertical.addEventListener('click', setVertical);
-    btnHorizontal.addEventListener('click', setHorizontal);
+    btnPrint.addEventListener('click', () => window.print());
   });
 </script>
 {% endblock %}

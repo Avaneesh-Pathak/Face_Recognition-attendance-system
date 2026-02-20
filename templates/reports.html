@@ -10,61 +10,71 @@
 <div class="container-fluid py-4">
   <!-- Summary Cards -->
   <div class="row mb-4">
+    <!-- Total Employees -->
     <div class="col-xl-3 col-md-6 mb-4">
       <div class="card dashboard-card border-start border-primary border-4">
         <div class="card-body">
           <div class="d-flex align-items-center">
             <div class="flex-grow-1">
-              <p class="text-muted mb-1">Total Employees</p>
-              <h4 class="mb-0">{{ total_employees }}</h4>
+              <p class="text-muted mb-1 fw-bold">Total Employees</p>
+              <h4 class="mb-0 fw-bolder">{{ total_employees }}</h4>
             </div>
             <div class="flex-shrink-0">
-              <i class="fas fa-users fa-2x text-primary"></i>
+              <div class="icon-shape bg-primary text-white rounded-circle p-3">
+                <i class="fas fa-users fs-4"></i>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
     
+    <!-- Present Employees (CLICKABLE) -->
     <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card dashboard-card border-start border-success border-4">
+      <div class="card dashboard-card border-start border-success border-4 clickable-card" onclick="showEmployeeList('present')">
         <div class="card-body">
           <div class="d-flex align-items-center">
             <div class="flex-grow-1">
-              <p class="text-muted mb-1">Present (Range)</p>
-              <h4 class="mb-0">{{ present_employees }}</h4>
+              <p class="text-muted mb-1 fw-bold">Present (Range)</p>
+              <h4 class="mb-0 fw-bolder text-success">{{ present_employees }} <i class="fas fa-hand-pointer ms-1 fs-6 text-muted opacity-50"></i></h4>
             </div>
             <div class="flex-shrink-0">
-              <i class="fas fa-user-check fa-2x text-success"></i>
+              <div class="icon-shape bg-success text-white rounded-circle p-3 shadow-sm">
+                <i class="fas fa-user-check fs-4"></i>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
     
+    <!-- Absent Employees (CLICKABLE) -->
     <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card dashboard-card border-start border-danger border-4">
+      <div class="card dashboard-card border-start border-danger border-4 clickable-card" onclick="showEmployeeList('absent')">
         <div class="card-body">
           <div class="d-flex align-items-center">
             <div class="flex-grow-1">
-              <p class="text-muted mb-1">Absent (Range)</p>
-              <h4 class="mb-0">{{ absent_employees }}</h4>
+              <p class="text-muted mb-1 fw-bold">Absent (Range)</p>
+              <h4 class="mb-0 fw-bolder text-danger">{{ absent_employees }} <i class="fas fa-hand-pointer ms-1 fs-6 text-muted opacity-50"></i></h4>
             </div>
             <div class="flex-shrink-0">
-              <i class="fas fa-user-times fa-2x text-danger"></i>
+              <div class="icon-shape bg-danger text-white rounded-circle p-3 shadow-sm">
+                <i class="fas fa-user-times fs-4"></i>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
     
+    <!-- Attendance Rate -->
     <div class="col-xl-3 col-md-6 mb-4">
       <div class="card dashboard-card border-start border-warning border-4">
         <div class="card-body">
           <div class="d-flex align-items-center">
             <div class="flex-grow-1">
-              <p class="text-muted mb-1">Attendance Rate</p>
-              <h4 class="mb-0">
+              <p class="text-muted mb-1 fw-bold">Attendance Rate</p>
+              <h4 class="mb-0 fw-bolder">
                 {% if total_employees > 0 %}
                   {% widthratio present_employees total_employees 100 %}%
                 {% else %}
@@ -73,7 +83,9 @@
               </h4>
             </div>
             <div class="flex-shrink-0">
-              <i class="fas fa-chart-pie fa-2x text-warning"></i>
+              <div class="icon-shape bg-warning text-white rounded-circle p-3">
+                <i class="fas fa-chart-pie fs-4"></i>
+              </div>
             </div>
           </div>
         </div>
@@ -82,26 +94,26 @@
   </div>
 
   <!-- Filters and Controls -->
-  <div class="card dashboard-card mb-4">
-    <div class="card-header">
-      <h5 class="card-title mb-0">
-        <i class="fas fa-filter me-2"></i>Report Filters
+  <div class="card dashboard-card mb-4 border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-3">
+      <h5 class="card-title mb-0 fw-bold">
+        <i class="fas fa-filter me-2 text-primary"></i>Report Filters
       </h5>
     </div>
-    <div class="card-body">
-        <form method="get" class="text-center mb-3">
-            <div class="row justify-content-center align-items-end g-2">
+    <div class="card-body py-4">
+        <form method="get" class="mb-4">
+            <div class="row align-items-end g-3">
                 <div class="col-md-3">
-                    <label for="start_date" class="form-label text-start w-100">Start Date</label>
-                    <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control">
+                    <label for="start_date" class="form-label text-muted fw-bold small text-uppercase">Start Date</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control form-control-lg bg-light border-0">
                 </div>
                 <div class="col-md-3">
-                    <label for="end_date" class="form-label text-start w-100">End Date</label>
-                    <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control">
+                    <label for="end_date" class="form-label text-muted fw-bold small text-uppercase">End Date</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control form-control-lg bg-light border-0">
                 </div>
-                <div class="col-md-3">
-                    <label for="employee" class="form-label text-start w-100">Employee</label>
-                    <select name="employee" id="employee" class="form-select">
+                <div class="col-md-4">
+                    <label for="employee" class="form-label text-muted fw-bold small text-uppercase">Employee</label>
+                    <select name="employee" id="employee" class="form-select form-select-lg bg-light border-0">
                         <option value="">All Employees</option>
                         {% for emp in employees %}
                         <option value="{{ emp.id }}" {% if emp.id == selected_employee %}selected{% endif %}>
@@ -110,60 +122,57 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="fas fa-filter me-1"></i> Filter Results
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="fas fa-search me-1"></i> Filter
                     </button>
                 </div>
             </div>
         </form>
       
-      <div class="row mt-3">
-        <div class="col-12">
-          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div>
-              <span class="text-muted">
-                {% if start_date and end_date %}
-                    {% if start_date == end_date %}
-                        Showing data for <strong>{{ start_date|date:"M d, Y" }}</strong>
-                    {% else %}
-                        Showing data from <strong>{{ start_date|date:"M d, Y" }}</strong> to <strong>{{ end_date|date:"M d, Y" }}</strong>
-                    {% endif %}
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-3 border-top">
+        <div>
+          <span class="badge bg-light text-dark border px-3 py-2">
+            <i class="fas fa-calendar-alt me-1 text-muted"></i>
+            {% if start_date and end_date %}
+                {% if start_date == end_date %}
+                    <strong>{{ start_date|date:"M d, Y" }}</strong>
                 {% else %}
-                  Showing all recent data
+                    <strong>{{ start_date|date:"M d, Y" }}</strong> — <strong>{{ end_date|date:"M d, Y" }}</strong>
                 {% endif %}
-              </span>
-            </div>
-            <!-- CSV Download -->
-            <div>
-                <a href="?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}&download=excel" class="btn btn-success">
-                  <i class="fas fa-file-excel me-1"></i> Export Excel
-                </a>
-            </div>
-          </div>
+            {% else %}
+              All recent data
+            {% endif %}
+          </span>
+        </div>
+        
+        <div class="d-flex gap-2">
+            <a href="?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}&download=excel" class="btn btn-success rounded-pill px-4 shadow-sm">
+              <i class="fas fa-file-excel me-1"></i> Export Excel
+            </a>
+            
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Statistics Row -->
+  <!-- Charts & Dist Row -->
   <div class="row mb-4">
-    <div class="col-lg-8">
-      <div class="card dashboard-card h-100">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <h5 class="card-title mb-0">Attendance Overview</h5>
+    <div class="col-lg-8 mb-4 mb-lg-0">
+      <div class="card dashboard-card h-100 border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0 fw-bold">Attendance Overview</h5>
           <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-              <i class="fas fa-calendar me-1"></i> Period
+            <button class="btn btn-sm btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              <i class="fas fa-clock me-1"></i> Period
             </button>
-            <ul class="dropdown-menu dropdown-menu-end">
+            <ul class="dropdown-menu dropdown-menu-end shadow">
               <li><a class="dropdown-item" href="?range=week">This Week</a></li>
               <li><a class="dropdown-item" href="?range=month">This Month</a></li>
             </ul>
           </div>
         </div>
         <div class="card-body">
-            <!-- FIXED: Added Canvas for Chart.js and removed placeholder -->
             <div style="position: relative; height: 300px; width: 100%;">
                 <canvas id="attendanceChart"></canvas>
             </div>
@@ -172,36 +181,39 @@
     </div>
     
     <div class="col-lg-4">
-      <div class="card dashboard-card h-100">
-        <div class="card-header">
-          <h5 class="card-title mb-0">Attendance Distribution</h5>
+      <div class="card dashboard-card h-100 border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom py-3">
+          <h5 class="card-title mb-0 fw-bold">Attendance Distribution</h5>
         </div>
-        <div class="card-body">
-          <div class="d-flex justify-content-center py-3">
-            <div class="position-relative" style="width: 180px; height: 180px; border-radius: 50%; background: conic-gradient(#198754 0% {% widthratio present_employees total_employees 100 %}%, #dc3545 0% 100%);">
-              <!-- Simple CSS pie chart representation -->
-              <div class="position-absolute top-50 start-50 translate-middle bg-white rounded-circle d-flex align-items-center justify-content-center" style="width: 140px; height: 140px;">
+        <div class="card-body d-flex flex-column justify-content-center">
+          <div class="d-flex justify-content-center py-4">
+            <div class="position-relative" style="width: 200px; height: 200px; border-radius: 50%; background: conic-gradient(#198754 0% {% widthratio present_employees total_employees 100 %}%, #dc3545 0% 100%); box-shadow: 0 0 15px rgba(0,0,0,0.1);">
+              <div class="position-absolute top-50 start-50 translate-middle bg-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 150px; height: 150px;">
                 <div class="text-center">
                   {% if total_employees > 0 %}
-                    <h3 class="mb-0">{% widthratio present_employees total_employees 100 %}%</h3>
+                    <h2 class="mb-0 fw-bolder text-dark">{% widthratio present_employees total_employees 100 %}%</h2>
                   {% else %}
-                    <h3 class="mb-0">0%</h3>
+                    <h2 class="mb-0 fw-bolder text-dark">0%</h2>
                   {% endif %}
-                  <small class="text-muted">Present</small>
+                  <span class="badge bg-light text-muted border mt-1">Present Rate</span>
                 </div>
               </div>
             </div>
           </div>
-          <div class="row text-center mt-3">
-            <div class="col-6">
-              <span class="badge bg-success p-2 w-100">
-                <i class="fas fa-user-check me-1"></i> {{ present_employees }} Present
-              </span>
+          <div class="row text-center mt-auto">
+            <div class="col-6 cursor-pointer clickable-badge" onclick="showEmployeeList('present')">
+              <div class="p-3 bg-success bg-opacity-10 rounded-3 border border-success border-opacity-25 h-100">
+                <i class="fas fa-user-check text-success fs-4 mb-2"></i>
+                <h5 class="mb-0 fw-bold text-success">{{ present_employees }}</h5>
+                <small class="text-success text-opacity-75 fw-semibold">Present</small>
+              </div>
             </div>
-            <div class="col-6">
-              <span class="badge bg-danger p-2 w-100">
-                <i class="fas fa-user-times me-1"></i> {{ absent_employees }} Absent
-              </span>
+            <div class="col-6 cursor-pointer clickable-badge" onclick="showEmployeeList('absent')">
+              <div class="p-3 bg-danger bg-opacity-10 rounded-3 border border-danger border-opacity-25 h-100">
+                <i class="fas fa-user-times text-danger fs-4 mb-2"></i>
+                <h5 class="mb-0 fw-bold text-danger">{{ absent_employees }}</h5>
+                <small class="text-danger text-opacity-75 fw-semibold">Absent</small>
+              </div>
             </div>
           </div>
         </div>
@@ -210,140 +222,180 @@
   </div>
 
   <!-- Attendance Table -->
-  <div class="card dashboard-card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <h5 class="card-title mb-0">
-        <i class="fas fa-table me-2"></i>Attendance Records
+  <div class="card dashboard-card border-0 shadow-sm overflow-hidden">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+
+      <!-- LEFT: Title -->
+      <h5 class="card-title mb-0 fw-bold">
+        <i class="fas fa-list-alt me-2 text-primary"></i>Attendance Logs
       </h5>
-      <span class="badge bg-primary">{{ attendance_data.paginator.count }} records</span>
+
+      <!-- RIGHT: Actions -->
+      <div class="d-flex align-items-center gap-2">
+
+        {% if request.user.is_superuser or request.user.employee.role != 'Employee' %}
+        <button type="button"
+                class="btn btn-primary rounded-pill px-4 shadow-sm"
+                onclick="openModal('create')">
+          <i class="fas fa-plus me-1"></i> Add Record
+        </button>
+        {% endif %}
+
+        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2 rounded-pill">
+          {{ attendance_data.paginator.count }} Records Found
+        </span>
+
+      </div>
     </div>
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle">
-          <thead class="table-light">
-            <tr>
-              <th class="ps-4">Employee</th>
-              <th>Type</th>
-              <th>Timestamp</th>
-              <th>Confidence</th>
-              <th>Location</th>
-              <th class="text-center">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for record in attendance_data %}
-            <tr>
-              <td class="ps-4">
-                <div class="d-flex align-items-center">
-                  <div class="flex-shrink-0">
-                    <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold" 
-                         style="width: 40px; height: 40px; font-size: 14px;">
+    <div class="table-responsive">
+      <table class="table table-hover table-borderless align-middle mb-0">
+        <thead class="table-light border-bottom">
+          <tr>
+            <th class="ps-4 py-3 text-uppercase small fw-bold text-muted">Employee</th>
+            <th class="py-3 text-uppercase small fw-bold text-muted">Type</th>
+            <th class="py-3 text-uppercase small fw-bold text-muted">Date & Time</th>
+            <th class="py-3 text-uppercase small fw-bold text-muted">Confidence</th>
+            <th class="py-3 text-uppercase small fw-bold text-muted">Location</th>
+            <th class="text-center py-3 text-uppercase small fw-bold text-muted">Status</th>
+            {% if request.user.is_superuser or request.user.employee.role != 'Employee' %}
+            <th class="text-end pe-4 py-3 text-uppercase small fw-bold text-muted">Actions</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in attendance_data %}
+          <tr class="border-bottom" style="transition: background-color 0.2s;">
+            <td class="ps-4 py-3">
+              <div class="d-flex align-items-center">
+                <div class="flex-shrink-0">
+                  {% if record.employee.face_image %}
+                    <img src="{{ record.employee.face_image.url }}"
+                        alt="{{ record.employee.user.get_full_name }}"
+                        class="rounded-circle shadow-sm object-fit-cover"
+                        style="width: 45px; height: 45px;">
+                  {% else %}
+                    <div class="bg-gradient-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm" 
+                        style="width: 45px; height: 45px; font-size: 16px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
                       {{ record.employee.user.first_name|first|upper }}{{ record.employee.user.last_name|first|upper }}
                     </div>
-                  </div>
-                  <div class="flex-grow-1 ms-3">
-                    <h6 class="mb-0">{{ record.employee.user.get_full_name|default:record.employee }}</h6>
-                    <small class="text-muted">ID: {{ record.employee.employee_id|default:"N/A" }}</small>
-                  </div>
+                  {% endif %}
                 </div>
-              </td>
-              <td>
-                <span class="badge rounded-pill
-                  {% if record.attendance_type == 'check_in' %}bg-success
-                  {% else %}bg-info{% endif %}">
-                  {{ record.get_attendance_type_display }}
-                </span>
-              </td>
-              <td>
-                <div class="d-flex flex-column">
-                  <span class="fw-medium">{{ record.timestamp|date:"M d, Y" }}</span>
-                  <span class="text-muted small">{{ record.timestamp|date:"H:i A" }}</span>
+                <div class="flex-grow-1 ms-3">
+                  <h6 class="mb-0 fw-bold text-dark">{{ record.employee.user.get_full_name|default:record.employee }}</h6>
+                  <span class="badge bg-light text-muted border small mt-1">ID: {{ record.employee.employee_id|default:"N/A" }}</span>
                 </div>
-              </td>
-              <td>
-                {% if record.confidence_score %}
-                  <div class="d-flex align-items-center" style="width: 120px;">
-                    <div class="progress flex-grow-1 me-2" style="height: 6px;">
-                      <div class="progress-bar 
-                        {% if record.confidence_score >= 90 %}bg-success
-                        {% elif record.confidence_score >= 70 %}bg-warning
-                        {% else %}bg-danger{% endif %}" 
-                        role="progressbar"
-                        style="width: {{ record.confidence_score }}%">
-                      </div>
+              </div>
+            </td>
+            <td>
+              <span class="badge rounded-pill px-3 py-2
+                {% if record.attendance_type == 'check_in' %}bg-success bg-opacity-10 text-success border border-success border-opacity-25
+                {% else %}bg-info bg-opacity-10 text-info border border-info border-opacity-25{% endif %}">
+                <i class="fas {% if record.attendance_type == 'check_in' %}fa-sign-in-alt{% else %}fa-sign-out-alt{% endif %} me-1"></i>
+                {{ record.get_attendance_type_display }}
+              </span>
+            </td>
+            <td>
+              <div class="d-flex flex-column">
+                <span class="fw-bold text-dark">{{ record.timestamp|date:"M d, Y" }}</span>
+                <span class="text-muted small"><i class="far fa-clock me-1"></i>{{ record.timestamp|date:"h:i A" }}</span>
+              </div>
+            </td>
+            <td>
+              {% if record.confidence_score %}
+                <div class="d-flex align-items-center" style="width: 140px;">
+                  <div class="progress flex-grow-1 me-2 shadow-none border" style="height: 8px; border-radius: 4px;">
+                    <div class="progress-bar 
+                      {% if record.confidence_score >= 0.90 %}bg-success
+                      {% elif record.confidence_score >= 0.70 %}bg-warning
+                      {% else %}bg-danger{% endif %}" 
+                      role="progressbar"
+                      style="width: {% widthratio record.confidence_score 1 100 %}%">
                     </div>
-                    <span class="small fw-bold">{{ record.confidence_score|floatformat:0 }}%</span>
                   </div>
-                {% else %}
-                  <span class="text-muted small">N/A</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if record.location %}
-                  <span class="small text-muted">
-                    <i class="fas fa-map-marker-alt me-1 text-danger"></i> {{ record.location|truncatechars:20 }}
-                  </span>
-                {% else %}
-                  <span class="text-muted">-</span>
-                {% endif %}
-              </td>
-              <td class="text-center">
-                {% if record.attendance_type == 'check_in' %}
-                  <i class="fas fa-check-circle text-success fs-5" title="Checked In"></i>
-                {% else %}
-                  <i class="fas fa-sign-out-alt text-info fs-5" title="Checked Out"></i>
-                {% endif %}
-              </td>
-            </tr>
-            {% empty %}
-            <tr>
-              <td colspan="6" class="text-center py-5">
-                <div class="py-4">
-                  <i class="fas fa-inbox fa-3x text-muted mb-3 opacity-50"></i>
-                  <h5 class="text-muted">No attendance records found</h5>
-                  <p class="text-muted small">Try adjusting the date filters or selecting a different employee.</p>
+                  <span class="small fw-bold text-dark">{% widthratio record.confidence_score 1 100 %}%</span>
                 </div>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+              {% else %}
+                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2 py-1">
+                  <i class="fas fa-keyboard me-1"></i> Manual
+                </span>
+              {% endif %}
+            </td>
+            <td>
+              {% if record.location %}
+                <span class="text-muted small fw-medium">
+                  <i class="fas fa-map-marker-alt me-1 text-danger"></i> {{ record.location|truncatechars:25 }}
+                </span>
+              {% else %}
+                <span class="text-muted fst-italic">—</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if record.attendance_type == 'check_in' %}
+                <i class="fas fa-check-circle text-success fs-4" data-bs-toggle="tooltip" title="Successfully Checked In"></i>
+              {% else %}
+                <i class="fas fa-sign-out-alt text-info fs-4" data-bs-toggle="tooltip" title="Successfully Checked Out"></i>
+              {% endif %}
+            </td>
+            
+            {% if request.user.is_superuser or request.user.employee.role != 'Employee' %}
+            <td class="text-end pe-4">
+              <button class="btn btn-sm btn-light border text-primary me-1 shadow-sm action-btn" data-bs-toggle="tooltip" title="Edit Record"
+                      onclick="openModal('edit', {
+                        id: '{{ record.id }}', 
+                        type: '{{ record.attendance_type }}', 
+                        time: '{{ record.timestamp|date:'Y-m-d\TH:i' }}', 
+                        location: '{{ record.location|escapejs|default:'' }}', 
+                        notes: '{{ record.notes|escapejs|default:'' }}'
+                      })">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button class="btn btn-sm btn-light border text-danger shadow-sm action-btn" data-bs-toggle="tooltip" title="Delete Record"
+                      onclick="deleteAttendance('{{ record.id }}')">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </td>
+            {% endif %}
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center py-5">
+              <div class="py-5">
+                <div class="mb-3">
+                    <i class="fas fa-folder-open fa-4x text-muted opacity-25"></i>
+                </div>
+                <h5 class="text-muted fw-bold">No attendance records found</h5>
+                <p class="text-muted small mb-0">Try adjusting your date filters or select a different employee.</p>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
     
     <!-- Pagination -->
     {% if attendance_data.has_other_pages %}
-    <div class="card-footer bg-white">
-      <nav aria-label="Attendance records navigation">
+    <div class="card-footer bg-white py-3 border-top">
+      <nav aria-label="Attendance navigation">
         <ul class="pagination justify-content-center mb-0">
           {% if attendance_data.has_previous %}
-            <li class="page-item">
-              <a class="page-link" href="?page={{ attendance_data.previous_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">
-                <i class="fas fa-chevron-left"></i>
-              </a>
-            </li>
+            <li class="page-item"><a class="page-link shadow-sm border" href="?page={{ attendance_data.previous_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}"><i class="fas fa-chevron-left small"></i></a></li>
           {% else %}
-            <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-left"></i></span></li>
+            <li class="page-item disabled"><span class="page-link border bg-light"><i class="fas fa-chevron-left small text-muted"></i></span></li>
           {% endif %}
           
           {% for i in attendance_data.paginator.page_range %}
             {% if attendance_data.number == i %}
-              <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+              <li class="page-item active"><span class="page-link shadow-sm border-primary">{{ i }}</span></li>
             {% elif i > attendance_data.number|add:'-3' and i < attendance_data.number|add:'3' %}
-              <li class="page-item">
-                <a class="page-link" href="?page={{ i }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">{{ i }}</a>
-              </li>
+              <li class="page-item"><a class="page-link shadow-sm border" href="?page={{ i }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">{{ i }}</a></li>
             {% endif %}
           {% endfor %}
           
           {% if attendance_data.has_next %}
-            <li class="page-item">
-              <a class="page-link" href="?page={{ attendance_data.next_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">
-                <i class="fas fa-chevron-right"></i>
-              </a>
-            </li>
+            <li class="page-item"><a class="page-link shadow-sm border" href="?page={{ attendance_data.next_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}"><i class="fas fa-chevron-right small"></i></a></li>
           {% else %}
-            <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-right"></i></span></li>
+            <li class="page-item disabled"><span class="page-link border bg-light"><i class="fas fa-chevron-right small text-muted"></i></span></li>
           {% endif %}
         </ul>
       </nav>
@@ -352,98 +404,309 @@
   </div>
 </div>
 
+<!-- ========================================== -->
+<!-- LIST MODAL (Displays Present/Absent Employees) -->
+<!-- ========================================== -->
+<div class="modal fade" id="employeeListModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable border-0">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0 pb-0" id="listModalHeader">
+        <h5 class="modal-title fw-bold text-white mb-3 mt-2 ms-2" id="listModalTitle">Employee List</h5>
+        <button type="button" class="btn-close btn-close-white me-2 mb-3 shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <ul class="list-group list-group-flush" id="listModalBody">
+          <!-- Dynamically populated via JS -->
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HIDDEN DATA FOR MODAL POPULATION -->
+<div id="present-list-data" class="d-none">
+    {% for emp in present_employees_list %}
+    <li class="list-group-item d-flex justify-content-between align-items-center py-3 border-bottom">
+        <div class="d-flex align-items-center">
+            <div class="bg-gradient-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold me-3 shadow-sm" style="width: 40px; height: 40px; font-size: 14px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
+                {{ emp.user.first_name|first|upper }}{{ emp.user.last_name|first|upper }}
+            </div>
+            <div>
+                <h6 class="mb-0 fw-bold">{{ emp.user.get_full_name }}</h6>
+                <small class="text-muted">ID: {{ emp.employee_id }}</small>
+            </div>
+        </div>
+        <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill"><i class="fas fa-check me-1"></i>Present</span>
+    </li>
+    {% empty %}
+    <li class="list-group-item text-center text-muted py-5 border-0">
+        <i class="fas fa-user-slash fa-3x mb-3 opacity-25"></i>
+        <h6>No Present Employees</h6>
+        <small>No check-ins found for this period.</small>
+    </li>
+    {% endfor %}
+</div>
+
+<div id="absent-list-data" class="d-none">
+    {% for emp in absent_employees_list %}
+    <li class="list-group-item d-flex justify-content-between align-items-center py-3 border-bottom">
+        <div class="d-flex align-items-center">
+            <div class="bg-secondary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center text-secondary fw-bold me-3 border" style="width: 40px; height: 40px; font-size: 14px;">
+                {{ emp.user.first_name|first|upper }}{{ emp.user.last_name|first|upper }}
+            </div>
+            <div>
+                <h6 class="mb-0 fw-bold text-dark">{{ emp.user.get_full_name }}</h6>
+                <small class="text-muted">ID: {{ emp.employee_id }}</small>
+            </div>
+        </div>
+        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill"><i class="fas fa-times me-1"></i>Absent</span>
+    </li>
+    {% empty %}
+    <li class="list-group-item text-center text-muted py-5 border-0">
+        <i class="fas fa-users fa-3x mb-3 text-success opacity-25"></i>
+        <h6>No Absent Employees</h6>
+        <small>Everyone is present for this period!</small>
+    </li>
+    {% endfor %}
+</div>
+
+
+<!-- ========================================== -->
+<!-- SMART CRUD MODAL (Handles Both Create & Edit) -->
+<!-- ========================================== -->
+<div class="modal fade" id="crudModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered border-0">
+    <div class="modal-content border-0 shadow-lg overflow-hidden">
+      <div class="modal-header bg-primary text-white border-0 py-3">
+        <h5 class="modal-title fw-bold" id="modalTitle">
+            <i class="fas fa-clipboard-check me-2"></i><span id="modalTitleText">Manage Attendance</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4 bg-light">
+        <form id="crudForm">
+          {% csrf_token %}
+          <input type="hidden" id="modal_id">
+          <!-- Employee Select -->
+          <div class="form-floating mb-3 shadow-sm rounded" id="employee_group">
+            <select id="modal_employee" class="form-select border-0">
+              <option value="" disabled selected>Choose an employee...</option>
+              {% for emp in employees %}
+              <option value="{{ emp.id }}">{{ emp.user.get_full_name|default:emp.user.username }} ({{ emp.employee_id }})</option>
+              {% endfor %}
+            </select>
+            <label for="modal_employee" class="fw-bold text-muted"><i class="fas fa-user me-1"></i> Employee</label>
+          </div>
+          <!-- Type & Date Row -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="form-floating shadow-sm rounded">
+                    <select id="modal_type" class="form-select border-0" required>
+                      <option value="check_in">Check In</option>
+                      <option value="check_out">Check Out</option>
+                    </select>
+                    <label for="modal_type" class="fw-bold text-muted"><i class="fas fa-sign-in-alt me-1"></i> Type</label>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-floating shadow-sm rounded">
+                    <input type="datetime-local" id="modal_time" class="form-control border-0" required>
+                    <label for="modal_time" class="fw-bold text-muted"><i class="fas fa-clock me-1"></i> Timestamp</label>
+                </div>
+            </div>
+          </div>
+          <!-- Location -->
+          <div class="form-floating mb-3 shadow-sm rounded">
+            <input type="text" id="modal_location" class="form-control border-0" placeholder="e.g. Main Office">
+            <label for="modal_location" class="fw-bold text-muted"><i class="fas fa-map-marker-alt me-1"></i> Location (Optional)</label>
+          </div>
+          <!-- Notes -->
+          <div class="form-floating shadow-sm rounded">
+            <textarea id="modal_notes" class="form-control border-0" placeholder="Add notes here" style="height: 100px"></textarea>
+            <label for="modal_notes" class="fw-bold text-muted"><i class="fas fa-align-left me-1"></i> Notes (Optional)</label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 bg-white py-3">
+        <button type="button" class="btn btn-light border px-4 rounded-pill" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" form="crudForm" class="btn btn-primary px-4 rounded-pill shadow-sm" id="saveBtn">
+            <i class="fas fa-save me-1"></i> Save Record
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================== -->
+<!-- JS & CSS -->
+<!-- ========================================== -->
 <style>
+/* Dashboard Polish & Clickable Cards */
 .dashboard-card {
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-  border: 0;
-  border-radius: 0.5rem;
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
 }
 
-.table > :not(caption) > * > * {
-  padding: 1rem 0.75rem;
+.clickable-card {
+  cursor: pointer;
+}
+.clickable-card:hover {
+  border-color: #0d6efd !important;
+  background-color: #f8f9fa;
+}
+.clickable-card:hover .icon-shape {
+  transform: scale(1.1);
+  transition: 0.2s ease-in-out;
 }
 
-/* Fix for the Pie Chart CSS implementation */
-.border-start {
-  border-left-width: 4px !important;
+.clickable-badge {
+    transition: transform 0.2s;
 }
+.clickable-badge:hover {
+    transform: translateY(-4px);
+}
+
+.icon-shape {
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.2s ease-in-out;
+}
+.border-start { border-left-width: 5px !important; }
+.action-btn:hover { background-color: #f8f9fa !important; transform: scale(1.05); }
+.table > :not(caption) > * > * { padding: 1rem 0.75rem; vertical-align: middle; }
+.form-floating > .form-control:focus, .form-floating > .form-select:focus { box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15); }
 </style>
-<!-- FIXED: Added Scripts for Chart.js -->
+
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    var ctx = document.getElementById('attendanceChart').getContext('2d');
-    
-    // Parse the JSON data passed from Django
-    var labels = JSON.parse('{{ chart_labels|safe }}');
-    var data = JSON.parse('{{ chart_data|safe }}');
+let crudModal;
+let listModal;
 
-    var attendanceChart = new Chart(ctx, {
+document.addEventListener('DOMContentLoaded', function() {
+    // Tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) { return new bootstrap.Tooltip(tooltipTriggerEl); });
+
+    // Modals
+    crudModal = new bootstrap.Modal(document.getElementById('crudModal'));
+    listModal = new bootstrap.Modal(document.getElementById('employeeListModal'));
+
+    // CRUD Logic
+    document.getElementById('crudForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const saveBtn = document.getElementById('saveBtn');
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+        saveBtn.disabled = true;
+
+        const id = document.getElementById('modal_id').value;
+        const url = id ? `/attendance/update/${id}/` : `/attendance/create/`;
+        
+        const payload = new URLSearchParams({
+            attendance_type: document.getElementById('modal_type').value,
+            timestamp: document.getElementById('modal_time').value.replace('T', ' '),
+            location: document.getElementById('modal_location').value,
+            notes: document.getElementById('modal_notes').value
+        });
+
+        if (!id) {
+            const empId = document.getElementById('modal_employee').value;
+            if (!empId) { alert("Select an employee."); saveBtn.innerHTML = originalText; saveBtn.disabled = false; return; }
+            payload.append('employee', empId);
+        }
+
+        try {
+            const res = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }, body: payload });
+            const data = await res.json();
+            if (data.success) window.location.reload(); 
+            else { alert(data.error); saveBtn.innerHTML = originalText; saveBtn.disabled = false; }
+        } catch (error) { alert('Network error.'); saveBtn.innerHTML = originalText; saveBtn.disabled = false; }
+    });
+
+    // Chart
+    const ctx = document.getElementById('attendanceChart').getContext('2d');
+    new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: labels,
+            labels: JSON.parse('{{ chart_labels|safe }}'),
             datasets: [{
                 label: 'Employees Present',
-                data: data,
-                backgroundColor: 'rgba(13, 110, 253, 0.7)', // Bootstrap primary color
+                data: JSON.parse('{{ chart_data|safe }}'),
+                backgroundColor: 'rgba(13, 110, 253, 0.85)',
                 borderColor: 'rgba(13, 110, 253, 1)',
-                borderWidth: 1,
-                borderRadius: 4,
-                maxBarThickness: 40
+                borderWidth: 1, borderRadius: 6, maxBarThickness: 45
             }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false // Hide legend for single dataset
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.raw + ' Employees';
-                        }
-                    }
-                }
-            },
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
             scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1,
-                        precision: 0
-                    },
-                    grid: {
-                        borderDash: [2, 4],
-                        color: "#e9ecef"
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false
-                    }
-                }
+                y: { beginAtZero: true, ticks: { stepSize: 1 } },
+                x: { grid: { display: false } }
             }
         }
     });
 });
+
+// Show Employee List Modal (Present/Absent)
+function showEmployeeList(status) {
+    const titleEl = document.getElementById('listModalTitle');
+    const headerEl = document.getElementById('listModalHeader');
+    const bodyEl = document.getElementById('listModalBody');
+
+    if (status === 'present') {
+        titleEl.innerHTML = '<i class="fas fa-user-check me-2"></i> Present Employees';
+        headerEl.className = 'modal-header border-0 pb-0 bg-success';
+        bodyEl.innerHTML = document.getElementById('present-list-data').innerHTML;
+    } else {
+        titleEl.innerHTML = '<i class="fas fa-user-times me-2"></i> Absent Employees';
+        headerEl.className = 'modal-header border-0 pb-0 bg-danger';
+        bodyEl.innerHTML = document.getElementById('absent-list-data').innerHTML;
+    }
+    
+    listModal.show();
+}
+
+// Open CRUD Modal
+function openModal(mode, data = {}) {
+    document.getElementById('crudForm').reset();
+    document.getElementById('modal_id').value = '';
+    
+    if (mode === 'create') {
+        document.getElementById('modalTitleText').innerText = 'Add Attendance';
+        document.getElementById('employee_group').style.display = 'block';
+        document.getElementById('modal_employee').setAttribute('required', 'required');
+        const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('modal_time').value = now.toISOString().slice(0, 16);
+    } else {
+        document.getElementById('modalTitleText').innerText = 'Edit Attendance';
+        document.getElementById('employee_group').style.display = 'none';
+        document.getElementById('modal_employee').removeAttribute('required');
+        document.getElementById('modal_id').value = data.id;
+        document.getElementById('modal_type').value = data.type;
+        document.getElementById('modal_time').value = data.time;
+        document.getElementById('modal_location').value = data.location;
+        document.getElementById('modal_notes').value = data.notes;
+    }
+    crudModal.show();
+}
+
+// Delete Attendance
+async function deleteAttendance(id) {
+    if (!confirm('Delete this record?')) return;
+    try {
+        const res = await fetch(`/attendance/delete/${id}/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }});
+        const data = await res.json();
+        if (data.success) window.location.reload(); else alert(data.error);
+    } catch (error) { alert('Network error.'); }
+}
 </script>
-
-<style>
-.dashboard-card {
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-  border: 0;
-  border-radius: 0.5rem;
-}
-
-.table > :not(caption) > * > * {
-  padding: 1rem 0.75rem;
-}
-
-.border-start {
-  border-left-width: 4px !important;
-}
-</style>
 {% endblock %}

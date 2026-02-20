@@ -4,61 +4,189 @@
 {% block title %}Update Profile | {{ employee.employee_id }}{% endblock %}
 
 {% block content %}
-<div class="container fade-in-up" style="max-width: 1000px;">
+<div class="container-fluid fade-in-up px-4 py-4" style="max-width: 1400px;">
     
     <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="fw-bold text-dark mb-1">
                 <i class="fas fa-user-edit text-primary me-2"></i>Edit Employee Profile
             </h2>
-            <p class="text-muted mb-0">
-                Managing ID: <span class="badge bg-light text-primary border border-primary fw-bold">{{ employee.employee_id }}</span>
-            </p>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="#" class="text-decoration-none text-muted">Employees</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ employee.employee_id }}</li>
+                </ol>
+            </nav>
         </div>
-        <a href="{% url 'employee_list' %}" class="btn btn-outline-secondary rounded-pill px-4">
-            <i class="fas fa-arrow-left me-2"></i>Back to List
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{% url 'employee_list' %}" class="btn btn-light border text-secondary shadow-sm">
+                <i class="fas fa-arrow-left me-2"></i>Back
+            </a>
+            <button type="submit" form="updateForm" class="btn btn-primary shadow-sm px-4">
+                <i class="fas fa-save me-2"></i>Save Changes
+            </button>
+        </div>
     </div>
 
-    <form method="post" id="updateForm" novalidate>
+    <form method="post" enctype="multipart/form-data" id="updateForm">
         {% csrf_token %}
 
-        <div class="row">
-            <!-- Left Column: Personal Info (User Model) -->
-            <div class="col-lg-12 mb-4">
-                <div class="card modern-card h-100">
+        <div class="row g-4">
+            
+            <!-- LEFT COLUMN: Identity & Status -->
+            <div class="col-lg-4 col-xl-3">
+
+                <!-- 1. Face ID / Profile Picture Card -->
+                <div class="card modern-card mb-4 text-center">
+                    <div class="card-header-modern justify-content-center border-0 pb-0">
+                        <h6 class="fw-bold text-muted mb-0">BIOMETRIC PROFILE</h6>
+                    </div>
+                    <div class="card-body p-4">
+                        
+                        <!-- Current/Preview Image -->
+                        <div class="profile-img-container mb-3 mx-auto">
+                            {% if employee.face_image %}
+                                <img src="{{ employee.face_image.url }}" id="staticPreview" class="profile-img shadow-sm" alt="Face ID">
+                            {% else %}
+                                <div class="profile-placeholder shadow-sm" id="placeholderIcon">
+                                    <i class="fas fa-user-astronaut fa-3x text-secondary opacity-50"></i>
+                                </div>
+                            {% endif %}
+                            <img id="capturedPreview" class="profile-img shadow-sm d-none" alt="Captured">
+                        </div>
+
+                        <!-- Webcam Container (Hidden by default) -->
+                        <div id="webcamContainer" class="d-none mb-3">
+                            <div class="position-relative overflow-hidden rounded-3 border">
+                                <video id="video" autoplay playsinline class="w-100 bg-black" style="height: 200px; object-fit: cover;"></video>
+                                <canvas id="canvas" class="d-none"></canvas>
+                            </div>
+                            
+                            <!-- Camera Select -->
+                            <div class="mt-2">
+                                <select id="cameraSelect" class="form-select form-select-sm mb-2"></select>
+                            </div>
+                            
+                            <div class="d-flex gap-2 justify-content-center">
+                                <button type="button" class="btn btn-success btn-sm w-100" onclick="capturePhoto()">
+                                    <i class="fas fa-circle me-1"></i> Capture
+                                </button>
+                                <button type="button" class="btn btn-danger btn-sm" onclick="stopCameraUI()">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div id="photoActions">
+                            <button type="button" class="btn btn-outline-primary w-100 mb-2" onclick="initCamera()">
+                                <i class="fas fa-camera me-2"></i>Take New Photo
+                            </button>
+                            <label class="btn btn-outline-secondary w-100 btn-sm cursor-pointer position-relative">
+                                <i class="fas fa-upload me-2"></i>Upload File
+                                <input type="file" name="face_image" id="faceImageInput" class="position-absolute top-0 start-0 opacity-0 w-100 h-100" onchange="handleFileUpload(this)">
+                            </label>
+                        </div>
+
+                        {% if employee.face_image %}
+                        <div class="form-check mt-3 d-inline-block text-start">
+                            <input type="checkbox" name="remove_face" class="form-check-input" id="removeFace">
+                            <label class="form-check-label small text-danger" for="removeFace">Remove current photo</label>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 2. Status & Access Card -->
+                <div class="card modern-card mb-4">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-warning-soft text-warning">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h5 class="mb-0">Access Control</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold small text-uppercase text-muted">Status</label>
+                            {{ form.employment_status }}
+                        </div>
+
+                        <div class="p-3 bg-light rounded-3 border">
+                            <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0">
+                                <div>
+                                    <label class="form-check-label fw-bold text-dark" for="{{ form.is_active.id_for_label }}">Active User</label>
+                                    <div class="small text-muted" style="font-size: 0.75rem;">Can log in to system</div>
+                                </div>
+                                {{ form.is_active }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Detailed Information -->
+            <div class="col-lg-8 col-xl-9">
+                
+                <!-- 1. Personal Details -->
+                <div class="card modern-card mb-4">
                     <div class="card-header-modern">
                         <div class="icon-box bg-info-soft text-info">
                             <i class="fas fa-address-card"></i>
                         </div>
-                        <h5 class="mb-0">Personal Details</h5>
+                        
                     </div>
+                    <h5 class="fw-bold mb-3">Account Details</h5>
+
+                        <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Username</label>
+                            <input type="text" name="username" value="{{ user_obj.username }}" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" value="{{ user_obj.email }}" class="form-control">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">First Name</label>
+                            <input type="text" name="first_name" value="{{ user_obj.first_name }}" class="form-control">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Last Name</label>
+                            <input type="text" name="last_name" value="{{ user_obj.last_name }}" class="form-control">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">New Password</label>
+                            <input type="password" name="password" class="form-control" placeholder="Leave blank to keep password">
+                        </div>
+                        </div>
+
+                        <hr class="my-4">
                     <div class="card-body p-4">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">First Name</label>
-                                <div class="input-group input-group-modern">
-                                    <span class="input-group-text"><i class="fas fa-user"></i></span>
-                                    <input type="text" name="first_name" value="{{ user_obj.first_name }}" class="form-control" required>
-                                </div>
+                        <h5 class="mb-0">Personal Details</h5>  
+                        <br>
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold required">First Name</label>
+                                <input type="text" name="first_name" value="{{ user_obj.first_name }}" class="form-control" required>
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Last Name</label>
-                                <div class="input-group input-group-modern">
-                                    <span class="input-group-text"><i class="fas fa-user"></i></span>
-                                    <input type="text" name="last_name" value="{{ user_obj.last_name }}" class="form-control" required>
-                                </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold required">Last Name</label>
+                                <input type="text" name="last_name" value="{{ user_obj.last_name }}" class="form-control" required>
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Email Address</label>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold required">Email Address</label>
                                 <div class="input-group input-group-modern">
                                     <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                                     <input type="email" name="email" value="{{ user_obj.email }}" class="form-control" required>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Phone Number</label>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold required">Phone Number</label>
                                 <div class="input-group input-group-modern">
                                     <span class="input-group-text"><i class="fas fa-phone"></i></span>
                                     {{ form.phone_number }}
@@ -70,196 +198,381 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Bottom Section: Professional Info (Employee Model) -->
-            <div class="col-lg-8">
+                <!-- 2. Job & Department -->
                 <div class="card modern-card mb-4">
                     <div class="card-header-modern">
                         <div class="icon-box bg-primary-soft text-primary">
                             <i class="fas fa-briefcase"></i>
                         </div>
-                        <h5 class="mb-0">Job & Department</h5>
+                        <h5 class="mb-0">Professional Info</h5>
                     </div>
                     <div class="card-body p-4">
-                        <div class="row g-3">
-                            <div class="col-md-6">
+                        <div class="row g-4">
+                            <div class="col-md-6 col-xl-4">
                                 <label class="form-label fw-semibold">Department</label>
                                 {{ form.department }}
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-6 col-xl-4">
                                 <label class="form-label fw-semibold">Position</label>
                                 {{ form.position }}
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Reporting Manager</label>
+                            <div class="col-md-6 col-xl-4">
+                                <label class="form-label fw-semibold">Manager</label>
                                 {{ form.manager }}
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">System Role</label>
                                 {{ form.role }}
                             </div>
-                            <div class="col-md-12">
-                                <label class="form-label fw-semibold">Work Rule (Shift)</label>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Shift / Work Rule</label>
                                 {{ form.work_rule }}
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Right Column: Status & Settings -->
-            <div class="col-lg-4">
+                <!-- 3. Salary Structure -->
                 <div class="card modern-card mb-4">
                     <div class="card-header-modern">
-                        <div class="icon-box bg-warning-soft text-warning">
-                            <i class="fas fa-sliders-h"></i>
+                        <div class="icon-box bg-success-soft text-success">
+                            <i class="fas fa-money-bill-wave"></i>
                         </div>
-                        <h5 class="mb-0">Status & Access</h5>
+                        <h5 class="mb-0">Compensation</h5>
                     </div>
                     <div class="card-body p-4">
-                        <div class="mb-4">
-                            <label class="form-label fw-semibold">Employment Status</label>
-                            {{ form.employment_status }}
-                        </div>
-
-                        <hr class="text-muted opacity-25">
-
-                        <div class="form-check form-switch p-0 d-flex justify-content-between align-items-center">
-                            <div>
-                                <label class="form-check-label fw-bold mb-0" for="{{ form.is_active.id_for_label }}">Active Account</label>
-                                <div class="small text-muted">Toggle login access</div>
+                        <div class="row g-4">
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-semibold">Base Salary</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text fw-bold">₹</span>
+                                    <input type="number" step="0.01" name="base_salary" value="{{ salary.base_salary|default:'' }}" class="form-control">
+                                </div>
                             </div>
-                            <!-- Render checkbox manually to ensure styling -->
-                            {{ form.is_active }}
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-semibold">HRA</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text fw-bold">₹</span>
+                                    <input type="number" step="0.01" name="hra" value="{{ salary.hra|default:'' }}" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-semibold">Allowances</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text fw-bold">₹</span>
+                                    <input type="number" step="0.01" name="allowances" value="{{ salary.allowances|default:'' }}" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <label class="form-label fw-semibold">Deductions</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text fw-bold text-danger">-</span>
+                                    <input type="number" step="0.01" name="deductions" value="{{ salary.deductions|default:'' }}" class="form-control">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Action Buttons -->
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary btn-lg shadow-sm" id="submitBtn">
-                        <i class="fas fa-save me-2"></i>Save Changes
-                    </button>
-                    <a href="{% url 'employee_list' %}" class="btn btn-light btn-lg text-secondary">Cancel</a>
+
+                <!-- 4. Documents Upload (RESTORED SECTION) -->
+                <div class="card modern-card mb-4">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-secondary-soft text-secondary">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <h5 class="mb-0">Documents & Attachments</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <label class="form-label fw-semibold">Upload New Documents</label>
+                                <input type="file" name="documents" id="documentInput" class="form-control" multiple accept=".pdf,.doc,.docx,.jpg,.png">
+                                <div class="form-text text-muted small">
+                                    Supported formats: PDF, DOC, JPG, PNG.
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 bg-light rounded border mt-3 mt-md-0">
+                                    <h6 class="fw-bold small text-muted mb-2">SELECTED FILES</h6>
+                                    <div id="fileList" class="small text-dark">
+                                        <em class="text-muted">No files selected</em>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
             </div>
         </div>
     </form>
 </div>
 
-<!-- Modern CSS Styles -->
+<!-- Modern CSS -->
 <style>
     :root {
         --primary: #4361ee;
+        --secondary: #3f37c9;
+        --bg-color: #f8f9fa;
         --card-radius: 16px;
-        --input-radius: 10px;
+        --input-radius: 8px;
     }
-
-    /* Animations */
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(15px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    .fade-in-up { animation: fadeInUp 0.4s ease-out; }
+    
+    body { background-color: #f0f2f5; font-family: 'Inter', sans-serif; }
 
     /* Card Styling */
     .modern-card {
         background: #fff;
-        border: 0;
+        border: none;
         border-radius: var(--card-radius);
-        box-shadow: 0 5px 20px rgba(0,0,0,0.03);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
         transition: transform 0.2s;
         overflow: hidden;
     }
+    
     .card-header-modern {
-        padding: 18px 25px;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
+        padding: 20px 25px;
+        border-bottom: 1px solid rgba(0,0,0,0.04);
         display: flex;
         align-items: center;
         background: #fff;
     }
 
-    /* Icon Boxes */
-    .icon-box {
-        width: 36px;
-        height: 36px;
-        border-radius: 8px;
+    /* Profile Image Area */
+    .profile-img-container {
+        width: 150px;
+        height: 150px;
+        position: relative;
+    }
+    .profile-img, .profile-placeholder {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 4px solid #fff;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .profile-placeholder {
+        background: #f1f5f9;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-right: 12px;
+    }
+
+    /* Icons */
+    .icon-box {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
         font-size: 1rem;
     }
     .bg-primary-soft { background: rgba(67, 97, 238, 0.1); color: var(--primary); }
+    .bg-success-soft { background: rgba(25, 135, 84, 0.1); color: #198754; }
     .bg-info-soft { background: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
     .bg-warning-soft { background: rgba(255, 193, 7, 0.1); color: #ffc107; }
+    .bg-secondary-soft { background: rgba(108, 117, 125, 0.1); color: #6c757d; }
 
-    /* Form Controls */
+    /* Inputs */
     .form-control, .form-select {
         border-radius: var(--input-radius);
         border: 1px solid #e2e8f0;
         padding: 0.6rem 1rem;
         font-size: 0.95rem;
+        background-color: #fff;
     }
     .form-control:focus, .form-select:focus {
         border-color: var(--primary);
         box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+        background-color: #fff;
     }
-    
-    /* Input Group Icons */
     .input-group-modern .input-group-text {
         background: #f8f9fa;
-        border: 1px solid #e2e8f0;
-        border-right: none;
-        color: #6c757d;
-        border-top-left-radius: var(--input-radius);
-        border-bottom-left-radius: var(--input-radius);
+        border-color: #e2e8f0;
+        color: #64748b;
     }
-    .input-group-modern .form-control {
-        border-left: none;
-    }
+    .required::after { content: "*"; color: #ef4444; margin-left: 3px; }
 
-    /* Toggle Switch Customization */
+    /* Switch */
     .form-switch .form-check-input {
-        width: 3em;
-        height: 1.5em;
-        margin-left: 0; /* Reset default bootstrap margin */
-        cursor: pointer;
+        width: 3em; height: 1.5em; cursor: pointer;
     }
     .form-switch .form-check-input:checked {
-        background-color: #198754;
-        border-color: #198754;
+        background-color: #198754; border-color: #198754;
     }
+
+    /* Animation */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in-up { animation: fadeInUp 0.4s ease-out; }
 </style>
 
 <!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    // Automatically apply Bootstrap classes to Django fields
+    // 1. Initialize Bootstrap classes
     document.addEventListener("DOMContentLoaded", function() {
-        // 1. Style standard inputs and selects
-        const inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea');
-        inputs.forEach(input => {
-            if (!input.classList.contains('form-control')) {
-                input.classList.add('form-control');
-            }
-        });
-
-        // 2. Style Checkboxes (Is Active)
+        const inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea');
+        inputs.forEach(el => el.classList.add('form-control'));
+        
         const checks = document.querySelectorAll('input[type="checkbox"]');
-        checks.forEach(c => {
-            c.classList.add('form-check-input');
-            c.setAttribute('role', 'switch'); // Ensure it acts like a switch
-        });
-
-        // 3. Loading state on submit
-        const form = document.getElementById('updateForm');
-        const btn = document.getElementById('submitBtn');
-        form.addEventListener('submit', function() {
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
-            btn.disabled = true;
-        });
+        checks.forEach(c => c.classList.add('form-check-input'));
     });
-</script>
 
+    // 2. Document Selection Preview
+    const docInput = document.getElementById('documentInput');
+    const docList = document.getElementById('fileList');
+    
+    if (docInput) {
+        docInput.addEventListener('change', function() {
+            docList.innerHTML = '';
+            const files = Array.from(this.files);
+            
+            if (files.length === 0) {
+                docList.innerHTML = '<em class="text-muted">No files selected</em>';
+                return;
+            }
+
+            files.forEach(file => {
+                const div = document.createElement('div');
+                div.className = 'text-truncate mb-1';
+                // Simple icon logic based on name
+                let icon = 'fa-file';
+                if(file.name.includes('.pdf')) icon = 'fa-file-pdf text-danger';
+                else if(file.name.includes('.doc')) icon = 'fa-file-word text-primary';
+                else if(file.name.match(/\.(jpg|jpeg|png)$/)) icon = 'fa-file-image text-success';
+                
+                div.innerHTML = `<i class="fas ${icon} me-2"></i>${file.name}`;
+                docList.appendChild(div);
+            });
+        });
+    }
+
+    // 3. Advanced Webcam Logic with Rotation
+    let videoStream = null;
+    const video = document.getElementById("video");
+    const cameraSelect = document.getElementById("cameraSelect");
+    const container = document.getElementById("webcamContainer");
+    const actions = document.getElementById("photoActions");
+    const staticPreview = document.getElementById("staticPreview");
+    const capturedPreview = document.getElementById("capturedPreview");
+    const placeholder = document.getElementById("placeholderIcon");
+
+    async function loadCameras() {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === "videoinput");
+            
+            cameraSelect.innerHTML = "";
+            videoDevices.forEach((device, index) => {
+                const option = document.createElement("option");
+                option.value = device.deviceId;
+                option.text = device.label || `Camera ${index + 1}`; 
+                cameraSelect.appendChild(option);
+            });
+
+            cameraSelect.onchange = () => {
+                if(videoStream) startCamera(); 
+            };
+        } catch (e) {
+            console.error("Error enumerating devices:", e);
+        }
+    }
+
+    async function initCamera() {
+        await loadCameras();
+        container.classList.remove("d-none");
+        actions.classList.add("d-none");
+        if(staticPreview) staticPreview.classList.add("d-none");
+        if(placeholder) placeholder.classList.add("d-none");
+        capturedPreview.classList.add("d-none");
+        
+        startCamera();
+    }
+
+    async function startCamera() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+        }
+
+        const deviceId = cameraSelect.value;
+        const constraints = {
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                deviceId: deviceId ? { exact: deviceId } : undefined
+            }
+        };
+
+        try {
+            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = videoStream;
+            if (!cameraSelect.options[0].text) loadCameras(); 
+        } catch (err) {
+            console.error(err);
+            Swal.fire("Camera Error", "Could not access camera", "error");
+            stopCameraUI();
+        }
+    }
+
+    function stopCameraUI() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+        }
+        container.classList.add("d-none");
+        actions.classList.remove("d-none");
+        
+        if(capturedPreview.src && !capturedPreview.classList.contains("d-none")) {
+            // keep captured visible
+        } else if (staticPreview) {
+            staticPreview.classList.remove("d-none");
+        } else if (placeholder) {
+            placeholder.classList.remove("d-none");
+        }
+    }
+
+    function capturePhoto() {
+        const canvas = document.getElementById("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0);
+
+        canvas.toBlob(blob => {
+            const file = new File([blob], "face_update.jpg", { type: "image/jpeg" });
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            document.getElementById("faceImageInput").files = dataTransfer.files;
+
+            const url = URL.createObjectURL(blob);
+            capturedPreview.src = url;
+            capturedPreview.classList.remove("d-none");
+            if(staticPreview) staticPreview.classList.add("d-none");
+            if(placeholder) placeholder.classList.add("d-none");
+            
+            stopCameraUI();
+        }, "image/jpeg");
+    }
+
+    function handleFileUpload(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                capturedPreview.src = e.target.result;
+                capturedPreview.classList.remove("d-none");
+                if(staticPreview) staticPreview.classList.add("d-none");
+                if(placeholder) placeholder.classList.add("d-none");
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+</script>
 {% endblock %}

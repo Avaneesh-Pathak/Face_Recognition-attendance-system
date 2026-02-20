@@ -141,18 +141,27 @@
                     <div class="card-body p-4">
                         <div class="row align-items-center">
                             <div class="col-lg-6 mb-4 mb-lg-0">
-                                <div class="mb-4">
-                                    <label class="form-label fw-semibold">Upload Photo</label>
-                                    {{ form.face_image }}
-                                    <div class="form-text mt-2"><i class="fas fa-check-circle text-success me-1"></i> Ensure good lighting and neutral expression.</div>
-                                    {% if form.face_image.errors %}<div class="text-danger small">{{ form.face_image.errors.0 }}</div>{% endif %}
-                                </div>
-                                <div class="d-flex gap-2">
-                                    <button type="button" class="btn btn-outline-primary w-100" id="openCamBtn">
-                                        <i class="fas fa-camera me-2"></i>Use Webcam
-                                    </button>
-                                </div>
-                            </div>
+    <div class="mb-4">
+        <label class="form-label fw-semibold">Upload Photo</label>
+        {{ form.face_image }}
+        <div class="form-text mt-2"><i class="fas fa-check-circle text-success me-1"></i> Ensure good lighting and neutral expression.</div>
+        {% if form.face_image.errors %}<div class="text-danger small">{{ form.face_image.errors.0 }}</div>{% endif %}
+    </div>
+
+    <!-- NEW: Camera Selection Dropdown -->
+    <div class="mb-3">
+        <label class="form-label fw-semibold small text-muted">Select Camera Source</label>
+        <select id="cameraSelect" class="form-select form-select-sm">
+            <option value="">Default (Front/User)</option>
+        </select>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-primary w-100" id="openCamBtn">
+            <i class="fas fa-camera me-2"></i>Use Webcam
+        </button>
+    </div>
+</div>
 
                             <div class="col-lg-6 d-flex justify-content-center">
                                 <!-- Camera/Preview UI -->
@@ -428,36 +437,111 @@
     }
 
     // 4. Webcam Logic
+    // 4. Enhanced Webcam Logic with Camera Selection
     const openCamBtn = document.getElementById("openCamBtn");
     const captureBtn = document.getElementById("captureBtn");
     const webcam = document.getElementById("webcam");
     const capturedInput = document.getElementById("captured_image");
-    let stream = null;
+    const cameraSelect = document.getElementById("cameraSelect");
+    let currentStream = null;
 
-    if (openCamBtn) {
-        openCamBtn.addEventListener("click", async () => {
-            if (stream) {
-                // Stop camera if already running (toggle behavior)
-                stream.getTracks().forEach(t => t.stop());
-                stream = null;
-                webcam.style.display = "none";
-                captureBtn.style.display = "none";
-                openCamBtn.innerHTML = '<i class="fas fa-camera me-2"></i>Use Webcam';
-                if(placeholder) placeholder.style.display = "flex";
-                return;
-            }
+    // A. Function to list available cameras
+    async function getCameraDevices() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+            console.log("enumerateDevices() not supported.");
+            return;
+        }
+
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
             
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 400, height: 400, facingMode: "user" } });
-                webcam.srcObject = stream;
-                webcam.style.display = "block";
-                previewImage.style.display = "none";
-                if(placeholder) placeholder.style.display = "none";
-                captureBtn.style.display = "inline-flex";
-                openCamBtn.innerHTML = '<i class="fas fa-times me-2"></i>Close Camera';
-            } catch (err) {
-                console.error("Camera Error: ", err);
-                Swal.fire('Error', 'Could not access camera. Check permissions.', 'error');
+            // Clear existing options except the first one
+            while (cameraSelect.options.length > 1) {
+                cameraSelect.remove(1);
+            }
+
+            videoDevices.forEach((device, index) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                // If label is empty (permission not granted yet), give generic name
+                option.text = device.label || `Camera ${index + 1} (${index === 0 ? 'Front' : 'Back' }?)`;
+                cameraSelect.appendChild(option);
+            });
+        } catch (err) {
+            console.error("Error listing devices:", err);
+        }
+    }
+
+    // B. Function to start/restart stream
+    async function startStream() {
+        // Stop existing stream if running
+        if (currentStream) {
+            currentStream.getTracks().forEach(t => t.stop());
+        }
+
+        const selectedDeviceId = cameraSelect.value;
+        
+        // Constraints: Use specific ID if selected, otherwise default to "user" (front)
+        const constraints = {
+            video: { 
+                width: { ideal: 640 }, 
+                height: { ideal: 640 },
+                deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+                facingMode: selectedDeviceId ? undefined : "user"
+            }
+        };
+
+        try {
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            webcam.srcObject = currentStream;
+            webcam.style.display = "block";
+            previewImage.style.display = "none";
+            if(placeholder) placeholder.style.display = "none";
+            captureBtn.style.display = "inline-flex";
+            openCamBtn.innerHTML = '<i class="fas fa-times me-2"></i>Close Camera';
+            
+            // Refresh device list to get actual labels (requires permission to be granted first)
+            getCameraDevices(); 
+        } catch (err) {
+            console.error("Camera Error: ", err);
+            Swal.fire('Error', 'Could not access camera. Check permissions or try a different device.', 'error');
+            // Reset UI if failed
+            stopStreamUI();
+        }
+    }
+
+    // C. Helper to stop stream and reset UI
+    function stopStreamUI() {
+        if (currentStream) {
+            currentStream.getTracks().forEach(t => t.stop());
+            currentStream = null;
+        }
+        webcam.style.display = "none";
+        captureBtn.style.display = "none";
+        openCamBtn.innerHTML = '<i class="fas fa-camera me-2"></i>Use Webcam';
+        if(placeholder && !previewImage.src) placeholder.style.display = "flex";
+    }
+
+    // D. Event Listeners
+    if (openCamBtn) {
+        openCamBtn.addEventListener("click", () => {
+            if (currentStream) {
+                stopStreamUI();
+            } else {
+                startStream();
+            }
+        });
+    }
+
+    // Change camera immediately if dropdown changes and camera is active
+    if (cameraSelect) {
+        // Initial load of devices (might not have labels yet)
+        getCameraDevices();
+
+        cameraSelect.addEventListener("change", () => {
+            if (currentStream) {
+                startStream(); // Restart with new device
             }
         });
     }
@@ -467,18 +551,20 @@
             const canvas = document.createElement("canvas");
             canvas.width = webcam.videoWidth;
             canvas.height = webcam.videoHeight;
-            canvas.getContext("2d").drawImage(webcam, 0, 0);
+            const ctx = canvas.getContext("2d");
+            
+            // Optional: Mirror image if using front camera (user preference usually)
+            // ctx.translate(canvas.width, 0);
+            // ctx.scale(-1, 1);
+            
+            ctx.drawImage(webcam, 0, 0);
             const imageData = canvas.toDataURL("image/png");
             
             capturedInput.value = imageData;
             previewImage.src = imageData;
             previewImage.style.display = "block";
-            webcam.style.display = "none";
             
-            // Stop stream
-            stream.getTracks().forEach(t => t.stop());
-            stream = null;
-            captureBtn.style.display = "none";
+            stopStreamUI();
             openCamBtn.innerHTML = '<i class="fas fa-camera me-2"></i>Retake Photo';
         });
     }

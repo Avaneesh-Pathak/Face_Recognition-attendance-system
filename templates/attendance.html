@@ -4,132 +4,245 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Face Attendance | Kiosk Mode</title>
+  <title>NovaFace | AI Attendance Kiosk</title>
 
   <!-- Fonts & Icons -->
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
   
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-  <audio id="successBeep" src="{% static 'sounds/beep.wav' %}" preload="auto"></audio>
-  <audio id="errorBeep" src="{% static 'sounds/error.wav' %}" preload="auto"></audio>
+  <!-- Animate.css -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+  <audio id="successBeep" src="{% static  'sounds/beep.wav' %}" preload="auto"></audio>
+  <audio id="errorBeep" src="{% static 'sounds/error.mp3' %}" preload="auto"></audio>
+  <audio id="scanBeep" src="{% static 'sounds/scan.mp3' %}" preload="auto"></audio>
 
   <style>
-    :root {
-      --primary: #2563eb;
-      --primary-dark: #1e40af;
-      --secondary: #4f46e5;
-      --accent: #06b6d4;
-      --success: #10b981;
-      --success-light: #d1fae5;
-      --danger: #ef4444;
-      --danger-light: #fee2e2;
-      --warning: #f59e0b;
-      --warning-light: #fef3c7;
-      --bg-gradient: linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%);
-      --glass-bg: rgba(255, 255, 255, 0.95);
-      --glass-border: rgba(255, 255, 255, 0.8);
-      --glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.15);
-      --card-radius: 24px;
-      --font-main: 'Outfit', sans-serif;
-      --font-body: 'Inter', sans-serif;
-    }
-
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
     }
 
-    body {
-      background: var(--bg-gradient);
-      font-family: var(--font-body);
-      color: #1e293b;
-      min-height: 100vh;
-      overflow-x: hidden;
-      display: flex;
-      flex-direction: column;
-      position: relative;
+    :root {
+      /* Clean White Theme */
+      --primary: #4361ee;
+      --primary-dark: #3a56d4;
+      --primary-light: #eef2ff;
+      --secondary: #7209b7;
+      --accent: #0891b2;
+      --success: #0fba83;
+      --success-light: #e3f9ed;
+      --danger: #f43f5e;
+      --danger-light: #ffe4e8;
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --info: #4361ee;
+      --info-light: #e0e7ff;
+      
+      /* Neutrals */
+      --white: #ffffff;
+      --off-white: #f8fafc;
+      --gray-50: #f1f5f9;
+      --gray-100: #e2e8f0;
+      --gray-200: #cbd5e1;
+      --gray-300: #94a3b8;
+      --gray-400: #64748b;
+      --gray-500: #475569;
+      --gray-600: #334155;
+      --gray-700: #1e293b;
+      --gray-800: #0f172a;
+      
+      /* Glass Effects - Light Mode */
+      --glass-bg: rgba(255, 255, 255, 0.9);
+      --glass-border: rgba(255, 255, 255, 0.95);
+      --glass-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.05);
+      --card-radius: 32px;
+      
+      /* Fonts */
+      --font-primary: 'Plus Jakarta Sans', sans-serif;
+      --font-secondary: 'Inter', sans-serif;
     }
 
-    /* --- Animated Background --- */
-    .bg-shape {
+    body {
+      background: var(--off-white);
+      font-family: var(--font-secondary);
+      color: var(--gray-700);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Subtle Background Pattern */
+    .bg-pattern {
       position: fixed;
-      border-radius: 50%;
-      filter: blur(80px);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      background-image: 
+        radial-gradient(circle at 30% 40%, rgba(67, 97, 238, 0.03) 0%, transparent 30%),
+        radial-gradient(circle at 70% 60%, rgba(114, 9, 183, 0.03) 0%, transparent 35%),
+        linear-gradient(135deg, transparent 0%, var(--off-white) 100%);
+    }
+
+    /* Grid Overlay */
+    .grid-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        linear-gradient(rgba(67, 97, 238, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(67, 97, 238, 0.02) 1px, transparent 1px);
+      background-size: 50px 50px;
       z-index: -1;
-      opacity: 0.5;
-      animation: float 15s infinite ease-in-out;
+      pointer-events: none;
     }
-    .shape-1 {
-      top: -10%;
-      left: -10%;
-      width: 600px;
-      height: 600px;
-      background: rgba(37, 99, 235, 0.15);
-    }
-    .shape-2 {
-      bottom: -10%;
-      right: -5%;
-      width: 500px;
-      height: 500px;
-      background: rgba(6, 182, 212, 0.15);
-      animation-delay: 3s;
+
+    /* Floating Particles - Light Version */
+    .particle {
+      position: fixed;
+      width: 4px;
+      height: 4px;
+      background: var(--primary);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: -1;
+      opacity: 0.2;
+      animation: float 15s infinite linear;
     }
 
     @keyframes float {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      33% { transform: translate(30px, -20px) rotate(2deg); }
-      66% { transform: translate(-20px, 30px) rotate(-2deg); }
+      0% { transform: translateY(100vh) translateX(0); opacity: 0; }
+      10% { opacity: 0.3; }
+      90% { opacity: 0.3; }
+      100% { transform: translateY(-100vh) translateX(100px); opacity: 0; }
     }
 
-    /* --- Kiosk Header --- */
-    .kiosk-header {
-      text-align: center;
-      padding: 1.5rem 0;
-      margin-bottom: 1rem;
-    }
-    .brand-title {
-      font-family: var(--font-main);
-      font-weight: 800;
-      font-size: 2.8rem;
-      background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      letter-spacing: -0.5px;
-      text-shadow: 0 2px 10px rgba(37, 99, 235, 0.2);
-    }
-    .brand-subtitle {
-      font-size: 1.1rem;
-      color: #475569;
-      font-weight: 500;
-    }
-
-    /* --- Main Card --- */
-    .glass-card {
-      background: var(--glass-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--card-radius);
-      box-shadow: var(--glass-shadow);
+    /* Main Container */
+    .kiosk-container {
       padding: 2rem;
-      height: 100%;
+      min-height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    .kiosk-header {
+      margin-bottom: 2rem;
+      animation: slideDown 0.8s ease;
+    }
+
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .logo-icon {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: white;
+      box-shadow: 0 15px 25px -8px rgba(67, 97, 238, 0.3);
+      transform: rotate(-5deg);
       transition: transform 0.3s ease;
     }
 
-    /* --- Camera Section --- */
+    .logo-icon:hover {
+      transform: rotate(0deg) scale(1.05);
+    }
+
+    .brand-text {
+      font-family: var(--font-primary);
+      font-weight: 800;
+      font-size: 2.5rem;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -1px;
+    }
+
+    .brand-tagline {
+      color: var(--gray-400);
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+    }
+
+    .date-time {
+      text-align: right;
+      animation: slideDown 0.8s ease 0.1s both;
+      background: white;
+      padding: 1rem 2rem;
+      border-radius: 50px;
+      box-shadow: var(--glass-shadow);
+      display: inline-block;
+      float: right;
+    }
+
+    .current-time {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--gray-800);
+      line-height: 1;
+      font-family: var(--font-primary);
+    }
+
+    .current-date {
+      color: var(--gray-500);
+      font-size: 0.9rem;
+    }
+
+    /* Glass Card - Light Version */
+    .glass-card {
+      background: white;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--gray-100);
+      border-radius: var(--card-radius);
+      padding: 2rem;
+      box-shadow: var(--glass-shadow);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      height: 100%;
+      animation: fadeIn 0.8s ease;
+    }
+
+    .glass-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 25px 50px -12px rgba(67, 97, 238, 0.25);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    /* Camera Section */
     .camera-wrapper {
       position: relative;
       border-radius: 24px;
       overflow: hidden;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      border: 4px solid white;
       background: #000;
       aspect-ratio: 4/3;
       width: 100%;
+      border: 4px solid white;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.2);
     }
 
     #camera, #fullscreenCamera {
@@ -139,29 +252,48 @@
       transform: scaleX(-1);
     }
 
+    /* Scanner Animation - Light Theme */
+    .scanner-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        var(--primary) 20%,
+        var(--secondary) 50%,
+        var(--accent) 80%,
+        transparent 100%
+      );
+      animation: scan 2.5s linear infinite;
+      box-shadow: 0 0 20px rgba(67, 97, 238, 0.5);
+      z-index: 10;
+    }
+
+    @keyframes scan {
+      0% { top: -5%; }
+      100% { top: 105%; }
+    }
+
     .scan-overlay {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: linear-gradient(
-        to bottom,
-        transparent 0%,
-        rgba(37, 99, 235, 0.1) 45%,
-        rgba(37, 99, 235, 0.2) 50%,
-        rgba(37, 99, 235, 0.1) 55%,
-        transparent 100%
+      background: radial-gradient(circle at 50% 50%, 
+        rgba(67, 97, 238, 0.1) 0%,
+        transparent 70%
       );
-      background-size: 100% 200%;
-      animation: scan 2.5s linear infinite;
       pointer-events: none;
-      z-index: 10;
+      z-index: 5;
+      animation: pulseOverlay 2s ease infinite;
     }
 
-    @keyframes scan {
-      0% { background-position: 0% -100%; }
-      100% { background-position: 0% 200%; }
+    @keyframes pulseOverlay {
+      0%, 100% { opacity: 0.2; }
+      50% { opacity: 0.5; }
     }
 
     .face-frame {
@@ -169,17 +301,83 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 60%;
-      height: 70%;
+      width: 65%;
+      height: 75%;
       border: 3px solid rgba(255, 255, 255, 0.6);
-      border-radius: 24px;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+      border-radius: 32px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
       pointer-events: none;
-      z-index: 5;
+      z-index: 8;
     }
 
-    /* --- MESSAGE SYSTEM - HIGHLY VISIBLE --- */
-    .message-container {
+    .face-frame::before {
+      content: '';
+      position: absolute;
+      top: -3px;
+      left: -3px;
+      width: 40px;
+      height: 40px;
+      border-top: 4px solid var(--primary);
+      border-left: 4px solid var(--primary);
+      border-radius: 32px 0 0 0;
+    }
+
+    .face-frame::after {
+      content: '';
+      position: absolute;
+      bottom: -3px;
+      right: -3px;
+      width: 40px;
+      height: 40px;
+      border-bottom: 4px solid var(--primary);
+      border-right: 4px solid var(--primary);
+      border-radius: 0 0 32px 0;
+    }
+
+    /* Status Indicator - Light */
+    .status-container {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      background: var(--primary-light);
+      border-radius: 50px;
+      margin-top: 1.5rem;
+      border: 1px solid rgba(67, 97, 238, 0.2);
+    }
+
+    .status-led {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 4px rgba(15, 186, 131, 0.2);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(15, 186, 131, 0.3); }
+      70% { box-shadow: 0 0 0 8px rgba(15, 186, 131, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(15, 186, 131, 0); }
+    }
+
+    .status-led.idle {
+      background: var(--gray-300);
+      animation: none;
+    }
+
+    .status-led.error {
+      background: var(--danger);
+      animation: none;
+    }
+
+    .status-text {
+      color: var(--gray-700);
+      font-weight: 500;
+    }
+
+    /* Message Center */
+    .message-center {
       position: absolute;
       bottom: 20px;
       left: 20px;
@@ -194,350 +392,358 @@
     .kiosk-message {
       padding: 16px 24px;
       border-radius: 50px;
-      font-weight: 700;
-      font-size: 1.2rem;
+      font-weight: 600;
+      font-size: 1rem;
       text-align: center;
-      animation: messagePop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
-      border: 2px solid white;
-      letter-spacing: 0.5px;
-      backdrop-filter: blur(10px);
-      width: 100%;
-      max-width: 600px;
+      animation: slideUpIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 10px 25px -8px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      width: fit-content;
       margin: 0 auto;
+      backdrop-filter: blur(10px);
     }
 
-    .kiosk-message.success {
-      background: rgba(16, 185, 129, 0.95);
-      color: white;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .kiosk-message.error {
-      background: rgba(239, 68, 68, 0.95);
-      color: white;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .kiosk-message.warning {
-      background: rgba(245, 158, 11, 0.95);
-      color: white;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .kiosk-message.info {
-      background: rgba(37, 99, 235, 0.95);
-      color: white;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    @keyframes messagePop {
+    @keyframes slideUpIn {
       0% { opacity: 0; transform: translateY(20px) scale(0.95); }
       100% { opacity: 1; transform: translateY(0) scale(1); }
     }
 
-    /* Fullscreen messages - even bigger */
-    .fullscreen-overlay .kiosk-message {
-      font-size: 1.6rem;
-      padding: 20px 40px;
-      border-radius: 60px;
-      border-width: 3px;
+    .kiosk-message.success {
+      background: var(--success);
+      color: white;
     }
 
-    /* --- Status Badge --- */
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 24px;
-      border-radius: 50px;
-      font-weight: 600;
-      font-size: 1.1rem;
-      margin-top: 1.5rem;
-      background: white;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-      border: 1px solid rgba(255,255,255,0.8);
-    }
-    .status-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #94a3b8;
-      transition: all 0.3s ease;
-    }
-    .status-dot.active { 
-      background: var(--success); 
-      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.3);
-      animation: pulse 2s infinite;
-    }
-    .status-dot.error { 
-      background: var(--danger); 
-      box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.3);
+    .kiosk-message.error {
+      background: var(--danger);
+      color: white;
     }
 
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-      70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    .kiosk-message.warning {
+      background: var(--warning);
+      color: white;
     }
 
-    /* --- Recent Activity List --- */
-    .attendance-list-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.5rem;
-    }
-    .list-title {
-      font-family: var(--font-main);
-      font-weight: 700;
-      font-size: 1.4rem;
-      color: #1e293b;
+    .kiosk-message.info {
+      background: var(--primary);
+      color: white;
     }
 
-    .attendance-list-container {
+    /* Attendance List - Light */
+    .attendance-list {
       max-height: 500px;
       overflow-y: auto;
       padding-right: 5px;
+      margin-top: 1rem;
+    }
+
+    .attendance-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .attendance-list::-webkit-scrollbar-track {
+      background: var(--gray-100);
+      border-radius: 10px;
+    }
+
+    .attendance-list::-webkit-scrollbar-thumb {
+      background: var(--gray-300);
+      border-radius: 10px;
+    }
+
+    .attendance-list::-webkit-scrollbar-thumb:hover {
+      background: var(--gray-400);
     }
 
     .attendance-item {
       display: flex;
       align-items: center;
+      gap: 1rem;
       padding: 1rem;
-      background: white;
-      border-radius: 16px;
+      background: var(--off-white);
+      border-radius: 20px;
       margin-bottom: 0.75rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-      transition: all 0.2s ease;
-      border-left: 4px solid transparent;
+      border: 1px solid var(--gray-100);
+      transition: all 0.3s ease;
+      animation: slideIn 0.3s ease;
     }
-    .attendance-item:hover {
-      transform: translateX(5px);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-    }
-    .attendance-item.check-in { border-left-color: var(--success); }
-    .attendance-item.check-out { border-left-color: var(--warning); }
 
-    .avatar-circle {
-      width: 45px;
-      height: 45px;
-      background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
-      border-radius: 50%;
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .attendance-item:hover {
+      background: white;
+      transform: translateX(5px);
+      border-color: var(--primary);
+      box-shadow: 0 5px 15px rgba(67, 97, 238, 0.1);
+    }
+
+    .attendance-avatar {
+      width: 50px;
+      height: 50px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 700;
       font-size: 1.2rem;
-      color: #1e293b;
-      margin-right: 1rem;
-    }
-    .user-info h6 { 
-      margin: 0; 
-      font-weight: 700; 
-      color: #1e293b;
-      font-size: 1rem;
-    }
-    .user-info small { 
-      color: #64748b; 
-      font-size: 0.85rem;
-    }
-    .time-badge {
-      margin-left: auto;
-      background: #f1f5f9;
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #475569;
+      color: white;
     }
 
-    /* --- Fullscreen Mode (FIXED) --- */
-    .fullscreen-overlay {
+    .attendance-info {
+      flex: 1;
+    }
+
+    .attendance-name {
+      font-weight: 600;
+      color: var(--gray-800);
+      margin: 0;
+    }
+
+    .attendance-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.8rem;
+      color: var(--gray-500);
+    }
+
+    .attendance-type {
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .type-check-in {
+      background: var(--success-light);
+      color: var(--success);
+    }
+
+    .type-check-out {
+      background: var(--warning-light);
+      color: var(--warning);
+    }
+
+    .attendance-time {
+      font-size: 0.8rem;
+      color: var(--gray-400);
+    }
+
+    /* Control Buttons - Light */
+    .control-btn {
+      background: white;
+      border: 1px solid var(--gray-200);
+      color: var(--gray-700);
+      padding: 0.75rem 1.8rem;
+      border-radius: 50px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+    }
+
+    .control-btn:hover {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(67, 97, 238, 0.4);
+    }
+
+    .control-btn i {
+      font-size: 1rem;
+    }
+
+    /* Stats Cards - Light */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--off-white);
+      border-radius: 20px;
+      padding: 1.2rem;
+      text-align: center;
+      border: 1px solid var(--gray-100);
+      transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+      background: white;
+      border-color: var(--primary);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 20px -10px rgba(67, 97, 238, 0.2);
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--gray-800);
+      line-height: 1;
+      font-family: var(--font-primary);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 0.3rem;
+    }
+
+    /* FPS Badge */
+    .fps-badge {
+      background: white;
+      color: var(--primary);
+      padding: 0.3rem 0.8rem;
+      border-radius: 30px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid var(--gray-200);
+    }
+
+    /* Fullscreen Mode - Light */
+    .fullscreen-mode {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: #0f172a;
+      background: white;
       z-index: 9999;
       display: none;
-      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .fullscreen-mode.active {
+      display: block;
+    }
+
+    .fullscreen-container {
       padding: 2rem;
-      overflow: hidden;
+      min-height: 100vh;
     }
-    
-    .fullscreen-overlay.active { 
-      display: flex !important; 
+
+    .fullscreen-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      background: white;
+      padding: 1rem 2rem;
+      border-radius: 60px;
+      box-shadow: var(--glass-shadow);
     }
-    
-    .fs-grid {
+
+    .fullscreen-content {
       display: grid;
-      grid-template-columns: 1fr 380px;
+      grid-template-columns: 1fr 400px;
       gap: 2rem;
-      height: calc(100vh - 100px);
-      flex: 1;
     }
-    
-    .fs-camera-area {
+
+    .fullscreen-camera {
       position: relative;
       border-radius: 32px;
       overflow: hidden;
-      border: 2px solid rgba(255,255,255,0.15);
       background: #000;
-      box-shadow: 0 30px 60px -15px rgba(0,0,0,0.5);
-      height: 100%;
-      width: 100%;
+      border: 4px solid white;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      aspect-ratio: 4/3;
     }
-    
-    #fullscreenCamera {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    
-    .fs-sidebar {
-      background: rgba(255,255,255,0.08);
+
+    .fullscreen-sidebar {
+      background: var(--off-white);
       border-radius: 32px;
-      padding: 1.8rem;
-      backdrop-filter: blur(15px);
-      border: 1px solid rgba(255,255,255,0.12);
+      padding: 1.5rem;
+      border: 1px solid var(--gray-100);
+      box-shadow: var(--glass-shadow);
       overflow-y: auto;
-      height: 100%;
-    }
-    
-    .fs-title { 
-      color: white; 
-      margin-bottom: 1.5rem; 
-      font-family: var(--font-main);
-      font-weight: 700;
-      font-size: 1.6rem;
+      max-height: calc(100vh - 200px);
     }
 
-    /* Fullscreen status */
-    .fs-status {
-      position: absolute;
-      bottom: 30px;
-      left: 30px;
-      right: 30px;
-      text-align: center;
-      z-index: 20;
-    }
-    .fs-status-text {
-      background: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(10px);
-      color: white;
-      padding: 15px 30px;
-      border-radius: 50px;
-      font-size: 1.3rem;
-      font-weight: 600;
-      border: 1px solid rgba(255,255,255,0.2);
-      display: inline-block;
-    }
-
-    /* Fullscreen attendance list items - light text */
-    .fs-sidebar .attendance-item {
-      background: rgba(255,255,255,0.1);
-      border-left-width: 4px;
-    }
-    
-    .fs-sidebar .user-info h6 {
-      color: white;
-    }
-    
-    .fs-sidebar .user-info small {
-      color: rgba(255,255,255,0.7);
-    }
-    
-    .fs-sidebar .time-badge {
-      background: rgba(255,255,255,0.2);
-      color: white;
-    }
-    
-    .fs-sidebar .avatar-circle {
-      background: rgba(255,255,255,0.2);
-      color: white;
-    }
-
-    /* --- Buttons --- */
-    .btn-modern {
-      background: white;
-      color: var(--primary);
-      border: 1px solid #e2e8f0;
-      padding: 0.8rem 1.8rem;
-      border-radius: 50px;
-      font-weight: 600;
-      font-size: 1rem;
-      transition: all 0.2s;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-      cursor: pointer;
-    }
-    .btn-modern:hover {
-      background: var(--primary);
-      color: white;
-      border-color: var(--primary);
-      transform: translateY(-3px);
-      box-shadow: 0 10px 20px -5px var(--primary);
-    }
-
-    .btn-fullscreen-exit {
-      background: rgba(255,255,255,0.1);
-      color: white;
-      border: 1px solid rgba(255,255,255,0.2);
-      padding: 0.8rem 2rem;
-      border-radius: 50px;
-      font-weight: 600;
-      transition: all 0.2s;
-      cursor: pointer;
-    }
-    .btn-fullscreen-exit:hover {
-      background: rgba(255,255,255,0.2);
-      color: white;
-    }
-
-    /* Hide normal mode when fullscreen is active */
-    body.fullscreen-mode #normalMode {
-      display: none !important;
-    }
-
-    /* --- Responsive --- */
-    @media (max-width: 992px) {
-      .brand-title { font-size: 2.2rem; }
-      .fs-grid { 
+    /* Responsive */
+    @media (max-width: 768px) {
+      .kiosk-container {
+        padding: 1rem;
+      }
+      
+      .brand-text {
+        font-size: 2rem;
+      }
+      
+      .date-time {
+        float: none;
+        width: 100%;
+        text-align: center;
+        margin-top: 1rem;
+      }
+      
+      .fullscreen-content {
         grid-template-columns: 1fr;
-        grid-template-rows: 1fr auto;
+      }
+      
+      .fullscreen-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
       }
     }
   </style>
 </head>
 <body>
+  <!-- Clean Background -->
+  <div class="bg-pattern"></div>
+  <div class="grid-overlay"></div>
+  <div id="particles"></div>
 
-  <!-- Background Shapes -->
-  <div class="bg-shape shape-1"></div>
-  <div class="bg-shape shape-2"></div>
-
-  <!-- Main Container (Normal Mode) -->
-  <div class="container py-4 flex-grow-1 d-flex flex-column" id="normalMode">
-    
+  <!-- Main Kiosk View -->
+  <div class="kiosk-container" id="normalMode">
     <!-- Header -->
-    <header class="kiosk-header">
-      <h1 class="brand-title"><i class="fas fa-fingerprint me-3"></i>FaceAttend</h1>
-      <p class="brand-subtitle">Intelligent Attendance Kiosk • Always Scanning</p>
-    </header>
+    <div class="kiosk-header">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <div class="logo-wrapper">
+            <div class="logo-icon">
+              <i class="fas fa-fingerprint"></i>
+            </div>
+            <div>
+              <h1 class="brand-text">Nelson Hospital</h1>
+              <span class="brand-tagline">AI-Powered Attendance</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="date-time">
+            <div class="current-time" id="currentTime"></div>
+            <div class="current-date" id="currentDate"></div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <div class="row g-4 flex-grow-1">
-      <!-- Camera Section -->
+    <!-- Main Content -->
+    <div class="row g-4">
+      <!-- Camera Column -->
       <div class="col-lg-7 col-xl-8">
-        <div class="glass-card d-flex flex-column align-items-center justify-content-center">
-          
-          <div class="camera-wrapper w-100">
+        <div class="glass-card">
+          <div class="camera-wrapper">
             <video id="camera" autoplay playsinline></video>
             <canvas id="canvas" class="d-none"></canvas>
+            
+            <!-- Scanner Effects -->
+            <div class="scanner-line"></div>
             <div class="scan-overlay"></div>
             <div class="face-frame"></div>
             
-            <!-- Message Container -->
-            <div class="message-container" id="messageContainer">
+            <!-- Message Center -->
+            <div class="message-center" id="messageCenter">
               <div id="successMessage" class="kiosk-message success" style="display: none;"></div>
               <div id="errorMessage" class="kiosk-message error" style="display: none;"></div>
               <div id="warningMessage" class="kiosk-message warning" style="display: none;"></div>
@@ -545,33 +751,57 @@
             </div>
           </div>
 
-          <div class="status-badge">
-            <div id="statusDot" class="status-dot active"></div>
-            <span id="statusText">System Active • Scanning for faces</span>
+          <!-- Status Bar -->
+          <div class="status-container">
+            <div id="statusLed" class="status-led"></div>
+            <span id="statusText" class="status-text">System Online • Scanning</span>
+            <div class="ms-auto">
+              <span id="fps" class="fps-badge">30 fps</span>
+            </div>
           </div>
 
-          <div class="mt-4">
-            <button id="fullscreenBtn" class="btn-modern">
-              <i class="fas fa-expand-alt me-2"></i>Enter Fullscreen Mode
+          <!-- Stats -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value" id="todayCount">0</div>
+              <div class="stat-label">Today</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="checkIns">0</div>
+              <div class="stat-label">Check-ins</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="checkOuts">0</div>
+              <div class="stat-label">Check-outs</div>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="mt-4 text-center">
+            <button id="fullscreenBtn" class="control-btn">
+              <i class="fas fa-expand-alt"></i>
+              <span>Fullscreen Kiosk Mode</span>
             </button>
           </div>
-
         </div>
       </div>
 
-      <!-- Recent Activity Section -->
+      <!-- Activity Column -->
       <div class="col-lg-5 col-xl-4">
         <div class="glass-card">
-          <div class="attendance-list-header">
-            <h2 class="list-title"><i class="fas fa-history me-2 text-primary"></i>Today's Activity</h2>
-            <span class="badge bg-primary text-white px-3 py-2 rounded-pill" id="attendanceCount">0</span>
+          <div class="d-flex align-items-center justify-content-between mb-4">
+            <h5 class="mb-0">
+              <i class="fas fa-history me-2" style="color: var(--primary);"></i>
+              Live Activity Feed
+            </h5>
+            <span class="badge" style="background: var(--primary-light); color: var(--primary); padding: 0.5rem 1rem; border-radius: 30px;" id="activityCount">0</span>
           </div>
 
-          <div id="attendanceList" class="attendance-list-container">
-            <!-- Items will be injected here -->
-            <div class="text-center text-muted py-5">
-              <i class="fas fa-clock fa-4x mb-3 opacity-25"></i>
-              <p class="fs-5">Waiting for first attendance...</p>
+          <div id="attendanceList" class="attendance-list">
+            <!-- Items injected via JS -->
+            <div class="text-center py-5" style="color: var(--gray-400);">
+              <i class="fas fa-clock fa-3x mb-3" style="opacity: 0.5;"></i>
+              <p>Waiting for first scan...</p>
             </div>
           </div>
         </div>
@@ -579,281 +809,466 @@
     </div>
   </div>
 
-  <!-- Fullscreen Overlay (FIXED) -->
-  <div id="fullscreenOverlay" class="fullscreen-overlay">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <div class="d-flex align-items-center text-white">
-        <i class="fas fa-fingerprint fa-3x me-4 text-primary"></i>
-        <div>
-          <h2 class="m-0 fw-bold" style="font-family: 'Outfit', sans-serif;">FaceAttend Kiosk</h2>
-          <span class="opacity-75 fs-5">Fullscreen Mode • Live Attendance</span>
+  <!-- Fullscreen Mode -->
+  <div id="fullscreenMode" class="fullscreen-mode">
+    <div class="fullscreen-container">
+      <!-- Fullscreen Header -->
+      <div class="fullscreen-header">
+        <div class="d-flex align-items-center gap-3">
+          <div class="logo-icon" style="width: 50px; height: 50px; font-size: 1.5rem;">
+            <i class="fas fa-fingerprint"></i>
+          </div>
+          <div>
+            <h2 class="brand-text" style="font-size: 1.8rem;">NovaFace</h2>
+          </div>
         </div>
-      </div>
-      <button id="exitFullscreenBtn" class="btn-fullscreen-exit">
-        <i class="fas fa-times me-2"></i>Exit Fullscreen
-      </button>
-    </div>
-
-    <div class="fs-grid">
-      <div class="fs-camera-area position-relative">
-        <video id="fullscreenCamera" autoplay playsinline></video>
-        <canvas id="fullscreenCanvas" class="d-none"></canvas>
-        <div class="scan-overlay"></div>
-        <div class="face-frame" style="width: 60%; height: 70%;"></div>
-        
-        <!-- Fullscreen Message Container -->
-        <div class="message-container" id="fsMessageContainer">
-          <div id="fsSuccessMessage" class="kiosk-message success" style="display: none;"></div>
-          <div id="fsErrorMessage" class="kiosk-message error" style="display: none;"></div>
-          <div id="fsWarningMessage" class="kiosk-message warning" style="display: none;"></div>
-          <div id="fsInfoMessage" class="kiosk-message info" style="display: none;"></div>
-        </div>
-        
-        <!-- Fullscreen Status -->
-        <div class="fs-status">
-          <span id="fsStatusText" class="fs-status-text">
-            <i class="fas fa-circle text-success me-2 fa-beat"></i>System Active • Scanning...
-          </span>
+        <div class="d-flex gap-3">
+          <div class="text-end">
+            <div id="fsCurrentTime" class="fw-bold" style="color: var(--gray-800); font-size: 1.3rem;"></div>
+            <div style="color: var(--gray-500); font-size: 0.9rem;" id="fsCurrentDate"></div>
+          </div>
+          <button id="exitFullscreenBtn" class="control-btn">
+            <i class="fas fa-compress-alt"></i>
+            <span>Exit</span>
+          </button>
         </div>
       </div>
 
-      <div class="fs-sidebar">
-        <h3 class="fs-title"><i class="fas fa-list me-3"></i>Live Feed</h3>
-        <div id="fsAttendanceList" class="attendance-list-container" style="max-height: calc(100vh - 250px);">
-          <!-- Fullscreen list items -->
-          <div class="text-center text-white-50 py-5">
-            <i class="fas fa-clock fa-3x mb-3 opacity-25"></i>
-            <p class="fs-4">Waiting for attendance...</p>
+      <!-- Fullscreen Content -->
+      <div class="fullscreen-content">
+        <!-- Fullscreen Camera -->
+        <div class="fullscreen-camera">
+          <video id="fullscreenCamera" autoplay playsinline></video>
+          <canvas id="fullscreenCanvas" class="d-none"></canvas>
+          
+          <!-- Scanner Effects -->
+          <div class="scanner-line"></div>
+          <div class="scan-overlay"></div>
+          <div class="face-frame"></div>
+          
+          <!-- Message Center -->
+          <div class="message-center" id="fsMessageCenter">
+            <div id="fsSuccessMessage" class="kiosk-message success" style="display: none;"></div>
+            <div id="fsErrorMessage" class="kiosk-message error" style="display: none;"></div>
+            <div id="fsWarningMessage" class="kiosk-message warning" style="display: none;"></div>
+            <div id="fsInfoMessage" class="kiosk-message info" style="display: none;"></div>
+          </div>
+        </div>
+
+        <!-- Fullscreen Sidebar -->
+        <div class="fullscreen-sidebar">
+          <h5 class="mb-4" style="color: var(--gray-800);">
+            <i class="fas fa-bolt me-2" style="color: var(--primary);"></i>
+            Real-time Activity
+          </h5>
+          
+          <div id="fsAttendanceList" class="attendance-list" style="max-height: calc(100vh - 300px);">
+            <!-- Items injected via JS -->
+            <div class="text-center py-5" style="color: var(--gray-400);">
+              <i class="fas fa-clock fa-3x mb-3" style="opacity: 0.5;"></i>
+              <p>Waiting for scans...</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-<script>
-document.addEventListener("DOMContentLoaded", () => {
 
-  /* ================= ELEMENTS ================= */
-  const video = document.getElementById("camera");
-  const canvas = document.getElementById("canvas");
-  const fsVideo = document.getElementById("fullscreenCamera");
-  const fsCanvas = document.getElementById("fullscreenCanvas");
-
-  const statusText = document.getElementById("statusText");
-  const statusDot = document.getElementById("statusDot");
-  const fsStatusText = document.getElementById("fsStatusText");
-
-  const successMsg = document.getElementById("successMessage");
-  const errorMsg = document.getElementById("errorMessage");
-  const warningMsg = document.getElementById("warningMessage");
-  const infoMsg = document.getElementById("infoMessage");
-
-  const fsSuccessMsg = document.getElementById("fsSuccessMessage");
-  const fsErrorMsg = document.getElementById("fsErrorMessage");
-  const fsWarningMsg = document.getElementById("fsWarningMessage");
-  const fsInfoMsg = document.getElementById("fsInfoMessage");
-
-  const attendanceList = document.getElementById("attendanceList");
-  const fsAttendanceList = document.getElementById("fsAttendanceList");
-  const attendanceCount = document.getElementById("attendanceCount");
-
-  const beep = document.getElementById("successBeep");
-  const errorBeep = document.getElementById("errorBeep");
-
-  const fullscreenBtn = document.getElementById("fullscreenBtn");
-  const exitFullscreenBtn = document.getElementById("exitFullscreenBtn");
-  const fullscreenOverlay = document.getElementById("fullscreenOverlay");
-  const normalMode = document.getElementById("normalMode");
-
-  let isProcessing = false;
-  let attendanceRecords = [];
-  let cameraStream = null;
-  let messageTimeouts = {};
-
-  /* ================= CAMERA ================= */
-  async function startCamera() {
-    try {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(t => t.stop());
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // ==================== ELEMENTS ====================
+      const video = document.getElementById("camera");
+      const canvas = document.getElementById("canvas");
+      const fsVideo = document.getElementById("fullscreenCamera");
+      const fsCanvas = document.getElementById("fullscreenCanvas");
+      
+      const statusLed = document.getElementById("statusLed");
+      const statusText = document.getElementById("statusText");
+      
+      const successMsg = document.getElementById("successMessage");
+      const errorMsg = document.getElementById("errorMessage");
+      const warningMsg = document.getElementById("warningMessage");
+      const infoMsg = document.getElementById("infoMessage");
+      
+      const fsSuccessMsg = document.getElementById("fsSuccessMessage");
+      const fsErrorMsg = document.getElementById("fsErrorMessage");
+      const fsWarningMsg = document.getElementById("fsWarningMessage");
+      const fsInfoMsg = document.getElementById("fsInfoMessage");
+      
+      const attendanceList = document.getElementById("attendanceList");
+      const fsAttendanceList = document.getElementById("fsAttendanceList");
+      const activityCount = document.getElementById("activityCount");
+      const todayCount = document.getElementById("todayCount");
+      const checkIns = document.getElementById("checkIns");
+      const checkOuts = document.getElementById("checkOuts");
+      
+      const currentTime = document.getElementById("currentTime");
+      const currentDate = document.getElementById("currentDate");
+      const fsCurrentTime = document.getElementById("fsCurrentTime");
+      const fsCurrentDate = document.getElementById("fsCurrentDate");
+      
+      const fullscreenBtn = document.getElementById("fullscreenBtn");
+      const exitFullscreenBtn = document.getElementById("exitFullscreenBtn");
+      const fullscreenMode = document.getElementById("fullscreenMode");
+      const normalMode = document.getElementById("normalMode");
+      
+      const successBeep = document.getElementById("successBeep");
+      const errorBeep = document.getElementById("errorBeep");
+      const scanBeep = document.getElementById("scanBeep");
+      
+      // ==================== STATE ====================
+      let isProcessing = false;
+      let attendanceRecords = [];
+      let cameraStream = null;
+      let messageTimeouts = {};
+      let frameCount = 0;
+      let lastFpsUpdate = performance.now();
+      let fps = 30;
+      
+      // ==================== INIT ====================
+      function init() {
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+        createParticles();
+        startCamera();
+        startFrameLoop();
       }
-
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720, facingMode: "user" }
-      });
-
-      if (video) video.srcObject = cameraStream;
-      if (fsVideo) fsVideo.srcObject = cameraStream;
-
-      updateStatus("active", "System Active • Scanning");
-
-    } catch (e) {
-      updateStatus("error", "Camera error");
-      showMessage("Camera access denied", "error", false);
-      showMessage("Camera access denied", "error", true);
-    }
-  }
-
-  startCamera();
-
-  /* ================= STATUS ================= */
-  function updateStatus(state, text) {
-    if (statusText) statusText.textContent = text;
-    if (statusDot) {
-      statusDot.className = "status-dot";
-      if (state === "active") statusDot.classList.add("active");
-      if (state === "error") statusDot.classList.add("error");
-    }
-
-    if (fsStatusText) {
-      fsStatusText.innerHTML =
-        (state === "active"
-          ? '<i class="fas fa-circle text-success me-2 fa-beat"></i>'
-          : '<i class="fas fa-circle text-danger me-2"></i>'
-        ) + text;
-    }
-  }
-
-  /* ================= MESSAGE SYSTEM ================= */
-  function hideMessages(fullscreen) {
-    const msgs = fullscreen
-      ? [fsSuccessMsg, fsErrorMsg, fsWarningMsg, fsInfoMsg]
-      : [successMsg, errorMsg, warningMsg, infoMsg];
-    msgs.forEach(m => m && (m.style.display = "none"));
-  }
-
-  function showMessage(text, type, fullscreen) {
-    hideMessages(fullscreen);
-
-    let el;
-    if (fullscreen) {
-      el = type === "success" ? fsSuccessMsg :
-           type === "warning" ? fsWarningMsg :
-           type === "error" ? fsErrorMsg : fsInfoMsg;
-    } else {
-      el = type === "success" ? successMsg :
-           type === "warning" ? warningMsg :
-           type === "error" ? errorMsg : infoMsg;
-    }
-
-    if (!el) return;
-
-    el.textContent = text;
-    el.style.display = "block";
-
-    if (type === "success") beep.play().catch(()=>{});
-    if (type === "error" || type === "warning") errorBeep.play().catch(()=>{});
-
-    const duration = type === "warning" ? 8000 : 5000;
-    clearTimeout(messageTimeouts[fullscreen + type]);
-    messageTimeouts[fullscreen + type] = setTimeout(() => {
-      el.style.display = "none";
-    }, duration);
-  }
-
-  /* ================= ATTENDANCE LIST ================= */
-  function addRecord(name, type, time, confidence) {
-    const cls = type.toLowerCase().includes("in") ? "check-in" : "check-out";
-    const initials = name.split(" ").map(x => x[0]).join("").slice(0,2);
-
-    const html = `
-      <div class="attendance-item ${cls}">
-        <div class="avatar-circle">${initials}</div>
-        <div class="user-info">
-          <h6>${name}</h6>
-          <small>${type} • ${confidence}%</small>
-        </div>
-        <div class="time-badge">${time}</div>
-      </div>
-    `;
-
-    attendanceList?.insertAdjacentHTML("afterbegin", html);
-    fsAttendanceList?.insertAdjacentHTML("afterbegin", html);
-
-    attendanceRecords.unshift({ name, type });
-    if (attendanceRecords.length > 20) attendanceRecords.pop();
-    if (attendanceCount) attendanceCount.textContent = attendanceRecords.length;
-  }
-
-  /* ================= FRAME PROCESS ================= */
-  async function processFrame() {
-    if (isProcessing) return;
-
-    const activeVideo =
-      fullscreenOverlay.classList.contains("active") ? fsVideo : video;
-    const activeCanvas =
-      fullscreenOverlay.classList.contains("active") ? fsCanvas : canvas;
-
-    if (!activeVideo || activeVideo.readyState < 2) return;
-
-    isProcessing = true;
-
-    try {
-      activeCanvas.width = activeVideo.videoWidth;
-      activeCanvas.height = activeVideo.videoHeight;
-      activeCanvas.getContext("2d")
-        .drawImage(activeVideo, 0, 0);
-
-      const blob = await new Promise(r =>
-        activeCanvas.toBlob(r, "image/jpeg", 0.8)
-      );
-
-      const fd = new FormData();
-      fd.append("capture", blob, "frame.jpg");
-
-      const res = await fetch("{% url 'mark_attendance' %}", {
-        method: "POST",
-        headers: { "X-CSRFToken": "{{ csrf_token }}" },
-        body: fd
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        const now = new Date().toLocaleTimeString();
-        if (data.name) {
-          addRecord(data.name, data.attendance_type, now, data.confidence || 100);
+      
+      // ==================== PARTICLES ====================
+      function createParticles() {
+        const particlesContainer = document.getElementById("particles");
+        for (let i = 0; i < 30; i++) {
+          const particle = document.createElement("div");
+          particle.className = "particle";
+          particle.style.left = Math.random() * 100 + "%";
+          particle.style.animationDuration = (10 + Math.random() * 20) + "s";
+          particle.style.animationDelay = Math.random() * 5 + "s";
+          particle.style.background = i % 2 === 0 ? "var(--primary)" : "var(--secondary)";
+          particlesContainer.appendChild(particle);
         }
-        showMessage(data.message || "Attendance recorded", "success", false);
-        showMessage(data.message || "Attendance recorded", "success", true);
-      } else if (data.message) {
-        const type = data.color === "yellow" ? "warning" : "error";
-        showMessage(data.message, type, false);
-        showMessage(data.message, type, true);
       }
+      
+      // ==================== DATE/TIME ====================
+      function updateDateTime() {
+        const now = new Date();
+        
+        const timeStr = now.toLocaleTimeString('en-US', { 
+          hour: '2-digit', 
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false 
+        });
+        
+        const dateStr = now.toLocaleDateString('en-US', { 
+          weekday: 'long',
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+        
+        if (currentTime) currentTime.textContent = timeStr;
+        if (fsCurrentTime) fsCurrentTime.textContent = timeStr;
+        if (currentDate) currentDate.textContent = dateStr;
+        if (fsCurrentDate) fsCurrentDate.textContent = dateStr;
+      }
+      
+      // ==================== CAMERA ====================
+      async function startCamera() {
+        try {
+          if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+          }
+          
+          cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { 
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              facingMode: "user",
+              frameRate: { ideal: 30 }
+            }
+          });
+          
+          if (video) video.srcObject = cameraStream;
+          if (fsVideo) fsVideo.srcObject = cameraStream;
+          
+          updateStatus("online", "System Online • Scanning");
+          
+        } catch (e) {
+          console.error("Camera error:", e);
+          updateStatus("error", "Camera Error - Check Permissions");
+          showMessage("Camera access denied. Please check permissions.", "error", false);
+        }
+      }
+      
+      // ==================== STATUS ====================
+      function updateStatus(state, text) {
+        if (!statusLed || !statusText) return;
+        
+        statusLed.className = "status-led";
+        statusText.textContent = text;
+        
+        if (state === "online") {
+          statusLed.classList.add("active");
+        } else if (state === "error") {
+          statusLed.classList.add("error");
+        } else {
+          statusLed.classList.add("idle");
+        }
+      }
+      
+      // ==================== MESSAGE SYSTEM ====================
+      function hideMessages(fullscreen = false) {
+        const msgs = fullscreen 
+          ? [fsSuccessMsg, fsErrorMsg, fsWarningMsg, fsInfoMsg]
+          : [successMsg, errorMsg, warningMsg, infoMsg];
+        msgs.forEach(m => m && (m.style.display = "none"));
+      }
+      
+      function showMessage(text, type = "info", fullscreen = false) {
+        hideMessages(fullscreen);
+        
+        let el;
+        if (fullscreen) {
+          el = type === "success" ? fsSuccessMsg :
+               type === "warning" ? fsWarningMsg :
+               type === "error" ? fsErrorMsg : fsInfoMsg;
+        } else {
+          el = type === "success" ? successMsg :
+               type === "warning" ? warningMsg :
+               type === "error" ? errorMsg : infoMsg;
+        }
+        
+        if (!el) return;
+        
+        el.textContent = text;
+        el.style.display = "block";
+        
+        // Play sounds
+        if (type === "success") {
+          successBeep.play().catch(() => {});
+        } else if (type === "error" || type === "warning") {
+          errorBeep.play().catch(() => {});
+        } else {
+          scanBeep.play().catch(() => {});
+        }
+        
+        // Auto hide after duration
+        const duration = type === "warning" ? 8000 : 5000;
+        clearTimeout(messageTimeouts[fullscreen + type]);
+        messageTimeouts[fullscreen + type] = setTimeout(() => {
+          el.style.display = "none";
+        }, duration);
+      }
+      
+      // ==================== ATTENDANCE RECORD ====================
+      function addAttendanceRecord(data) {
+  // Remove placeholders
+  attendanceList.innerHTML = "";
+  fsAttendanceList.innerHTML = "";
 
-    } catch (e) {
-      console.error(e);
-    } finally {
-      isProcessing = false;
-    }
-  }
-
-  /* ================= LOOP ================= */
-  let last = 0;
-  function loop(ts) {
-    if (ts - last > 1000) {
-      processFrame();
-      last = ts;
-    }
-    requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
-
-  /* ================= FULLSCREEN ================= */
-  fullscreenBtn?.addEventListener("click", () => {
-    normalMode.style.display = "none";
-    fullscreenOverlay.classList.add("active");
-    document.body.style.overflow = "hidden";
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
   });
 
-  exitFullscreenBtn?.addEventListener("click", () => {
-    fullscreenOverlay.classList.remove("active");
-    normalMode.style.display = "flex";
-    document.body.style.overflow = "auto";
+  const initials = data.name
+    .split(" ")
+    .map(n => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  const typeClass = data.attendance_type.toLowerCase().includes("in")
+    ? "type-check-in"
+    : "type-check-out";
+
+  const html = `
+    <div class="attendance-item animate__animated animate__fadeInRight">
+      <div class="attendance-avatar">${initials}</div>
+      <div class="attendance-info">
+        <div class="attendance-name">${data.name}</div>
+        <div class="attendance-meta">
+          <span class="attendance-type ${typeClass}">
+            ${data.attendance_type}
+          </span>
+          <span class="attendance-time">${timeStr}</span>
+        </div>
+      </div>
+      <div class="text-end">
+        <small style="color: var(--success); font-weight:600;">
+          ${data.confidence}%
+        </small>
+      </div>
+    </div>
+  `;
+
+  // Main list
+  const d1 = document.createElement("div");
+  d1.innerHTML = html;
+  attendanceList.prepend(d1.firstElementChild);
+
+  // Side panel
+  const d2 = document.createElement("div");
+  d2.innerHTML = html;
+  fsAttendanceList.prepend(d2.firstElementChild);
+
+  attendanceRecords.unshift({
+    ...data,
+    timestamp: now.toISOString()
   });
 
-});
-</script>
+  // Keep max 20 records
+  while (attendanceList.children.length > 20) {
+    attendanceList.removeChild(attendanceList.lastElementChild);
+  }
+  while (fsAttendanceList.children.length > 20) {
+    fsAttendanceList.removeChild(fsAttendanceList.lastElementChild);
+  }
 
+  updateStats();
+}
+      function updateStats() {
+        const today = new Date().toDateString();
+        const todayRecords = attendanceRecords.filter(r => 
+          new Date(r.timestamp).toDateString() === today
+        );
+        
+        const checkInCount = todayRecords.filter(r => 
+          r.attendance_type?.toLowerCase().includes("in")
+        ).length;
+        
+        const checkOutCount = todayRecords.filter(r => 
+          r.attendance_type?.toLowerCase().includes("out")
+        ).length;
+        
+        if (activityCount) activityCount.textContent = attendanceRecords.length;
+        if (todayCount) todayCount.textContent = todayRecords.length;
+        if (checkIns) checkIns.textContent = checkInCount;
+        if (checkOuts) checkOuts.textContent = checkOutCount;
+      }
+      
+      // ==================== FRAME PROCESSING ====================
+      async function processFrame() {
+        if (isProcessing) return;
+        
+        const activeVideo = fullscreenMode.classList.contains("active") ? fsVideo : video;
+        const activeCanvas = fullscreenMode.classList.contains("active") ? fsCanvas : canvas;
+        
+        if (!activeVideo || activeVideo.readyState < 2) return;
+        
+        isProcessing = true;
+        
+        try {
+          // Draw frame to canvas
+          activeCanvas.width = activeVideo.videoWidth;
+          activeCanvas.height = activeVideo.videoHeight;
+          const ctx = activeCanvas.getContext("2d");
+          ctx.drawImage(activeVideo, 0, 0);
+          
+          // Convert to blob
+          const blob = await new Promise(r => activeCanvas.toBlob(r, "image/jpeg", 0.8));
+          
+          // Send to server
+          const formData = new FormData();
+          formData.append("capture", blob, "frame.jpg");
+          
+          const response = await fetch("{% url 'mark_attendance' %}", {
+            method: "POST",
+            headers: {
+              "X-CSRFToken": "{{ csrf_token }}"
+            },
+            body: formData
+          });
+          
+          const data = await response.json();
+          
+          // Update FPS
+          frameCount++;
+          const now = performance.now();
+          if (now - lastFpsUpdate > 1000) {
+            fps = frameCount;
+            document.getElementById("fps").textContent = fps + " fps";
+            frameCount = 0;
+            lastFpsUpdate = now;
+          }
+          
+          // Handle response
+          if (data.success) {
 
+  // ✅ ADD TO HISTORY ONLY IF NEW
+  if (data.status === "new" && data.name) {
+    addAttendanceRecord({
+      name: data.name,
+      attendance_type: data.attendance_type,
+      confidence: data.confidence
+    });
+  }
+
+  // ✅ SHOW MESSAGE FOR BOTH new & duplicate
+  showMessage(data.message || "Attendance processed", "success", false);
+  showMessage(data.message || "Attendance processed", "success", true);
+
+  // 🔔 SUCCESS BEEP (both cases)
+  successBeep.currentTime = 0;
+  successBeep.play().catch(() => {});
+}
+
+else if (!data.success && data.message) {
+  const type =
+    data.color === "yellow" ? "warning" :
+    data.color === "blue" ? "info" : "error";
+
+  showMessage(data.message, type, false);
+  showMessage(data.message, type, true);
+}
+          
+        } catch (e) {
+          console.error("Frame processing error:", e);
+        } finally {
+          isProcessing = false;
+        }
+      }
+      
+      // ==================== FRAME LOOP ====================
+      function startFrameLoop() {
+        let lastFrame = 0;
+        
+        function loop(timestamp) {
+          if (timestamp - lastFrame > 500) { // Process every 500ms
+            processFrame();
+            lastFrame = timestamp;
+          }
+          requestAnimationFrame(loop);
+        }
+        
+        requestAnimationFrame(loop);
+      }
+      
+      // ==================== FULLSCREEN MODE ====================
+      fullscreenBtn?.addEventListener("click", () => {
+        fullscreenMode.classList.add("active");
+        normalMode.style.display = "none";
+        document.body.style.overflow = "hidden";
+      });
+      
+      exitFullscreenBtn?.addEventListener("click", () => {
+        fullscreenMode.classList.remove("active");
+        normalMode.style.display = "block";
+        document.body.style.overflow = "auto";
+      });
+      
+      // ==================== ESC KEY ====================
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && fullscreenMode.classList.contains("active")) {
+          exitFullscreenBtn.click();
+        }
+      });
+      
+      // ==================== INITIALIZE ====================
+      init();
+    });
+  </script>
 </body>
 </html>

@@ -7,7 +7,7 @@ import io
 import zipfile
 import base64
 from core.models import get_employee_rule
-
+from django.db import transaction
 import json 
 import logging
 import tempfile
@@ -21,13 +21,15 @@ from datetime import date, datetime, timedelta
 from calendar import monthrange, month_name
 from PIL import Image
 from django.utils import timezone
+from django.contrib.auth import update_session_auth_hash
+from django.db import IntegrityError
 from datetime import datetime, date, time
 import calendar
 from django.db.models import Prefetch
 from django.core.paginator import Paginator
 from django.http import JsonResponse, Http404
 from django.urls import reverse
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.db.models.functions import TruncDate
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -55,6 +57,7 @@ from .utils_pdf import build_salary_slip_pdf
 from django.core.mail import EmailMessage
 from django.http import FileResponse
 from io import BytesIO
+from django.views.decorators.csrf import csrf_exempt
 from django.db.utils import ProgrammingError, OperationalError
 from .models import (Employee, Attendance, AttendanceSettings, DailyReport,Department, SalaryStructure, Payroll, LeaveType, 
     LeaveApplication, LeaveWorkflowStage, LeaveApproval,
@@ -64,7 +67,21 @@ from .forms import ( UserRegistrationForm, EmployeeRegistrationForm, AttendanceS
     LeaveTypeForm, LeaveApplicationForm, LeaveApprovalForm, LeaveWorkflowStageForm,
     JoiningDetailForm, ResignationForm, NotificationForm,PayrollFilterForm
     )
+from django.views.decorators.http import require_POST, require_GET
+from django.shortcuts import get_object_or_404, render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 
+from decimal import Decimal, InvalidOperation
+import json
+
+from core.models import (
+    Employee,
+    JoiningDetail,
+    JoiningDocument,
+    SalaryStructure
+)
+from core.face_system import get_face_system
 # ============================================================
 # 💰 SALARY & PAYROLL VIEWS (UPDATED)
 # ============================================================
@@ -80,12 +97,17 @@ from django.db.models import Sum
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
-
+from django.core.exceptions import ObjectDoesNotExist
 from .models import (
     SalaryStructure, Payroll, Employee
 )
 from .forms import SalaryStructureForm, PayrollFilterForm
 from .decorators import finance_required
+from django.db.models import Sum, Q
+
+from django.db.models import Sum
+from django.utils.timezone import now
+from django.contrib.auth.decorators import login_required
 
 from core.utils.payslip_pdf import generate_payslip_pdf
 from core.utils.payslip_email import email_payslip
@@ -122,147 +144,76 @@ def home(request):
 
 
 
-def register(request):
-    face_sys = get_face_system()
-    reg_success = request.session.pop('reg_success', None)
+# =====================================================
+# 📝 REGISTRATION VIEW (FINAL FIXED)
+# =====================================================
 
+def register(request):
     if request.method == "POST":
         form = EmployeeRegistrationForm(request.POST)
 
         if form.is_valid():
-            # 1. Create User
             try:
                 user = User.objects.create_user(
-                    username=form.cleaned_data['username'],
-                    email=form.cleaned_data['email'],
-                    password=form.cleaned_data['password1'],
-                    first_name=form.cleaned_data['first_name'],
-                    last_name=form.cleaned_data['last_name']
+                    username=form.cleaned_data["username"],
+                    email=form.cleaned_data["email"],
+                    password=form.cleaned_data["password1"],
+                    first_name=form.cleaned_data["first_name"],
+                    last_name=form.cleaned_data["last_name"],
                 )
-            except Exception as e:
-                messages.error(request, f"❌ User creation failed: {str(e)}")
-                return render(request, 'register.html', {
-                    'form': form,
-                    'reg_success': reg_success,
-                })
 
-
-            # 2. Create Employee
-            try:
                 employee = Employee.objects.create(
                     user=user,
-                    department=form.cleaned_data['department'],
-                    position=form.cleaned_data['position'],
-                    manager=form.cleaned_data['manager'],
-                    phone_number=form.cleaned_data['phone_number'],
-                    role=form.cleaned_data['role'],
-                    work_rule=form.cleaned_data.get('work_rule'),
+                    department=form.cleaned_data["department"],
+                    position=form.cleaned_data["position"],
+                    manager=form.cleaned_data["manager"],
+                    phone_number=form.cleaned_data["phone_number"],
+                    role=form.cleaned_data["role"],
+                    work_rule=form.cleaned_data.get("work_rule"),
                 )
-            except Exception as e:
-                user.delete()  # rollback user
-                messages.error(request, f"❌ Employee creation failed: {str(e)}")
-                return render(request, 'register.html', {
-                    'form': form,
-                    'reg_success': reg_success,
-                })
 
+                face_image = request.FILES.get("face_image")
 
-            # 3. Handle Uploaded Face Image
-            face_image = request.FILES.get('face_image')
-            if face_image:
-                employee.face_image = face_image
-                employee.save(update_fields=['face_image'])
-
-            # 4. Handle Webcam Image (Base64)
-            if request.POST.get('captured_image'):
-                try:
-                    fmt, imgstr = request.POST['captured_image'].split(';base64,')
-                    ext = fmt.split('/')[-1]
-                    employee.face_image = ContentFile(
+                if not face_image and request.POST.get("captured_image"):
+                    fmt, imgstr = request.POST["captured_image"].split(";base64,")
+                    ext = fmt.split("/")[-1]
+                    face_image = ContentFile(
                         base64.b64decode(imgstr),
-                        name=f"face_{employee.employee_id}.{ext}"
+                        name=f"face_{employee.employee_id}.{ext}",
                     )
-                    employee.save(update_fields=['face_image'])
-                except Exception as e:
-                    messages.warning(request, f"⚠ Webcam image could not be saved: {e}")
 
-            # 5. Salary
-            if form.cleaned_data.get('base_salary'):
-                SalaryStructure.objects.create(
-                    employee=employee,
-                    base_salary=form.cleaned_data['base_salary'],
-                    hra=form.cleaned_data.get('hra') or 0,
-                    allowances=form.cleaned_data.get('allowances') or 0,
-                    deductions=form.cleaned_data.get('deductions') or 0,
-                )
+                if face_image:
+                    employee.face_image = face_image
+                    employee.save(update_fields=["face_image"])
 
-            # 6. Joining Details
-            doj = form.cleaned_data['date_of_joining']
-            probation = form.cleaned_data['probation_period_months']
-            confirmation_date = doj + relativedelta(months=probation)
-            joining = JoiningDetail.objects.create(
-                employee=employee,
-                date_of_joining=doj,
-                probation_period_months=probation,
-                confirmation_date=confirmation_date
-            )
-
-            # 7. Save Documents
-            docs = []
-            for file in request.FILES.getlist('documents'):
-                doc = JoiningDocument.objects.create(joining=joining, file=file)
-                docs.append({'name': file.name, 'url': doc.file.url})
-
-            # 8. Extract & Save Face Embedding using InsightFace system
-            # 8. Extract & Save Face Embedding
-            if employee.face_image:
-                try:
-                    img_path = employee.face_image.path
-
-                    face_sys = get_face_system()  # ALWAYS fetch fresh singleton
-
-                    emb = face_sys.get_embedding(img_path)
+                if employee.face_image:
+                    face_sys = get_face_system()
+                    emb = face_sys.get_embedding(employee.face_image.path)
 
                     if emb is None:
+                        employee.face_encoding = json.dumps({"status": "FACE_PENDING"})
+                        employee.save(update_fields=["face_encoding"])
                         messages.warning(
                             request,
-                            "⚠ No clear face detected. Please upload a frontal, well-lit photo."
+                            "Face not registered. You can add face ID later."
                         )
                     else:
-                        employee.face_encoding = json.dumps([emb.tolist()])
+                        employee.face_encoding = json.dumps([emb])
                         employee.save(update_fields=["face_encoding"])
-
-                        # 🔁 refresh in-memory DB embeddings
                         face_sys.load_from_db()
 
-                except Exception as e:
-                    messages.error(request, f"⚠ Face encoding failed: {e}")
+                messages.success(request, "Employee registered successfully")
+                return redirect("employee_list")
 
-
-            request.session['reg_success'] = {
-                "employee_id": employee.employee_id,
-                "name": user.get_full_name() or user.username,
-                "docs": docs,
-            }
-            messages.success(
-                request,
-                f"Employee {employee.user.get_full_name()} ({employee.employee_id}) registered successfully."
-            )
-            return redirect('employee_list')
-
-        else:
-            # 🔍 Show exact form errors
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, f"{field}: {error}")
+            except Exception as e:
+                logger.exception("Registration failed")
+                messages.error(request, str(e))
 
     else:
         form = EmployeeRegistrationForm()
 
-    return render(request, 'register.html', {
-        'form': form,
-        'reg_success': reg_success,
-    })
+    return render(request, "register.html", {"form": form})
+
 
 
 # --- Real-time AJAX validators ---
@@ -281,21 +232,52 @@ def get_managers_by_department(request, dept_id):
     data = [{'id': m.id, 'name': m.user.get_full_name()} for m in managers]
     return JsonResponse({'managers': data})
 
+
 @login_required
-@hr_required
 def employee_list(request):
-    employees = (
-        Employee.objects
-        .select_related('user', 'department', 'work_rule', 'manager')
-        .order_by('employee_id')
+    employees = Employee.objects.select_related(
+        "user", "department", "salary_structure"
     )
 
-    return render(request, 'ems/employee_list.html', {
-        'employees': employees,
-        'title': 'Employee List'
-    })
+    total_employees = employees.count()
+
+    active_employees = employees.filter(
+        employment_status="active"
+    ).count()
+
+    inactive_employees = employees.exclude(
+        employment_status="active"
+    ).count()
+
+    total_payroll = employees.aggregate(
+        total=Sum("salary_structure__base_salary")
+    )["total"] or 0
+
+    context = {
+        "employees": employees,
+        "kpi": {
+            "total": total_employees,
+            "active": active_employees,
+            "inactive": inactive_employees,
+            "payroll": total_payroll,
+        }
+    }
+    return render(request, "ems/employee_list.html", context)
 
 class EmployeeUpdateForm(forms.ModelForm):
+    face_image = forms.ImageField(required=False)
+    remove_face = forms.BooleanField(required=False)
+     # 🔐 USER FIELDS (NEW)
+    username = forms.CharField(required=True)
+    first_name = forms.CharField(required=False)
+    last_name = forms.CharField(required=False)
+    email = forms.EmailField(required=False)
+
+    password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput,
+        help_text="Leave blank to keep current password"
+    )
     class Meta:
         model = Employee
         fields = [
@@ -308,6 +290,17 @@ class EmployeeUpdateForm(forms.ModelForm):
             'work_rule',
             'is_active',
         ]
+#=====================
+# SAFE DECIMAL HELPER
+# =====================
+def safe_decimal(value, default=Decimal("0.00")):
+    try:
+        if value in (None, "", " "):
+            return default
+        return Decimal(value)
+    except (InvalidOperation, TypeError):
+        return default
+
 
 @login_required
 @hr_required
@@ -315,30 +308,147 @@ def employee_update(request, pk):
     employee = get_object_or_404(Employee, pk=pk)
     user = employee.user
 
+    joining = getattr(employee, "joiningdetail", None)
+    salary = getattr(employee, "salary_structure", None)
+
     if request.method == "POST":
-        form = EmployeeUpdateForm(request.POST, instance=employee)
+        form = EmployeeUpdateForm(
+            request.POST,
+            request.FILES,
+            instance=employee
+        )
 
         if form.is_valid():
-            # Update Employee
-            form.save()
 
-            # Update User basic info
-            user.first_name = request.POST.get('first_name', user.first_name)
-            user.last_name = request.POST.get('last_name', user.last_name)
-            user.email = request.POST.get('email', user.email)
-            user.save()
+            # 🔐 ONE TRANSACTION = SAFE SYSTEM
+            with transaction.atomic():
+
+                # =====================
+                # UPDATE USER
+                # =====================
+                new_username = request.POST.get("username", "").strip()
+                new_password = request.POST.get("password", "")
+                print("USERNAME:", new_username)
+                print("PASSWORD PROVIDED:", bool(new_password))
+                # 🔐 Username update (safe)
+                if new_username and new_username != user.username:
+                    if User.objects.exclude(pk=user.pk).filter(username=new_username).exists():
+                        messages.error(request, "Username already exists.")
+                        return redirect("employee_update", pk=employee.pk)
+                    user.username = new_username
+
+                user.first_name = request.POST.get("first_name", user.first_name)
+                user.last_name = request.POST.get("last_name", user.last_name)
+                user.email = request.POST.get("email", user.email)
+
+                # 🔐 Password update (secure)
+                if new_password:
+                    user.set_password(new_password)
+                    update_session_auth_hash(request, user)  # 🔥 THIS IS REQUIRED
+
+                user.save()
+
+                # =====================
+                # UPDATE EMPLOYEE
+                # =====================
+                employee = form.save(commit=False)
+
+                # =====================
+                # FACE IMAGE HANDLING
+                # =====================
+                if form.cleaned_data.get("remove_face"):
+                    if employee.face_image:
+                        employee.face_image.delete(save=False)
+                    employee.face_image = None
+                    employee.face_encoding = None
+
+                if request.FILES.get("face_image"):
+                    if employee.face_image:
+                        employee.face_image.delete(save=False)
+
+                    employee.face_image = request.FILES["face_image"]
+
+                    face_sys = get_face_system()
+                    emb = face_sys.get_embedding(employee.face_image)
+
+                    employee.face_encoding = (
+                        json.dumps({"status": "FACE_PENDING"})
+                        if emb is None
+                        else json.dumps([emb])
+                    )
+
+                    if emb:
+                        face_sys.load_from_db()
+
+                employee.save()
+
+                # =====================
+                # SALARY UPDATE
+                # =====================
+                salary, _ = SalaryStructure.objects.get_or_create(
+                    employee=employee,
+                    defaults={
+                        "base_salary": Decimal("0.00"),
+                        "hra": Decimal("0.00"),
+                        "allowances": Decimal("0.00"),
+                        "deductions": Decimal("0.00"),
+                    }
+                )
+
+                salary.base_salary = safe_decimal(
+                    request.POST.get("base_salary"),
+                    salary.base_salary
+                )
+                salary.hra = safe_decimal(request.POST.get("hra"))
+                salary.allowances = safe_decimal(request.POST.get("allowances"))
+                salary.deductions = safe_decimal(request.POST.get("deductions"))
+                salary.save()
+
+                # =====================
+                # JOINING DETAIL
+                # =====================
+                joining, _ = JoiningDetail.objects.get_or_create(
+                    employee=employee
+                )
+
+                # =====================
+                # MULTIPLE DOCUMENT UPLOAD
+                # =====================
+                files = request.FILES.getlist("documents")
+                for file in files:
+                    JoiningDocument.objects.create(
+                        joining=joining,
+                        file=file
+                    )
+
+                # =====================
+                # DOCUMENT DELETE
+                # =====================
+                delete_ids = request.POST.getlist("delete_docs")
+                if delete_ids:
+                    JoiningDocument.objects.filter(
+                        id__in=delete_ids,
+                        joining=joining
+                    ).delete()
 
             messages.success(request, "Employee updated successfully.")
-            return redirect('employee_list')
+            return redirect("employee_list")
+
     else:
         form = EmployeeUpdateForm(instance=employee)
 
-    return render(request, 'ems/employee_form.html', {
-        'form': form,
-        'employee': employee,
-        'user_obj': user,
-        'title': 'Update Employee'
+    documents = joining.joining_documents.all() if joining else []
+
+    return render(request, "ems/employee_form.html", {
+        "form": form,
+        "employee": employee,
+        "user_obj": user,
+        "joining": joining,
+        "documents": documents,
+        "salary": salary,
     })
+
+
 
 @login_required
 @admin_required
@@ -347,15 +457,21 @@ def employee_delete(request, pk):
     user = employee.user
 
     if request.method == "POST":
-        user.delete()  # ✅ cascades to Employee
-        messages.success(request, "Employee and user account deleted successfully.")
-        return redirect('employee_list')
+        # delete all files explicitly
+        if employee.face_image:
+            employee.face_image.delete(save=False)
 
-    return render(request, 'ems/employee_confirm_delete.html', {
-        'employee': employee,
-        'title': 'Delete Employee'
+        for doc in JoiningDocument.objects.filter(joining__employee=employee):
+            doc.delete()
+
+        user.delete()  # ✅ cascades Employee
+
+        messages.success(request, "Employee deleted permanently")
+        return redirect("employee_list")
+
+    return render(request, "ems/employee_confirm_delete.html", {
+        "employee": employee
     })
-
 
 @login_required
 def dashboard(request):
@@ -593,6 +709,32 @@ def my_profile_view(request):
     })
 
 @login_required
+@hr_required
+def employee_profile(request, pk):
+    employee = get_object_or_404(
+        Employee.objects.select_related(
+            "user",
+            "department",
+            "manager",
+            "work_rule"
+        ),
+        pk=pk
+    )
+    today = date.today()
+    salary = getattr(employee, "salary_structure", None)
+    joining = getattr(employee, "joiningdetail", None)
+    documents = joining.joining_documents.all() if joining else []
+
+    return render(request, "ems/employee_profile.html", {
+        "employee": employee,
+        "salary": salary,
+        "joining": joining,
+        "documents": documents,
+        "year": today.year,   
+        "month": today.month, 
+    })
+
+@login_required
 def attendance_summary_api(request):
     """
     Returns live attendance aggregated for the last N days.
@@ -738,132 +880,175 @@ def attendance_heartbeat(request):
     })
 
 # ------------------ ✅ Final mark_attendance Endpoint ------------------
+# ============================================================
+# 🔁 SHIFT WINDOW (DAY + NIGHT SAFE)
+# ============================================================
+def get_shift_window(now, rule):
+    start_time = rule.shift_start_time
+    end_time = rule.shift_end_time
+    today = now.date()
+
+    # Night shift (crosses midnight)
+    if end_time <= start_time:
+        shift_start = datetime.combine(today, start_time)
+        shift_end = datetime.combine(today + timedelta(days=1), end_time)
+
+        if now.time() < end_time:
+            shift_start -= timedelta(days=1)
+            shift_end -= timedelta(days=1)
+    else:
+        # Day shift
+        shift_start = datetime.combine(today, start_time)
+        shift_end = datetime.combine(today, end_time)
+
+    return (
+        timezone.make_aware(shift_start),
+        timezone.make_aware(shift_end),
+    )
+
+
+# ============================================================
+# 📸 MARK ATTENDANCE
+# ============================================================
+@csrf_exempt
 @login_required
 def mark_attendance(request):
-    logger.info("mark_attendance called")
-
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Invalid method"}, status=400)
+        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
 
     if "capture" not in request.FILES:
-        return JsonResponse({"success": False, "message": "No image"}, status=400)
+        return JsonResponse({"success": False, "message": "No image data"}, status=400)
 
     try:
+        # ----------------------------------------------------
+        # 1️⃣ Decode Image
+        # ----------------------------------------------------
         file_bytes = np.frombuffer(request.FILES["capture"].read(), np.uint8)
         frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
         if frame is None:
-            return JsonResponse({
-                "success": False,
-                "message": "Invalid image",
-                "color": "red",
-            })
+            return JsonResponse({"success": False, "message": "Invalid image"}, status=400)
 
-        h, w = frame.shape[:2]
-        if w > 640:
-            frame = cv2.resize(frame, (640, int(h * 640 / w)))
+        # ----------------------------------------------------
+        # 2️⃣ Face Recognition
+        # ----------------------------------------------------
+        fs = get_face_system()
+        fs.load_from_db()
 
-        face_system = get_face_system()
-        emp_id, score, meta = face_system.recognize_from_frame(frame)
-        reason = meta.get("reason") if meta else None
+        emp_id, score, meta = fs.recognize_from_frame(frame)
 
-        logger.debug("Recognition: emp=%s score=%.3f reason=%s", emp_id, score, reason)
-
-        # ------------------ FACE FAILURES ------------------
         if not emp_id:
-            if reason == "UNSTABLE":
-                return JsonResponse({
-                    "success": False,
-                    "message": "Hold still for a moment",
-                    "color": "yellow",
-                })
+            reason = meta.get("reason", "")
+            msg = "Face not recognized"
+            color = "red"
+
+            if reason == "TOO_FAR":
+                msg = "Come Closer"
+                color = "yellow"
+            elif reason == "ACCUMULATING":
+                msg = "Hold Still..."
+                color = "blue"
+            elif reason == "NO_FACE":
+                msg = "No Face Detected"
 
             return JsonResponse({
                 "success": False,
-                "message": "Face not recognized",
-                "color": "red",
+                "message": msg,
+                "color": color
             })
 
+        # ----------------------------------------------------
+        # 3️⃣ Employee Validation
+        # ----------------------------------------------------
         employee = Employee.objects.filter(
             employee_id=emp_id,
             is_active=True
-        ).select_related("user").first()
+        ).select_related("work_rule", "user").first()
 
         if not employee:
             return JsonResponse({
                 "success": False,
-                "message": "Employee inactive",
-                "color": "red",
+                "message": "Employee inactive or not found",
+                "color": "red"
             })
 
-        now = timezone.now()
-
-        last_att = Attendance.objects.filter(
-            employee=employee
-        ).order_by("-timestamp").first()
-
-        settings_obj = AttendanceSettings.objects.first()
-        min_hours = float(getattr(settings_obj, "min_hours_before_checkout", 3.0))
-
-        # ------------------ SAME DAY LOGIC ------------------
-        if last_att and timezone.localtime(last_att.timestamp).date() == now.date():
-
-            if last_att.attendance_type == "check_in":
-                elapsed = (now - last_att.timestamp).total_seconds() / 3600
-                remaining_minutes = int((min_hours - elapsed) * 60)
-
-                if elapsed < min_hours:
-                    return JsonResponse({
-                        "success": False,
-                        "message": f"Attendance already marked. Wait {remaining_minutes} minutes for checkout",
-                        "color": "yellow",
-                    })
-
-                Attendance.objects.create(
-                    employee=employee,
-                    attendance_type="check_out",
-                    confidence_score=score,
-                )
-
-                return JsonResponse({
-                    "success": True,
-                    "attendance_type": "Check-Out",
-                    "name": employee.user.get_full_name(),
-                    "confidence": round(score * 100, 2),
-                    "message": "Checked out successfully",
-                    "color": "green",
-                })
-
+        if not employee.work_rule:
             return JsonResponse({
                 "success": False,
-                "message": "Already checked out today",
-                "color": "yellow",
+                "message": "Work rule not assigned",
+                "color": "red"
             })
 
-        # ------------------ FIRST CHECK-IN ------------------
+        # ----------------------------------------------------
+        # 4️⃣ Shift-Aware Attendance Logic
+        # ----------------------------------------------------
+        now = timezone.now()
+        user_name = employee.user.get_full_name()
+
+        settings_obj = AttendanceSettings.objects.first()
+        min_hours = settings_obj.min_hours_before_checkout if settings_obj else 0.5
+
+        shift_start, shift_end = get_shift_window(now, employee.work_rule)
+
+        last_att = Attendance.objects.filter(
+            employee=employee,
+            timestamp__range=(shift_start, shift_end)
+        ).order_by("-timestamp").first()
+
+        att_type = "check_in"
+
+        if last_att:
+            elapsed_hours = (now - last_att.timestamp).total_seconds() / 3600
+
+            # ⏱ Cooldown (2 minutes)
+            if elapsed_hours < (2 / 60):
+                return JsonResponse({
+                    "success": True,
+                    "status": "duplicate",
+                    "message": f"Already Marked: {user_name}",
+                    "name": user_name,
+                    "attendance_type": last_att.get_attendance_type_display(),
+                    "confidence": int(score * 100),
+                    "color": "green"
+                })
+
+            # 🔁 Checkout logic
+            if last_att.attendance_type == "check_in":
+                if elapsed_hours < min_hours:
+                    mins_left = int((min_hours - elapsed_hours) * 60)
+                    return JsonResponse({
+                        "success": False,
+                        "message": f"Wait {mins_left}m to checkout",
+                        "color": "yellow"
+                    })
+                att_type = "check_out"
+
+        # ----------------------------------------------------
+        # 5️⃣ Create Attendance Record
+        # ----------------------------------------------------
         Attendance.objects.create(
             employee=employee,
-            attendance_type="check_in",
-            confidence_score=score,
+            attendance_type=att_type,
+            confidence_score=score
         )
 
         return JsonResponse({
             "success": True,
-            "attendance_type": "Check-In",
-            "name": employee.user.get_full_name(),
-            "confidence": round(score * 100, 2),
-            "message": "Checked in successfully",
-            "color": "green",
+            "status": "new",
+            "message": f"Success: {user_name}",
+            "name": user_name,
+            "attendance_type": att_type.replace("_", " ").title(),
+            "confidence": int(score * 100),
+            "color": "green"
         })
 
-    except Exception:
-        logger.exception("mark_attendance crashed")
+    except Exception as e:
+        logger.exception("Attendance Error")
         return JsonResponse({
             "success": False,
-            "message": "Internal error",
-            "color": "red",
+            "message": "Server Error"
         }, status=500)
-
+        
 @login_required
 def attendance_log_api(request):
     today = timezone.now().date()
@@ -1065,6 +1250,20 @@ def video_feed():
         except Exception:
             logger.exception("Error releasing camera in video_feed")
 
+def can_manage_attendance(user):
+    # 🔑 Superuser always allowed
+    if user.is_authenticated and user.is_superuser:
+        return True
+
+    if not user.is_authenticated:
+        return False
+
+    try:
+        emp = user.employee
+    except:
+        return False
+
+    return emp.role in ['Admin', 'HR', 'Finance']
 
 @login_required
 def attendance_page(request):
@@ -1127,9 +1326,16 @@ def attendance_reports(request):
     if download == "excel":
         return generate_excel_report(attendance_qs, start_date, end_date)
 
-    # 5. Dashboard Statistics Calculation
-    total_employees_count = Employee.objects.filter(is_active=True).count()
+    # 5. Dashboard Statistics Calculation & Lists
+    active_employees = Employee.objects.filter(is_active=True).select_related('user')
+    total_employees_count = active_employees.count()
     
+    # Get IDs of employees who have checked in during this period
+    present_emp_ids = attendance_qs.filter(attendance_type='check_in').values_list('employee_id', flat=True).distinct()
+    
+    # Generate the actual lists
+    present_employees_list = [emp for emp in active_employees if emp.id in present_emp_ids]
+    absent_employees_list = [emp for emp in active_employees if emp.id not in present_emp_ids]
     # Count unique employees who have at least one 'check_in' record in the filtered range
     present_employees_count = attendance_qs.filter(
         attendance_type='check_in'
@@ -1178,6 +1384,8 @@ def attendance_reports(request):
         "total_employees": total_employees_count,
         "present_employees": present_employees_count,
         "absent_employees": absent_employees_count,
+        "present_employees_list": present_employees_list, # <--- NEW
+        "absent_employees_list": absent_employees_list,   # <--- NEW
         
         # For UI logic
         "date_filter": start_date if start_date == end_date else None,
@@ -1566,7 +1774,60 @@ def attendance_day_detail(request, emp_id, date):
     return JsonResponse(data)
 
 
+@login_required
+@require_POST
+def update_attendance(request, att_id):
+    if not can_manage_attendance(request.user):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
 
+    attendance = get_object_or_404(Attendance, id=att_id)
+
+    try:
+        attendance.attendance_type = request.POST.get('attendance_type')
+        attendance.timestamp = datetime.strptime(
+            request.POST.get('timestamp'),
+            "%Y-%m-%d %H:%M"
+        )
+        attendance.location = request.POST.get('location', '')
+        attendance.notes = request.POST.get('notes', '')
+        attendance.save()
+
+        return JsonResponse({'success': True})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@login_required
+@require_POST
+def delete_attendance(request, att_id):
+    if not can_manage_attendance(request.user):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    attendance = get_object_or_404(Attendance, id=att_id)
+    attendance.delete()
+
+    return JsonResponse({'success': True})
+
+@login_required
+@require_POST
+def create_attendance(request):
+    if not can_manage_attendance(request.user):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    employee = get_object_or_404(Employee, id=request.POST['employee'])
+
+    Attendance.objects.create(
+        employee=employee,
+        attendance_type=request.POST['attendance_type'],
+        timestamp=datetime.strptime(
+            request.POST['timestamp'], "%Y-%m-%d %H:%M"
+        ),
+        location=request.POST.get('location', ''),
+        notes=request.POST.get('notes', ''),
+        confidence_score=None  # manual entry
+    )
+
+    return JsonResponse({'success': True})
 # ============================================================
 # 🏢 ORGANISATION STRUCTURE VIEWS
 # ============================================================
@@ -1584,101 +1845,271 @@ def org_chart_view(request, employee_id=None):
     return render(request, 'ems/org_chart.html', {'reporting_chain': reporting_chain})
 
 # -------- Helpers --------
-def build_path_to_root(emp):
-    """CEO -> ... -> emp (list of dicts)."""
-    path = []
-    visited = set()
-    cur = emp
-    while cur and cur.id not in visited:
-        visited.add(cur.id)
-        path.append(cur)
-        cur = cur.manager
-    # reverse for CEO->...->emp
-    return list(reversed(path))
-
 def employee_to_dict(emp):
     return {
         "id": emp.id,
-        "employee_id": emp.employee_id,
-        "name": emp.user.get_full_name() if emp and emp.user else "",
-        "position": emp.position or "",
-        "department": emp.department.name if emp and emp.department else "",
-        "image": (emp.face_image.url if emp.face_image else None),
-        "profile_url": reverse('employee_detail', args=[emp.employee_id]),  # <- add this if available
+        "name": emp.user.get_full_name(),
+        "department": emp.department.name if emp.department else "",
+        "position": emp.position,
+        "profile_url": f"/employees/{emp.id}/profile/",
+        "children": [],
+        "is_current": False,
     }
 
-def build_subtree(emp, visited=None, max_depth=10, depth=0):
-    """
-    Build full subordinate tree for 'emp' up to max_depth to avoid infinite loops.
-    """
+def build_path_to_root(emp):
+    path = []
+    while emp:
+        path.append(emp)
+        emp = emp.manager
+    return list(reversed(path))
+
+def build_subtree(emp, visited=None):
     if visited is None:
         visited = set()
-    if not emp or emp.id in visited or depth > max_depth:
+    if emp.id in visited:
         return None
     visited.add(emp.id)
+
     node = employee_to_dict(emp)
-    # children
-    children = []
-    # Prefetch is usually handled outside; keeping simple here
-    for child in emp.subordinates.all().order_by('position', 'user__first_name'):
-        if child.id not in visited:
-            sub = build_subtree(child, visited, max_depth, depth+1)
-            if sub:
-                children.append(sub)
-    node["children"] = children
+    for child in emp.subordinates.all():
+        sub = build_subtree(child, visited)
+        if sub:
+            node["children"].append(sub)
     return node
 
-# -------- Page view --------
-@login_required
-def org_chart_page(request):
-    """
-    Renders the page; data comes via AJAX from /api/org-tree/
-    """
-    return render(request, 'ems/org_chart.html')
+def collect_ids(node, ids):
+    if not node:
+        return
+    ids.add(node["id"])
+    for c in node.get("children", []):
+        collect_ids(c, ids)
+
+def filter_tree(nodes, allowed_ids):
+    result = []
+    for n in nodes:
+        if n["id"] in allowed_ids:
+            n["children"] = filter_tree(n["children"], allowed_ids)
+            result.append(n)
+    return result
+
+def mark_current_employee(tree, emp_id):
+    for n in tree:
+        if n["id"] == emp_id:
+            n["is_current"] = True
+        mark_current_employee(n.get("children", []), emp_id)
 
 # -------- APIs --------
 @login_required
 def org_tree_api_me(request):
     """
-    Returns JSON with:
-      - path: CEO -> ... -> you
-      - team: you -> all subordinates
+    Always returns a valid org tree.
+    If Employee is not linked → show only User card.
     """
-    try:
-        emp = request.user.employee
-    except Employee.DoesNotExist:
-        raise Http404("No employee bound to the current user.")
 
-    # Prefetch children to reduce queries
-    emp = Employee.objects.select_related('user', 'department', 'manager').prefetch_related(
-        Prefetch('subordinates', queryset=Employee.objects.select_related('user', 'department'))
-    ).get(pk=emp.pk)
+    user = request.user
 
-    # Ensure a similar prefetch chain for all nodes in path
-    path_emps = build_path_to_root(emp)
-    # Build a set of IDs we’ll need to prefetch for subtree root (emp)
-    # (already prefetched on emp via subordinates)
-    path = [employee_to_dict(e) for e in path_emps]
+    # -------------------------------------------------
+    # CASE 1: USER HAS NO EMPLOYEE PROFILE
+    # -------------------------------------------------
+    if not hasattr(user, "employee"):
+        single_node = {
+            "id": f"user-{user.id}",
+            "name": user.get_full_name() or user.username,
+            "department": "—",
+            "position": "User",
+            "image": "",
+            "profile_url": "",
+            "children": [],
+            "is_current": True,
+        }
+        return JsonResponse({"ok": True, "tree": [single_node]})
 
-    team_tree = build_subtree(emp)
+    # -------------------------------------------------
+    # CASE 2: USER HAS EMPLOYEE PROFILE
+    # -------------------------------------------------
+    current_emp = user.employee
+    is_hr = user.is_superuser or current_emp.role in ["HR", "Admin"]
 
-    return JsonResponse({"ok": True, "path": path, "team": team_tree})
+    employees = (
+        current_emp.__class__.objects
+        .select_related("user", "department", "manager")
+        .prefetch_related("subordinates")
+    )
+
+    # Build employee map
+    emp_map = {}
+    for emp in employees:
+        emp_map[emp.id] = {
+            "id": emp.id,
+            "name": emp.user.get_full_name(),
+            "department": emp.department.name if emp.department else "",
+            "position": emp.position,
+            "manager_id": emp.manager_id,
+            "image": emp.profile_image.url if getattr(emp, "profile_image", None) else "",
+            "profile_url": reverse("employee_detail", args=[emp.employee_id]),
+            "children": [],
+            "is_current": emp.id == current_emp.id,
+        }
+
+    # Build hierarchy
+    roots = []
+    for emp in employees:
+        node = emp_map[emp.id]
+        if emp.manager_id and emp.manager_id in emp_map:
+            emp_map[emp.manager_id]["children"].append(node)
+        else:
+            roots.append(node)
+
+    # -------------------------------------------------
+    # HR / ADMIN → FULL TREE
+    # -------------------------------------------------
+    if is_hr:
+        return JsonResponse({"ok": True, "tree": roots})
+
+    # -------------------------------------------------
+    # EMPLOYEE → LIMITED TREE
+    # -------------------------------------------------
+    allowed_ids = {current_emp.id}
+
+    # Managers
+    mgr = current_emp.manager
+    while mgr:
+        allowed_ids.add(mgr.id)
+        mgr = mgr.manager
+
+    # Subordinates
+    def collect_children(eid):
+        for c in emp_map[eid]["children"]:
+            allowed_ids.add(c["id"])
+            collect_children(c["id"])
+
+    collect_children(current_emp.id)
+
+    def filter_tree(nodes):
+        result = []
+        for n in nodes:
+            if n["id"] in allowed_ids:
+                n_copy = n.copy()
+                n_copy["children"] = filter_tree(n["children"])
+                result.append(n_copy)
+        return result
+
+    restricted_tree = filter_tree(roots)
+
+    # -------------------------------------------------
+    # FALLBACK → ONLY SELF
+    # -------------------------------------------------
+    if not restricted_tree:
+        return JsonResponse({
+            "ok": True,
+            "tree": [{
+                **emp_map[current_emp.id],
+                "children": []
+            }]
+        })
+
+    return JsonResponse({"ok": True, "tree": restricted_tree})
+
 
 @login_required
-def org_tree_api(request, employee_id):
+def org_chart_page(request):
     """
-    Same as above but for any employee_id (admin/HR usage).
+    Renders the HTML page. Data is fetched via AJAX.
     """
-    employee = get_object_or_404(Employee.objects.select_related('user', 'department', 'manager'), employee_id=employee_id)
-    employee = Employee.objects.select_related('user', 'department', 'manager').prefetch_related(
-        Prefetch('subordinates', queryset=Employee.objects.select_related('user', 'department'))
-    ).get(pk=employee.pk)
+    return render(request, 'ems/org_chart.html')
 
-    path_emps = build_path_to_root(employee)
-    path = [employee_to_dict(e) for e in path_emps]
-    team_tree = build_subtree(employee)
+@login_required
+def org_tree_api(request):
+    """
+    Returns the JSON Org Tree based on user role:
+    - HR/Admin: Full organization
+    - Employee: Only their managers (path to CEO) -> them -> their subordinates
+    If they have no manager/subordinates, returns just their card.
+    """
+    try:
+        current_emp = request.user.employee
+    except getattr(request.user, 'employee', None).DoesNotExist if hasattr(request.user, 'employee') else Exception:
+        return JsonResponse({"ok": False, "error": "Employee not linked"}, status=403)
 
-    return JsonResponse({"ok": True, "path": path, "team": team_tree})
+    # Determine role access
+    emp_role = getattr(current_emp, 'role', '')
+    is_hr = request.user.is_superuser or emp_role in ["HR", "Admin"]
+
+    # 1. Fetch all employees to build map efficiently (1 DB query)
+    # Adjust related fields based on your actual model architecture
+    employees = current_emp.__class__.objects.select_related("user", "department", "manager").all()
+
+    emp_map = {}
+    for emp in employees:
+        image_url = emp.profile_image.url if getattr(emp, 'profile_image', None) else ""
+        
+        # Safely get profile URL
+        try:
+            profile_url = reverse('employee_detail', args=[emp.employee_id])
+        except:
+            profile_url = f"/employees/{emp.id}/profile/"
+
+        emp_map[emp.id] = {
+            "id": emp.id,
+            "name": emp.user.get_full_name() if hasattr(emp, 'user') else "Unknown",
+            "department": emp.department.name if getattr(emp, 'department', None) else "",
+            "position": getattr(emp, 'role', getattr(emp, 'designation', 'Employee')),
+            "manager_id": emp.manager_id,
+            "image": image_url,
+            "profile_url": profile_url,
+            "children": [],
+            "is_current": (emp.id == current_emp.id)
+        }
+
+    # 2. Build Full Tree
+    roots = []
+    for emp in employees:
+        node = emp_map[emp.id]
+        if emp.manager_id and emp.manager_id in emp_map:
+            emp_map[emp.manager_id]["children"].append(node)
+        else:
+            roots.append(node)
+
+    # If HR, return full org chart
+    if is_hr:
+        return JsonResponse({"ok": True, "tree": roots})
+
+    # 3. If Normal Employee -> Restrict View Logic
+    allowed_ids = set()
+
+    # Add self
+    allowed_ids.add(current_emp.id)
+
+    # Add managers up to CEO
+    curr_mgr_id = current_emp.manager_id
+    while curr_mgr_id and curr_mgr_id in emp_map:
+        allowed_ids.add(curr_mgr_id)
+        curr_mgr_id = emp_map[curr_mgr_id]["manager_id"]
+
+    # Add all subordinates downward
+    def collect_subordinates(node_id):
+        for child in emp_map[node_id]["children"]:
+            allowed_ids.add(child["id"])
+            collect_subordinates(child["id"])
+
+    collect_subordinates(current_emp.id)
+
+    # 4. Filter the tree to only allowed nodes
+    def filter_tree(nodes):
+        result = []
+        for n in nodes:
+            if n["id"] in allowed_ids:
+                # Copy dict so we don't mutate original during recursion
+                n_copy = n.copy()
+                n_copy["children"] = filter_tree(n["children"])
+                result.append(n_copy)
+        return result
+
+    restricted_tree = filter_tree(roots)
+
+    # Note: Even if 'restricted_tree' only has 1 node (the user), it perfectly returns just their card!
+    return JsonResponse({"ok": True, "tree": restricted_tree})
+
 
 def employee_detail(request, employee_id):
     employee = get_object_or_404(Employee, employee_id=employee_id)
@@ -2320,6 +2751,8 @@ def leave_application_detail(request, pk):
         'history': history,
         'title': 'Leave Details'
     })
+
+
 # ============================================================
 # 📄 JOINING & RESIGNATION VIEWS
 # ============================================================

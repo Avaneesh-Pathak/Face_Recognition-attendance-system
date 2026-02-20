@@ -2,8 +2,11 @@
 {% load static %}
 
 {% block title %}Employee Directory | FaceAttend{% endblock %}
+{% load tz %}
 
 {% block content %}
+{% now "Y" as year %}
+{% now "m" as month %}
 <div class="container-fluid px-4 fade-in-up">
     
     <!-- Header Section -->
@@ -18,14 +21,96 @@
             <i class="fas fa-plus me-2"></i>Add Employee
         </a>
     </div>
+    <!-- KPI CARDS -->
+    <div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body">
+            <h6 class="text-muted">Total Employees</h6>
+            <h3 class="fw-bold">{{ kpi.total }}</h3>
+        </div>
+        </div>
+    </div>
 
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body">
+            <h6 class="text-muted">Active Employees</h6>
+            <h3 class="fw-bold text-success">{{ kpi.active }}</h3>
+        </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body">
+            <h6 class="text-muted">Inactive</h6>
+            <h3 class="fw-bold text-danger">{{ kpi.inactive }}</h3>
+        </div>
+        </div>
+    </div>
+    </div>
+    <!-- Search & Filter Bar -->
     <!-- Search & Filter Bar -->
     <div class="card border-0 shadow-sm mb-4 search-card">
         <div class="card-body p-3">
-            <div class="input-group">
-                <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
-                <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Search by name, ID, or department...">
-            </div>
+            <form method="GET" class="row g-2 align-items-center">
+                <!-- Text Search (Client-side JS) -->
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
+                        <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Search in results...">
+                    </div>
+                </div>
+
+                <!-- Department Filter -->
+                <div class="col-md-2">
+                    <select name="department" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
+                        <option value="">All Departments</option>
+                        {% for dept in departments %}
+                            <option value="{{ dept.id }}" {% if selected_dept == dept.id|stringformat:"s" %}selected{% endif %}>
+                                {{ dept.get_name_display }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Salary Sort -->
+                <div class="col-md-2">
+                    <select name="sort_salary" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
+                        <option value="">Sort by Salary</option>
+                        <option value="highest" {% if selected_sort == 'highest' %}selected{% endif %}>Highest to Lowest</option>
+                        <option value="lowest" {% if selected_sort == 'lowest' %}selected{% endif %}>Lowest to Highest</option>
+                    </select>
+                </div>
+
+                <!-- Gender Filter -->
+                <!-- <div class="col-md-2">
+                    <select name="gender" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
+                        <option value="">All Genders</option>
+                        {% for code, name in genders %}
+                            <option value="{{ code }}" {% if selected_gender == code %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div> -->
+
+                <!-- Role Filter -->
+                <div class="col-md-2">
+                    <select name="role" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
+                        <option value="">All Roles</option>
+                        {% for code, name in roles %}
+                            <option value="{{ code }}" {% if selected_role == code %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Clear Filters Button -->
+                <div class="col-md-1">
+                    <a href="{% url 'employee_list' %}" class="btn btn-light shadow-sm w-100 text-muted" data-bs-toggle="tooltip" title="Clear all filters">
+                        <i class="fas fa-undo"></i>
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -40,13 +125,16 @@
                             <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Department</th>
                             <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Role</th>
                             <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Work Rule</th>
+                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Base Salary</th>
                             <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Status</th>
                             <th class="text-end pe-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for e in employees %}
-                        <tr>
+                        <tr class="employee-row"
+                            data-href="{% url 'employee_profile' e.id %}"
+                            style="cursor:pointer;">
                             <!-- Name & ID Column -->
                             <td class="ps-4">
                                 <div class="d-flex px-2 py-1">
@@ -76,7 +164,13 @@
                             <td>
                                 <span class="text-secondary text-sm">{{ e.work_rule|default:"Standard" }}</span>
                             </td>
-
+                            <td>
+                                {% if e.salary_structure %}
+                                    ₹{{ e.salary_structure.base_salary|floatformat:0 }}
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <!-- Status (Dynamic Badges) -->
                             <td>
                                 {% if e.employment_status == 'Active' %}
@@ -90,12 +184,34 @@
 
                             <!-- Actions -->
                             <td class="text-end pe-4">
-                                <a href="{% url 'employee_update' e.id %}" class="btn btn-link text-primary p-0 me-3" data-bs-toggle="tooltip" title="Edit Profile">
-                                    <i class="fas fa-user-edit fa-lg"></i>
+                            <div class="d-inline-flex align-items-center gap-2">
+
+                                <!-- Edit -->
+                                <a href="{% url 'employee_update' e.id %}"
+                                class="btn btn-sm btn-outline-primary rounded-circle"
+                                data-bs-toggle="tooltip"
+                                title="Edit Employee">
+                                <i class="fas fa-pen"></i>
                                 </a>
-                                <button onclick="confirmDelete('{% url 'employee_delete' e.id %}', '{{ e.user.get_full_name|escapejs }}')" class="btn btn-link text-danger p-0 border-0 bg-transparent" data-bs-toggle="tooltip" title="Delete">
-                                    <i class="fas fa-trash-alt fa-lg"></i>
+
+                                <!-- Attendance -->
+                                <a href="{% url 'attendance_calendar' e.id year month %}"
+                                class="btn btn-sm btn-outline-success rounded-circle"
+                                data-bs-toggle="tooltip"
+                                title="Attendance Calendar">
+                                <i class="fas fa-calendar-check"></i>
+                                </a>
+
+                                <!-- Delete -->
+                                <button type="button"
+                                        onclick="confirmDelete('{% url 'employee_delete' e.id %}', '{{ e.user.get_full_name|escapejs }}')"
+                                        class="btn btn-sm btn-outline-danger rounded-circle"
+                                        data-bs-toggle="tooltip"
+                                        title="Delete Employee">
+                                <i class="fas fa-trash"></i>
                                 </button>
+
+                            </div>
                             </td>
                         </tr>
                         {% empty %}
@@ -205,4 +321,17 @@
     });
 </script>
 
+<!-- profile script -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll(".employee-row").forEach(row => {
+            row.addEventListener("click", function (e) {
+                // prevent clicking buttons/icons inside row
+                if (e.target.closest("a, button, i")) return;
+
+                window.location.href = this.dataset.href;
+            });
+        });
+    });
+</script>
 {% endblock %}

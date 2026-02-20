@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Profile | {{ employee.user.get_full_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in-up px-4 py-4" style="max-width: 1400px;">
+
+    <!-- Breadcrumb & Actions -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">Employee Profile</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="#" class="text-decoration-none text-muted">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'employee_list' %}" class="text-decoration-none text-muted">Employees</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ employee.employee_id }}</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+
+            <!-- Back -->
+            <a href="{% url 'employee_list' %}"
+            class="btn btn-light border text-secondary shadow-sm px-3">
+                <i class="fas fa-arrow-left me-2"></i>
+                Back
+            </a>
+
+            <!-- Attendance Calendar -->
+            <a href="{% url 'attendance_calendar' employee.id year month %}"
+            class="btn btn-outline-primary shadow-sm px-4">
+                <i class="fas fa-calendar-alt me-2"></i>
+                Attendance Calendar
+            </a>
+
+            <!-- Edit Profile (Primary Action) -->
+            <a href="{% url 'employee_update' employee.id %}"
+            class="btn btn-primary shadow-sm px-4">
+                <i class="fas fa-user-edit me-2"></i>
+                Edit Profile
+            </a>
+
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- LEFT COLUMN: Identity Card -->
+        <div class="col-lg-4 col-xl-3">
+            <div class="card modern-card mb-4 h-100">
+                <div class="card-body text-center p-4">
+                    
+                    <!-- Profile Image -->
+                    <div class="position-relative d-inline-block mb-3">
+                        {% if employee.face_image %}
+                            <img src="{{ employee.face_image.url }}" class="rounded-circle shadow-sm border border-4 border-white" 
+                                 style="width: 160px; height: 160px; object-fit: cover;">
+                        {% else %}
+                            <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto shadow-sm" 
+                                 style="width: 160px; height: 160px;">
+                                <i class="fas fa-user text-secondary opacity-25 fa-4x"></i>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Status Badge -->
+                        <span class="position-absolute bottom-0 end-0 badge rounded-pill 
+                            {% if employee.is_active %}bg-success{% else %}bg-danger{% endif %} border border-white p-2">
+                            {% if employee.is_active %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}
+                        </span>
+                    </div>
+
+                    <h4 class="fw-bold mb-1">{{ employee.user.get_full_name }}</h4>
+                    <p class="text-muted mb-3">{{ employee.position.title|default:"No Position" }}</p>
+                    
+                    <div class="d-flex justify-content-center gap-2 mb-4">
+                        <span class="badge bg-primary-soft px-3 py-2 rounded-pill">
+                            {{ employee.employee_id }}
+                        </span>
+                        <span class="badge bg-warning-soft px-3 py-2 rounded-pill">
+                            {{ employee.employment_status|default:"Active" }}
+                        </span>
+                    </div>
+
+                    <hr class="opacity-10 my-4">
+
+                    <!-- Contact Info -->
+                    <div class="text-start">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="icon-circle bg-light text-primary me-3">
+                                <i class="fas fa-envelope"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <small class="text-muted d-block">Email Address</small>
+                                <span class="text-dark fw-medium text-truncate d-block" title="{{ employee.user.email }}">
+                                    {{ employee.user.email }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <div class="icon-circle bg-light text-primary me-3">
+                                <i class="fas fa-phone"></i>
+                            </div>
+                            <div>
+                                <small class="text-muted d-block">Phone Number</small>
+                                <span class="text-dark fw-medium">
+                                    {{ employee.phone_number|default:"Not Provided" }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Details -->
+        <div class="col-lg-8 col-xl-9">
+            
+            <!-- 1. Work & Department Info -->
+            <div class="card modern-card mb-4">
+                <div class="card-header-modern">
+                    <div class="icon-box bg-info-soft text-info">
+                        <i class="fas fa-briefcase"></i>
+                    </div>
+                    <h5 class="mb-0">Professional Information</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row g-4">
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase fw-bold mb-1">Department</label>
+                            <div class="fs-6 text-dark fw-semibold">
+                                {{ employee.department.name|default:"-" }}
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase fw-bold mb-1">Reporting Manager</label>
+                            <div class="d-flex align-items-center">
+                                {% if employee.manager %}
+                                    {% if employee.manager.face_image %}
+                                        <img src="{{ employee.manager.face_image.url }}" class="rounded-circle me-2" width="24" height="24">
+                                    {% else %}
+                                        <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-2" style="width:24px; height:24px; font-size:10px;">
+                                            {{ employee.manager.first_name|slice:":1" }}
+                                        </div>
+                                    {% endif %}
+                                    <span class="fw-semibold">{{ employee.manager.user.get_full_name }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase fw-bold mb-1">System Role</label>
+                            <div class="fs-6 text-dark fw-semibold">{{ employee.role }}</div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase fw-bold mb-1">Work Shift / Rule</label>
+                            <div class="fs-6 text-dark fw-semibold">
+                                <i class="far fa-clock text-muted me-1"></i>{{ employee.work_rule|default:"Standard Shift" }}
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase fw-bold mb-1">Date of Joining</label>
+                            <div class="fs-6 text-dark fw-semibold">
+                                {{ joining.date_of_joining|date:"M d, Y"|default:"-" }}
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <label class="text-muted small text-uppercase fw-bold mb-1">Confirmation Date</label>
+                            <div class="fs-6 text-dark fw-semibold">
+                                {{ joining.confirmation_date|date:"M d, Y"|default:"-" }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Financial & Documents Grid -->
+            <div class="row">
+                <!-- Salary Structure -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card modern-card h-100">
+                        <div class="card-header-modern">
+                            <div class="icon-box bg-success-soft text-success">
+                                <i class="fas fa-coins"></i>
+                            </div>
+                            <h5 class="mb-0">Compensation</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            {% if salary %}
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0 align-middle">
+                                    <tbody>
+                                        <tr>
+                                            <td class="ps-4 text-muted">Base Salary</td>
+                                            <td class="pe-4 text-end fw-bold">₹{{ salary.base_salary|floatformat:2 }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="ps-4 text-muted">HRA</td>
+                                            <td class="pe-4 text-end fw-bold">₹{{ salary.hra|floatformat:2 }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="ps-4 text-muted">Allowances</td>
+                                            <td class="pe-4 text-end fw-bold">₹{{ salary.allowances|floatformat:2 }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="ps-4 text-muted">Deductions</td>
+                                            <td class="pe-4 text-end fw-bold text-danger">- ₹{{ salary.deductions|floatformat:2 }}</td>
+                                        </tr>
+                                        <tr class="bg-light">
+                                            <td class="ps-4 fw-bold text-dark">Net Payable (Est.)</td>
+                                            <td class="pe-4 text-end fw-bold text-success">
+                                                <!-- Simple calculation for display -->
+                                                ₹{{ salary.base_salary|add:salary.hra|add:salary.allowances|add:"-salary.deductions"|floatformat:2 }}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                                <div class="p-4 text-center text-muted">
+                                    <i class="fas fa-money-check-alt fa-2x mb-2 opacity-25"></i>
+                                    <p>Salary structure not defined.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Documents -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card modern-card h-100">
+                        <div class="card-header-modern">
+                            <div class="icon-box bg-secondary-soft text-secondary">
+                                <i class="fas fa-folder-open"></i>
+                            </div>
+                            <h5 class="mb-0">Joining Documents</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            {% if documents %}
+                                <div class="vstack gap-3">
+                                    {% for doc in documents %}
+                                    <div class="d-flex align-items-center p-2 rounded border bg-light hover-shadow transition">
+                                        <div class="me-3">
+                                            {% if '.pdf' in doc.file.name %}
+                                                <i class="fas fa-file-pdf text-danger fs-3"></i>
+                                            {% elif '.doc' in doc.file.name %}
+                                                <i class="fas fa-file-word text-primary fs-3"></i>
+                                            {% else %}
+                                                <i class="fas fa-file-image text-success fs-3"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="overflow-hidden me-auto">
+                                            <h6 class="mb-0 text-truncate small fw-bold">Document {{ forloop.counter }}</h6>
+                                            <small class="text-muted" style="font-size: 0.75rem;">Uploaded on Joining</small>
+                                        </div>
+                                        <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-white border shadow-sm">
+                                            <i class="fas fa-download text-muted"></i>
+                                        </a>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <div class="text-center py-4 text-muted">
+                                    <i class="far fa-folder-open fa-2x mb-2 opacity-25"></i>
+                                    <p class="small mb-0">No documents found.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+    :root {
+        --primary: #4361ee;
+        --card-radius: 16px;
+    }
+
+    body {
+        background-color: #f3f4f6;
+        font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    /* Card Styling */
+    .modern-card {
+        background: #fff;
+        border: none;
+        border-radius: var(--card-radius);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+        transition: transform 0.2s;
+        overflow: hidden;
+    }
+
+    .card-header-modern {
+        padding: 20px 25px;
+        border-bottom: 1px solid rgba(0,0,0,0.04);
+        display: flex;
+        align-items: center;
+        background: #fff;
+    }
+
+    /* Icons */
+    .icon-box {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
+        font-size: 1rem;
+    }
+
+    .icon-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Soft Colors */
+    .bg-primary-soft { background: rgba(67, 97, 238, 0.1); color: var(--primary); }
+    .bg-info-soft { background: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
+    .bg-success-soft { background: rgba(25, 135, 84, 0.1); color: #198754; }
+    .bg-warning-soft { background: rgba(255, 193, 7, 0.1); color: #d6a205; }
+    .bg-secondary-soft { background: rgba(108, 117, 125, 0.1); color: #6c757d; }
+
+    /* Utilities */
+    .hover-shadow:hover {
+        background-color: #fff !important;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    }
+    .transition { transition: all 0.2s ease; }
+    
+    .table-hover tbody tr:hover {
+        background-color: rgba(67, 97, 238, 0.02);
+    }
+
+    /* Animation */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in-up { animation: fadeInUp 0.4s ease-out; }
+</style>
+{% endblock %}

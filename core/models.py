@@ -11,6 +11,15 @@ from datetime import date, datetime, timedelta
 import calendar
 import json
 
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import date, datetime, time, timedelta
+import calendar
+from django.utils import timezone
+from django.core.files.base import ContentFile
+
+from core.utils.payslip_pdf import generate_payslip_pdf
+from core.utils.payslip_email import email_payslip
+
 
 # ============================================================
 # 👤 EMPLOYEE MASTER
@@ -120,6 +129,25 @@ class Department(models.Model):
 # ============================================================
 # 💰 SALARY & PAYROLL
 # ============================================================
+# ============================================================
+# 🔁 SHIFT WINDOW (DAY + NIGHT SAFE)
+# ============================================================
+def get_shift_window(day: date, work_rule):
+    start_time = work_rule.shift_start_time
+    end_time = work_rule.shift_end_time
+
+    start_dt = datetime.combine(day, start_time)
+
+    # Night shift (cross-midnight)
+    if end_time <= start_time:
+        end_dt = datetime.combine(day + timedelta(days=1), end_time)
+    else:
+        end_dt = datetime.combine(day, end_time)
+
+    return (
+        timezone.make_aware(start_dt),
+        timezone.make_aware(end_dt),
+    )
 
 
 class SalaryStructure(models.Model):
@@ -157,51 +185,45 @@ def daterange(start: date, end: date):
         yield d
         d += timedelta(days=1)
 
-
-
-def get_employee_rule(emp):
+# ============================================================
+# 📋 EMPLOYEE RULE (SAFE DICT)
+# ============================================================
+def get_employee_rule(emp: Employee):
     rule = emp.work_rule
     if not rule:
         raise ValueError("Employee has no WorkRule assigned")
 
     return {
-        # Working pattern
-        "working_days": getattr(rule, "working_days", "5_day"),
-        "saturday_is_working": getattr(rule, "saturday_is_working", False),
-        "sunday_is_working": getattr(rule, "sunday_is_working", False),
-
-        # Shift
-        "shift_start": getattr(rule, "shift_start_time", None),
-        "shift_end": getattr(rule, "shift_end_time", None),
-
-        # Day thresholds (USED BY SALARY)
-        "full_day_hours": Decimal(str(getattr(rule, "full_day_hours", 8.0))),
-        "half_day_hours": Decimal(str(getattr(rule, "half_day_hours", 4.0))),
-
-        # Night shift (OPTIONAL / FUTURE)
-        "night_start": getattr(rule, "night_shift_start", None),
-        "night_end": getattr(rule, "night_shift_end", None),
-        "night_multiplier": Decimal(str(getattr(rule, "night_bonus_multiplier", 0))),
-
-        # Overtime (USED)
-        "overtime_rate": Decimal(str(getattr(rule, "overtime_rate", 0))),
-        "count_weekend_overtime": getattr(rule, "count_weekend_overtime", True),
-        "count_holiday_overtime": getattr(rule, "count_holiday_overtime", True),
+        "working_days": rule.working_days,
+        "saturday_is_working": rule.saturday_is_working,
+        "sunday_is_working": rule.sunday_is_working,
+        "full_day_hours": Decimal(str(rule.full_day_hours)),
+        "half_day_hours": Decimal(str(rule.half_day_hours)),
+        "overtime_rate": Decimal(str(rule.overtime_rate)),
+        "count_weekend_overtime": rule.count_weekend_overtime,
+        "count_holiday_overtime": rule.count_holiday_overtime,
     }
 
-
-
-def is_working_day(day, rule):
+# ============================================================
+# 📅 WORKING DAY CHECK
+# ============================================================
+def is_working_day(day: date, rule: dict) -> bool:
     wd = day.weekday()  # 0=Mon
+
     if rule["working_days"] == "5_day":
         return wd < 5
+
     if rule["working_days"] == "6_day":
         return wd < 6
+
     if wd == 5:
         return rule["saturday_is_working"]
+
     if wd == 6:
         return rule["sunday_is_working"]
+
     return True
+
 
 def get_hours_worked(employee: 'Employee', day: date) -> float:
     """Compute hours from earliest check-in to latest check-out on a given date.
@@ -228,28 +250,11 @@ def has_approved_leave(employee: 'Employee', day: date):
         return (False, False)
     return (True, bool(getattr(leave.leave_type, 'is_paid', True)))
 
-
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import date, datetime, time, timedelta
-import calendar
-from django.utils import timezone
-from django.core.files.base import ContentFile
-
-from core.utils.payslip_pdf import generate_payslip_pdf
-from core.utils.payslip_email import email_payslip
-
-
-NIGHT_START = time(22, 0)
-NIGHT_END = time(6, 0)
-NIGHT_BONUS_MULTIPLIER = Decimal("0.20")  # 20%
-
-
+# ============================================================
+# 💰 PAYROLL MANAGER (FINAL & CORRECT)
 class PayrollManager(models.Manager):
 
     def generate_monthly_salary(self, year: int, month: int):
-        from decimal import Decimal, ROUND_HALF_UP
-        import calendar
-        from django.utils import timezone
 
         first_day = date(year, month, 1)
         last_day = date(year, month, calendar.monthrange(year, month)[1])
@@ -258,11 +263,15 @@ class PayrollManager(models.Manager):
         employees = Employee.objects.filter(
             is_active=True,
             employment_status="active"
-        ).select_related("work_rule")
+        ).select_related("work_rule", "user")
 
         for emp in employees:
 
+            # Prevent duplicate payroll
             if Payroll.objects.filter(employee=emp, month=first_day).exists():
+                continue
+
+            if not emp.work_rule:
                 continue
 
             try:
@@ -281,11 +290,33 @@ class PayrollManager(models.Manager):
             lop_days = Decimal("0.0")
             overtime_hours = Decimal("0.0")
 
-            for day in daterange(first_day, last_day):
+            for day in self._daterange(first_day, last_day):
+
+                # ---------- WORKING DAY ----------
+                if not is_working_day(day, rule):
+                    continue
+
+                # ---------- HOLIDAY ----------
+                if Holiday.objects.filter(date=day).exists():
+                    full_days += 1
+                    continue
+
+                # ---------- APPROVED LEAVE ----------
+                if LeaveApplication.objects.filter(
+                    employee=emp,
+                    status="approved",
+                    start_date__lte=day,
+                    end_date__gte=day
+                ).exists():
+                    full_days += 1
+                    continue
+
+                # ---------- SHIFT WINDOW ----------
+                shift_start, shift_end = get_shift_window(day, emp.work_rule)
 
                 logs = Attendance.objects.filter(
                     employee=emp,
-                    timestamp__date=day
+                    timestamp__range=(shift_start, shift_end)
                 ).order_by("timestamp")
 
                 if not logs.exists():
@@ -303,7 +334,7 @@ class PayrollManager(models.Manager):
                     (cout.timestamp - cin.timestamp).total_seconds() / 3600
                 ).quantize(Decimal("0.01"))
 
-                # ---- Day classification ----
+                # ---------- DAY CLASSIFICATION ----------
                 if work_hours >= rule["full_day_hours"]:
                     full_days += 1
                 elif work_hours >= rule["half_day_hours"]:
@@ -312,7 +343,7 @@ class PayrollManager(models.Manager):
                     lop_days += 1
                     continue
 
-                # ---- Overtime ----
+                # ---------- OVERTIME ----------
                 if work_hours > rule["full_day_hours"]:
                     overtime_hours += (
                         work_hours - rule["full_day_hours"]
@@ -352,18 +383,15 @@ class PayrollManager(models.Manager):
                 processed_at=timezone.now(),
             )
 
-            # Generate payslip
             pdf, filename = generate_payslip_pdf(payroll)
             payroll.payslip_pdf.save(filename, ContentFile(pdf.read()))
             email_payslip(payroll)
 
-
-    def _daterange(self, start, end):
+    def _daterange(self, start: date, end: date):
         d = start
         while d <= end:
             yield d
             d += timedelta(days=1)
-
 
 class Payroll(models.Model):
     employee = models.ForeignKey("Employee", on_delete=models.CASCADE)
@@ -486,7 +514,6 @@ class WorkRule(models.Model):
 
     def __str__(self):
         return self.name
-
 
 
 # ============================================================
