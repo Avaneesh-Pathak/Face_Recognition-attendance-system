@@ -72,7 +72,8 @@ from django.views.decorators.http import require_POST, require_GET
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-
+from django.utils import timezone
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 import json
 
@@ -924,6 +925,27 @@ def get_shift_window(time_ref, rule):
 
     return shift_start, shift_end
 
+def get_open_checkin(employee):
+    """
+    Returns the latest check-in that does not yet have a checkout.
+    Works perfectly for night shifts and day shifts.
+    """
+    last_checkin = Attendance.objects.filter(
+        employee=employee,
+        attendance_type="check_in"
+    ).order_by("-timestamp").first()
+
+    if not last_checkin:
+        return None
+
+    has_checkout = Attendance.objects.filter(
+        employee=employee,
+        attendance_type="check_out",
+        timestamp__gt=last_checkin.timestamp
+    ).exists()
+
+    return None if has_checkout else last_checkin
+
 # ============================================================
 # 📸 MARK ATTENDANCE
 @csrf_exempt
@@ -979,21 +1001,17 @@ def mark_attendance(request):
         employee = Employee.objects.filter(
             employee_id=emp_id,
             is_active=True
-        ).select_related(
-            "work_rule",
-            "user",
-            "assigned_location"
-        ).first()
+        ).select_related("work_rule", "user", "assigned_location").first()
 
-        if not employee or not employee.work_rule:
+        if not employee:
             return JsonResponse({
                 "success": False,
-                "message": "Employee invalid or work rule missing",
+                "message": "Employee not found",
                 "color": "red"
             })
 
         # ----------------------------------------------------
-        # 📍 LOCATION VALIDATION (UNCHANGED)
+        # 📍 Location Validation
         # ----------------------------------------------------
         lat = request.POST.get("latitude")
         lng = request.POST.get("longitude")
@@ -1030,7 +1048,7 @@ def mark_attendance(request):
                 })
 
         # ----------------------------------------------------
-        # 🔒 SHIFT LOGIC (DB LOCKED)
+        # 🔒 ATTENDANCE LOGIC (PERMANENT FIX)
         # ----------------------------------------------------
         with transaction.atomic():
             now = timezone.now()
@@ -1038,85 +1056,75 @@ def mark_attendance(request):
 
             settings_obj = AttendanceSettings.objects.first()
             min_hours = settings_obj.min_hours_before_checkout if settings_obj else 0
+            REST_HOURS_AFTER_CHECKOUT = 8  # 🔒 HARD LOCK
 
-            shift_start, shift_end = get_shift_window(now, employee.work_rule)
+            # --------------------------------------------
+            # 1️⃣ Check for open shift
+            # --------------------------------------------
+            open_checkin = get_open_checkin(employee)
 
-            shift_logs = Attendance.objects.select_for_update().filter(
-                employee=employee,
-                timestamp__range=(shift_start, shift_end)
-            ).order_by("timestamp")
+            # --------------------------------------------
+            # 2️⃣ If open shift → CHECK-OUT
+            # --------------------------------------------
+            if open_checkin:
+                worked_hours = (now - open_checkin.timestamp).total_seconds() / 3600
 
-            check_in = shift_logs.filter(attendance_type="check_in").first()
-            check_out = shift_logs.filter(attendance_type="check_out").first()
-
-            # 🚫 Shift already completed
-            if check_in and check_out:
-                return JsonResponse({
-                    "success": True,
-                    "status": "completed",
-                    "message": f"Shift already completed: {user_name}",
-                    "name": user_name,
-                    "attendance_type": "Completed",
-                    "confidence": int(score * 100),
-                    "color": "green"
-                })
-
-            # ⏱ Anti-spam (camera protection)
-            last_att = shift_logs.last()
-            if last_att:
-                elapsed_seconds = (now - last_att.timestamp).total_seconds()
-                if elapsed_seconds < 120:
-                    return JsonResponse({
-                        "success": True,
-                        "status": "duplicate",
-                        "message": f"Already Marked: {user_name}",
-                        "name": user_name,
-                        "attendance_type": last_att.get_attendance_type_display(),
-                        "confidence": int(score * 100),
-                        "color": "green"
-                    })
-
-            # ------------------------------------------------
-            # ✅ DECISION LOGIC (CORRECT)
-            # ------------------------------------------------
-            if not check_in:
-                # ✅ FIRST AND ONLY CHECK-IN
-                att_type = "check_in"
-
-            else:
-                # ❌ No second check-in allowed
-                if check_out:
-                    return JsonResponse({
-                        "success": True,
-                        "status": "completed",
-                        "message": f"Shift already completed: {user_name}",
-                        "name": user_name,
-                        "attendance_type": "Completed",
-                        "confidence": int(score * 100),
-                        "color": "green"
-                    })
-
-                # ⏳ MIN HOURS CHECK — ONLY FOR CHECKOUT
-                worked_hours = (now - check_in.timestamp).total_seconds() / 3600
                 if worked_hours < min_hours:
                     mins_left = int((min_hours - worked_hours) * 60)
+                    
                     return JsonResponse({
                         "success": False,
-                        "message": f"Wait {mins_left}m to checkout",
+                        "message": f"Wait {mins_left} minutes to checkout",
                         "color": "yellow"
                     })
 
                 att_type = "check_out"
 
-            # ------------------------------------------------
-            # 📝 CREATE RECORD
-            # ------------------------------------------------
+            # --------------------------------------------
+            # 3️⃣ No open shift → CHECK-IN (8h lock)
+            # --------------------------------------------
+            else:
+                last_checkout = Attendance.objects.filter(
+                    employee=employee,
+                    attendance_type="check_out"
+                ).order_by("-timestamp").first()
+
+                if last_checkout:
+                    remaining_minutes = int(
+                        (REST_HOURS_AFTER_CHECKOUT * 60) -
+                        ((now - last_checkout.timestamp).total_seconds() / 60)
+                    )
+
+                    if remaining_minutes > 0:
+                        hours_left = remaining_minutes // 60
+                        minutes_left = remaining_minutes % 60
+
+                        if hours_left > 0:
+                            message = f"Next check-in allowed after {hours_left}h {minutes_left}m"
+                        else:
+                            message = f"Next check-in allowed after {minutes_left} minutes"
+
+                        return JsonResponse({
+                            "success": False,
+                            "message": message,
+                            "color": "yellow"
+                        })
+
+                att_type = "check_in"
+
+            # --------------------------------------------
+            # 4️⃣ Create Attendance Record
+            # --------------------------------------------
             Attendance.objects.create(
                 employee=employee,
                 attendance_type=att_type,
                 confidence_score=score,
                 location=matched_office.name
             )
+
+        # ----------------------------------------------------
+        # ✅ Success Response
+        # ----------------------------------------------------
         local_time = timezone.localtime(now)
         return JsonResponse({
             "success": True,
@@ -1136,7 +1144,7 @@ def mark_attendance(request):
             "message": "Server Error"
         }, status=500)
 
-
+        
 
 @login_required
 def attendance_log_api(request):
@@ -1365,7 +1373,6 @@ def video_feed_view(request):
     if gen is None:
         return HttpResponseServerError("Camera not accessible")
     return StreamingHttpResponse(gen, content_type='multipart/x-mixed-replace; boundary=frame')
-
 
 
 @staff_member_required
@@ -1696,54 +1703,33 @@ def attendance_history_page(request):
     return render(request, 'attendance_history.html', context)
 
 
-@login_required
-@require_GET
-def attendance_calendar_data(request, employee_id, year, month):
-    """Get attendance data for calendar display"""
-    # ensure ints
-    try:
-        year = int(year)
-        month = int(month)
-    except Exception:
-        return JsonResponse({'error': 'Invalid year/month'}, status=400)
 
-    emp = get_object_or_404(Employee, id=employee_id)
+def get_work_date(attendance, rule):
+    """
+    Logical work date:
+    - Day shift → same date
+    - Night shift → early morning belongs to previous day
+    """
+    ts = timezone.localtime(attendance.timestamp)
 
-    start_date = date(year, month, 1)
-    end_day = calendar.monthrange(year, month)[1]
-    end_date = date(year, month, end_day)
+    if not rule:
+        return ts.date()
 
-    present_days = Attendance.objects.filter(
-        employee=emp,
-        timestamp__date__range=(start_date, end_date),
-        attendance_type='check_in'
-    ).values_list('timestamp__date', flat=True)
+    start = rule.shift_start_time
+    end = rule.shift_end_time
 
-    present_day_set = {d.day for d in present_days}
+    # Night shift (crosses midnight)
+    if end <= start:
+        if ts.time() < end:
+            return ts.date() - timedelta(days=1)
 
-    month_data = []
-    for day in range(1, end_day + 1):
-        current_date = date(year, month, day)
-        month_data.append({
-            'day': day,
-            'date': current_date.isoformat(),
-            'present': day in present_day_set,
-            'is_weekend': current_date.weekday() >= 5,
-            'is_future': current_date > timezone.now().date()
-        })
-
-    return JsonResponse({
-        'employee': emp.user.get_full_name(),
-        'year': year,
-        'month': month,
-        'month_name': calendar.month_name[month],
-        'data': month_data
-    })
+    return ts.date()
 
 
 @login_required
 def attendance_calendar(request, employee_id, year, month):
     employee = get_object_or_404(Employee, id=employee_id)
+
     year = int(year)
     month = int(month)
 
@@ -1751,116 +1737,176 @@ def attendance_calendar(request, employee_id, year, month):
     end_day = monthrange(year, month)[1]
     end_date = date(year, month, end_day)
 
+    rule = employee.work_rule
+
+    # 🚨 EXTENDED RANGE (CRITICAL FOR NIGHT SHIFT)
     attendance_records = Attendance.objects.filter(
         employee=employee,
-        timestamp__date__range=(start_date, end_date)
-    ).order_by('timestamp')
+        timestamp__gte=start_date - timedelta(days=1),
+        timestamp__lte=end_date + timedelta(days=1),
+    ).order_by("timestamp")
 
-    settings = AttendanceSettings.objects.first()
-    max_daily_hours = settings.max_daily_hours if settings else 8.0
-
+    # -----------------------------
+    # BUILD DAILY ATTENDANCE (FIXED)
+    # -----------------------------
     daily_attendance = {}
-    for record in attendance_records:
-        day = record.timestamp.date()
-        if day not in daily_attendance:
-            daily_attendance[day] = {'check_in': None, 'check_out': None}
-        if record.attendance_type == 'check_in' and not daily_attendance[day]['check_in']:
-            daily_attendance[day]['check_in'] = record.timestamp
-        elif record.attendance_type == 'check_out':
-            daily_attendance[day]['check_out'] = record.timestamp
 
+    for record in attendance_records:
+        work_date = get_work_date(record, rule)
+
+        if not (start_date <= work_date <= end_date):
+            continue
+
+        daily_attendance.setdefault(work_date, {
+            "check_in": None,
+            "check_out": None,
+        })
+
+        ts = timezone.localtime(record.timestamp)
+
+        if record.attendance_type == "check_in":
+            daily_attendance[work_date]["check_in"] = ts
+        elif record.attendance_type == "check_out":
+            daily_attendance[work_date]["check_out"] = ts
+
+    # -----------------------------
+    # CALENDAR RENDER DATA
+    # -----------------------------
     month_data = []
     total_present = total_absent = total_holiday = 0
-    total_working_hours = timedelta()
+    total_work_seconds = 0
 
     for d in range(1, end_day + 1):
         day_date = date(year, month, d)
         weekday = calendar.day_name[day_date.weekday()]
-        is_holiday = weekday == "Sunday"
+        is_sunday = weekday == "Sunday"
 
-        check_in = daily_attendance.get(day_date, {}).get('check_in')
-        check_out = daily_attendance.get(day_date, {}).get('check_out')
+        record = daily_attendance.get(day_date)
+        check_in = record["check_in"] if record else None
+        check_out = record["check_out"] if record else None
+
+        present = False
         daily_hours = None
 
-        if check_in and check_out:
-            daily_hours = check_out - check_in
-            total_working_hours += daily_hours
+        if check_in and check_out and check_out > check_in:
+            delta = check_out - check_in
+            daily_hours = str(delta).split(".")[0]
+            total_work_seconds += delta.total_seconds()
+            present = True
             total_present += 1
-        elif is_holiday:
-            total_holiday += 1
         else:
-            total_absent += 1
+            if is_sunday:
+                total_holiday += 1
+            else:
+                total_absent += 1
 
         month_data.append({
-            'day': d,
-            'day_name': weekday[:3],
-            'present': bool(check_in and check_out),
-            'holiday': is_holiday,
-            'daily_hours': str(daily_hours).split('.')[0] if daily_hours else None,
+            "day": d,
+            "day_name": weekday[:3],
+            "present": present,
+            "holiday": is_sunday and not present,
+            "daily_hours": daily_hours,
         })
 
-    next_month = month + 1 if month < 12 else 1
-    next_year = year if month < 12 else year + 1
-    previous_month = month - 1 if month > 1 else 12
-    previous_year = year if month > 1 else year - 1
+    total_working_hours = round(total_work_seconds / 3600, 2)
 
-    first_day_offset = (calendar.weekday(year, month, 1) + 1) % 7
-
-    total_hours = total_working_hours.total_seconds() / 3600
-    total_expected_hours = (total_present * max_daily_hours)
+    settings = AttendanceSettings.objects.first()
+    expected_hours = total_present * (settings.max_daily_hours if settings else 8)
 
     context = {
-        'employee': employee,
-        'year': year,
-        'month': month,
-        'month_name': month_name[month],
-        'data': month_data,
-        'next_month': next_month,
-        'next_year': next_year,
-        'previous_month': previous_month,
-        'previous_year': previous_year,
-        'day_names': list(calendar.day_name),
-        'first_day_offset': first_day_offset,
-        'total_present': total_present,
-        'total_absent': total_absent,
-        'total_holiday': total_holiday,
-        'all_employees': Employee.objects.all().order_by('user__first_name'),
-        'total_working_hours': round(total_hours, 2),
-        'total_expected_hours': round(total_expected_hours, 2),
+        "employee": employee,
+        "year": year,
+        "month": month,
+        "month_name": month_name[month],
+        "data": month_data,
+
+        "total_present": total_present,
+        "total_absent": total_absent,
+        "total_holiday": total_holiday,
+        "total_working_hours": total_working_hours,
+        "total_expected_hours": round(expected_hours, 2),
+
+        "next_month": month + 1 if month < 12 else 1,
+        "next_year": year if month < 12 else year + 1,
+        "previous_month": month - 1 if month > 1 else 12,
+        "previous_year": year if month > 1 else year - 1,
+
+        "day_names": list(calendar.day_name),
+        "first_day_offset": (calendar.weekday(year, month, 1) + 1) % 7,
+        "all_employees": Employee.objects.all().order_by("user__first_name"),
     }
 
-    return render(request, 'attendance_calendar.html', context)
+    return render(request, "attendance_calendar.html", context)
+
 
 
 def attendance_day_detail(request, emp_id, date):
-    """
-    Returns JSON with all attendance logs for a specific employee and date.
-    """
     try:
         date_obj = datetime.strptime(date, "%Y-%m-%d").date()
     except ValueError:
-        return JsonResponse({'error': 'Invalid date format'}, status=400)
+        return JsonResponse({"error": "Invalid date"}, status=400)
 
-    logs = Attendance.objects.filter(
-        employee_id=emp_id,
-        timestamp__date=date_obj
-    ).order_by('timestamp')
+    emp = get_object_or_404(Employee, id=emp_id)
+    rule = emp.work_rule
 
-    data = {
-        'logs': [
+    logs = Attendance.objects.filter(employee=emp).order_by("timestamp")
+
+    day_logs = [
+        log for log in logs
+        if get_work_date(log, rule) == date_obj
+    ]
+
+    return JsonResponse({
+        "logs": [
             {
-                'type': log.get_attendance_type_display(),
-                'timestamp': log.timestamp.strftime("%I:%M %p"),
-                'location': log.location or '—',
-                'confidence': f"{log.confidence_score * 100:.1f}%" if log.confidence_score else '—',
-                'image': log.image_capture.url if getattr(log, 'image_capture', None) else '',
-                'notes': log.notes or ''
+                "type": log.get_attendance_type_display(),
+                "timestamp": timezone.localtime(log.timestamp).strftime("%I:%M %p"),
+                "location": log.location or "—",
+                "confidence": f"{log.confidence_score * 100:.1f}%" if log.confidence_score else "—",
             }
-            for log in logs
+            for log in day_logs
         ]
-    }
+    })
 
-    return JsonResponse(data)
+@login_required
+@require_GET
+def attendance_calendar_data(request, employee_id, year, month):
+    emp = get_object_or_404(Employee, id=employee_id)
+    rule = emp.work_rule
+
+    year = int(year)
+    month = int(month)
+
+    start_date = date(year, month, 1)
+    end_day = calendar.monthrange(year, month)[1]
+    end_date = date(year, month, end_day)
+
+    present_days = set()
+
+    for rec in Attendance.objects.filter(employee=emp):
+        work_date = get_work_date(rec, rule)
+        if start_date <= work_date <= end_date and rec.attendance_type == "check_in":
+            present_days.add(work_date.day)
+
+    data = []
+    for d in range(1, end_day + 1):
+        current = date(year, month, d)
+        data.append({
+            "day": d,
+            "present": d in present_days,
+            "is_weekend": current.weekday() >= 5,
+            "is_future": current > timezone.localdate(),
+        })
+
+    return JsonResponse({
+        "employee": emp.user.get_full_name(),
+        "year": year,
+        "month": month,
+        "month_name": calendar.month_name[month],
+        "data": data,
+    })
+
+
 
 
 @login_required
@@ -2341,8 +2387,6 @@ def department_delete(request, pk):
 # ============================================================
 # 💰 SALARY & PAYROLL VIEWS
 # ============================================================
-
-
 @login_required
 def salary_structure_list(request):
     structures = SalaryStructure.objects.select_related('employee__user')
@@ -2350,7 +2394,6 @@ def salary_structure_list(request):
         'structures': structures,
         'title': 'Salary Structures'
     })
-
 
 @login_required
 def salary_structure_create(request):
@@ -2367,8 +2410,6 @@ def salary_structure_create(request):
         'form': form,
         'title': 'Create Salary Structure'
     })
-
-
 
 @login_required
 @finance_required
@@ -2404,40 +2445,69 @@ def payroll_list(request):
         'title': 'Payroll'
     })
 
-
-
 @login_required
-# @finance_required
+@finance_required
 def generate_payroll(request):
     if request.method == 'POST':
         month = int(request.POST.get('month'))
         year = int(request.POST.get('year'))
+        employee_id = request.POST.get('employee', '').strip()
 
         try:
-            Payroll.objects.generate_monthly_salary(
-                year=year,
-                month=month
-            )
-            messages.success(
-                request,
-                f"Payroll generated for {calendar.month_name[month]} {year}"
-            )
+            # ---------------------------------------
+            # ALL EMPLOYEES
+            # ---------------------------------------
+            if employee_id == "":
+                Payroll.objects.generate_salary(
+                    year=year,
+                    month=month
+                )
+
+                messages.success(
+                    request,
+                    f"Payroll generated for ALL employees "
+                    f"({calendar.month_name[month]} {year})"
+                )
+
+            # ---------------------------------------
+            # SINGLE EMPLOYEE
+            # ---------------------------------------
+            else:
+                emp = Employee.objects.get(id=int(employee_id))
+
+                Payroll.objects.generate_salary(
+                    year=year,
+                    month=month,
+                    employee=emp
+                )
+
+                messages.success(
+                    request,
+                    f"Payroll generated for {emp.user.get_full_name()} "
+                    f"({calendar.month_name[month]} {year})"
+                )
+
+        except Employee.DoesNotExist:
+            messages.error(request, "Invalid employee selected.")
+
         except Exception as e:
-            messages.error(request, f"Error: {e}")
+            messages.error(request, f"Payroll error: {e}")
 
         return redirect('payroll_list')
 
-    active_employees = Employee.objects.filter(
+    employees = Employee.objects.filter(
+        employment_status='active',
+        is_active=True
+    ).select_related('user')
+    employees_count = Employee.objects.filter(
         employment_status='active',
         is_active=True
     ).count()
-
     return render(request, 'ems/generate_payroll.html', {
         'title': 'Generate Payroll',
-        'active_employees_count': active_employees,
+        'employees': employees,
+        'employees_count': employees_count,
     })
-
-
 
 @login_required
 def my_salary(request):
@@ -2458,9 +2528,6 @@ def my_salary(request):
         'salary_structure': structure,
         'title': 'My Salary'
     })
-
-
-
 
 @login_required
 # @finance_required
@@ -2504,9 +2571,6 @@ def pay_salary(request, pk):
         "title": "Pay Salary"
     })
 
-
-
-
 @login_required
 def download_salary_slip(request, pk):
     payroll = get_object_or_404(
@@ -2528,8 +2592,6 @@ def download_salary_slip(request, pk):
         open(payroll.payslip_pdf.path, 'rb'),
         content_type='application/pdf'
     )
-
-
 
 @login_required
 def payroll_slip_pdf(request, pk):
@@ -2565,7 +2627,6 @@ def payroll_slip_pdf(request, pk):
         content_type="application/pdf"
     )
 
-
 @login_required
 # @finance_required
 def payroll_expense_chart(request):
@@ -2598,8 +2659,6 @@ def payroll_expense_api(request):
         'labels': labels,
         'totals': totals
     })
-
-
 
 @login_required
 # @finance_required
@@ -2878,7 +2937,6 @@ def leave_application_update(request, pk):
         'form': form,
         'title': 'Update Leave Application'
     })
-
 
 @login_required
 def my_pending_approvals(request):

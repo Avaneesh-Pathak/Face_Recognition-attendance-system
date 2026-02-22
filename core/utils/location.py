@@ -4,7 +4,7 @@ def is_inside_office(user_lat, user_lng, office):
     """
     Returns True if user is inside office GPS radius
     """
-    R = 6371000  # Earth radius (meters)
+    R = 6371000  # Earth radius in meters
 
     lat1 = math.radians(float(user_lat))
     lon1 = math.radians(float(user_lng))

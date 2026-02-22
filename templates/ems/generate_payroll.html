@@ -39,9 +39,27 @@
                     <div class="mb-3">
                         <label for="year" class="form-label">Year</label>
                         <input type="number" name="year" id="year" class="form-control" 
-                               min="2020" max="2030" value="2024" required>
+                               min="2020" max="2030" value="2026" required>
                     </div>
+                    <div class="mb-3">
+                        <label for="employee" class="form-label fw-semibold">
+                            Employee <span class="text-muted">(optional)</span>
+                        </label>
 
+                        <select name="employee" id="employee" class="form-select">
+                            <option value="">— All Employees —</option>
+                            {% for emp in employees %}
+                                <option value="{{ emp.id }}">   
+                                    {{ emp.user.get_full_name }} ({{ emp.employee_id }})
+                                </option>
+                            {% endfor %}
+                        </select>
+
+                        <div class="form-text">
+                            Select an employee to generate payroll only for that person.
+                            Leave this blank to generate payroll for <strong>all employees</strong>.
+                        </div>
+                    </div>
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle"></i>
                         <strong>Warning:</strong> This action cannot be undone. Please verify the month and year before proceeding.
@@ -65,13 +83,10 @@
             <div class="card-body">
                 <div class="row text-center">
                     <div class="col-6">
-                        <h5>{{ active_employees_count }}</h5>
+                        <h5>{{ employees_count }}</h5>
                         <small class="text-muted">Active Employees</small>
                     </div>
-                    <div class="col-6">
-                        <h5>{{ recent_payroll_count }}</h5>
-                        <small class="text-muted">Recent Payroll Records</small>
-                    </div>
+                    
                 </div>
             </div>
         </div>

@@ -37,10 +37,9 @@
 
                 <div class="d-grid gap-2">
                     <button class="btn btn-outline-primary">
-                        <i class="fas fa-camera me-2"></i>Update Face Data
-                    </button>
-                    <button class="btn btn-light text-muted">
-                        <i class="fas fa-key me-2"></i>Change Password
+                        <a href="{% url 'employee_update' employee.id %}" class="text-decoration-none text-dark">
+                            <i class="fas fa-camera me-2"></i>Update Data
+                        </a>
                     </button>
                 </div>
             </div>

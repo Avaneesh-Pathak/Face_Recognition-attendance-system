@@ -219,8 +219,29 @@ def generate_payslip_pdf(payroll):
     # -------------------------------------------------
 
     total_days = calendar.monthrange(payroll.month.year, payroll.month.month)[1]
-    paid_days = min(payroll.present_days or 0, total_days)
-    lop_days = max(total_days - paid_days, 0)
+
+    # --- FIX: derive paid days from worked hours (PDF only) ---
+    rule = emp.work_rule
+    full_day_hours = Decimal(rule.full_day_hours or 0)
+
+    if full_day_hours > 0 and structure.base_salary:
+        # hourly_rate used in payroll generation
+        hourly_rate = (
+            structure.base_salary /
+            (Decimal(total_days) * full_day_hours)
+        )
+
+        worked_hours = Decimal(payroll.basic_pay) / hourly_rate
+
+        paid_days = int(
+            (worked_hours / full_day_hours)
+            .quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        )
+    else:
+        paid_days = 0
+
+    paid_days = max(0, min(paid_days, total_days))
+    lop_days = total_days - paid_days
 
     def metric(lbl, val):
         return Table([[Paragraph(lbl, styles["Label"])],

@@ -280,104 +280,171 @@ def has_approved_leave(employee: 'Employee', day: date):
 class PayrollManager(models.Manager):
 
     def generate_monthly_salary(self, year: int, month: int):
+        return self.generate_salary(year, month)
+
+    def generate_salary(self, year, month, employee=None):
+
+        print(f"\n[START] Payroll generation → {month}/{year}")
 
         first_day = date(year, month, 1)
         last_day = date(year, month, calendar.monthrange(year, month)[1])
-        days_in_month = Decimal(calendar.monthrange(year, month)[1])
 
         employees = Employee.objects.filter(
             is_active=True,
             employment_status="active"
-        ).select_related("work_rule", "user")
+        ).select_related("work_rule")
+
+        if employee:
+            employees = employees.filter(id=employee.id)
+
+        print(f"[INFO] Employees found: {employees.count()}")
 
         for emp in employees:
+            print("\n==============================")
+            print(f"[EMP] {emp.user.get_full_name()} ({emp.employee_id})")
 
-            # Prevent duplicate payroll
-            if Payroll.objects.filter(employee=emp, month=first_day).exists():
-                continue
-
+            # ----------------------------------
+            # SAFETY CHECKS
+            # ----------------------------------
             if not emp.work_rule:
+                print("❌ No WorkRule → SKIPPED")
                 continue
+
+            existing_payroll = Payroll.objects.filter(
+                employee=emp,
+                month=first_day
+            ).first()
+
+            if existing_payroll:
+                print("⚠ Existing payroll found → REGENERATING")
+                existing_payroll.delete()
 
             try:
-                structure = SalaryStructure.objects.get(employee=emp)
+                structure = emp.salary_structure
             except SalaryStructure.DoesNotExist:
+                print("❌ No SalaryStructure → SKIPPED")
                 continue
 
             rule = get_employee_rule(emp)
 
-            salary_per_day = (
-                structure.base_salary / days_in_month
+            print(f"[RULE] {rule}")
+
+            # ----------------------------------
+            # HOURLY RATE (MONTHLY → HOURLY)
+            # ----------------------------------
+            working_days = sum(
+                1 for d in daterange(first_day, last_day)
+                if is_working_day(d, rule)
+            )
+
+            if working_days == 0:
+                print("❌ No working days → SKIPPED")
+                continue
+
+            total_month_hours = Decimal(working_days) * rule["full_day_hours"]
+
+            hourly_rate = (
+                structure.base_salary / total_month_hours
             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-            full_days = Decimal("0.0")
-            half_days = Decimal("0.0")
-            lop_days = Decimal("0.0")
-            overtime_hours = Decimal("0.0")
+            print(f"[RATE] Hourly rate: {hourly_rate}")
 
-            for day in self._daterange(first_day, last_day):
+            total_work_hours = Decimal("0.00")
+            overtime_hours = Decimal("0.00")
+            lop_days = Decimal("0.00")
 
-                # ---------- WORKING DAY ----------
-                if not is_working_day(day, rule):
-                    continue
+            # ----------------------------------
+            # DAY LOOP
+            # ----------------------------------
+            for day in daterange(first_day, last_day):
+
+                is_work_day = is_working_day(day, rule)
+                print(f"\n[DAY] {day} | Working: {is_work_day}")
 
                 # ---------- HOLIDAY ----------
                 if Holiday.objects.filter(date=day).exists():
-                    full_days += 1
+                    if is_work_day:
+                        total_work_hours += rule["full_day_hours"]
+                        print("✔ Holiday (paid)")
                     continue
 
-                # ---------- APPROVED LEAVE ----------
-                if LeaveApplication.objects.filter(
-                    employee=emp,
-                    status="approved",
-                    start_date__lte=day,
-                    end_date__gte=day
-                ).exists():
-                    full_days += 1
+                # ---------- LEAVE ----------
+                is_leave, is_paid = has_approved_leave(emp, day)
+                if is_leave:
+                    if is_paid:
+                        total_work_hours += rule["full_day_hours"]
+                        print("✔ Paid leave")
+                    else:
+                        lop_days += 1
+                        print("❌ Unpaid leave")
                     continue
 
-                # ---------- SHIFT WINDOW ----------
-                shift_start, shift_end = get_shift_window(day, emp.work_rule)
-
-                logs = Attendance.objects.filter(
-                    employee=emp,
-                    timestamp__range=(shift_start, shift_end)
-                ).order_by("timestamp")
+                # ---------- ATTENDANCE FETCH ----------
+                if emp.work_rule.shift_end_time > emp.work_rule.shift_start_time:
+                    # ✅ DAY SHIFT → DATE BASED (FIX)
+                    logs = Attendance.objects.filter(
+                        employee=emp,
+                        timestamp__date=day
+                    ).order_by("timestamp")
+                    print(f"[LOGS] Day-shift logs: {logs.count()}")
+                else:
+                    # ✅ NIGHT SHIFT → SHIFT WINDOW
+                    shift_start, shift_end = get_shift_window(day, emp.work_rule)
+                    logs = Attendance.objects.filter(
+                        employee=emp,
+                        timestamp__range=(shift_start, shift_end)
+                    ).order_by("timestamp")
+                    print(f"[LOGS] Night-shift logs: {logs.count()}")
 
                 if not logs.exists():
-                    lop_days += 1
+                    if is_work_day:
+                        lop_days += 1
+                        print("❌ No attendance → LOP")
                     continue
 
                 cin = logs.filter(attendance_type="check_in").first()
                 cout = logs.filter(attendance_type="check_out").last()
 
+                print(f"[IN ] {cin}")
+                print(f"[OUT] {cout}")
+
                 if not cin or not cout or cout.timestamp <= cin.timestamp:
-                    lop_days += 1
+                    if is_work_day:
+                        lop_days += 1
+                        print("❌ Invalid punches → LOP")
                     continue
 
                 work_hours = Decimal(
                     (cout.timestamp - cin.timestamp).total_seconds() / 3600
                 ).quantize(Decimal("0.01"))
 
-                # ---------- DAY CLASSIFICATION ----------
-                if work_hours >= rule["full_day_hours"]:
-                    full_days += 1
-                elif work_hours >= rule["half_day_hours"]:
-                    half_days += Decimal("0.5")
+                print(f"[HOURS] Worked: {work_hours}")
+
+                # ✅ EVEN 1 HOUR COUNTS
+                if is_work_day:
+                    total_work_hours += work_hours
                 else:
-                    lop_days += 1
-                    continue
+                    if rule["count_weekend_overtime"]:
+                        overtime_hours += work_hours
 
                 # ---------- OVERTIME ----------
                 if work_hours > rule["full_day_hours"]:
-                    overtime_hours += (
-                        work_hours - rule["full_day_hours"]
-                    )
+                    overtime_hours += work_hours - rule["full_day_hours"]
 
-            paid_days = full_days + half_days
+            # ----------------------------------
+            # FINAL SALARY
+            # ----------------------------------
+            print("\n[SUMMARY]")
+            print(f"Total work hours: {total_work_hours}")
+            print(f"Overtime hours: {overtime_hours}")
+            print(f"LOP days: {lop_days}")
+
+            if total_work_hours == 0 and overtime_hours == 0:
+                print("❌ No payable hours → SKIPPED")
+                continue
 
             basic_pay = (
-                salary_per_day * paid_days
+                total_work_hours * hourly_rate
             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
             ot_pay = (
@@ -400,23 +467,24 @@ class PayrollManager(models.Manager):
                 deductions=structure.deductions,
                 calculated_salary=net_salary,
                 net_salary=net_salary,
-                present_days=paid_days,
-                half_days=half_days,
                 absent_days=lop_days,
                 overtime_hours=overtime_hours,
                 status="processed",
                 processed_at=timezone.now(),
             )
 
-            pdf, filename = generate_payslip_pdf(payroll)
-            payroll.payslip_pdf.save(filename, ContentFile(pdf.read()))
-            email_payslip(payroll)
+            print(f"✅ Payroll generated: ₹{net_salary}")
 
-    def _daterange(self, start: date, end: date):
-        d = start
-        while d <= end:
-            yield d
-            d += timedelta(days=1)
+            try:
+                pdf, filename = generate_payslip_pdf(payroll)
+                payroll.payslip_pdf.save(filename, ContentFile(pdf.read()))
+                email_payslip(payroll)
+            except Exception as e:
+                print(f"⚠ Payslip/email failed for {emp.employee_id}: {e}")
+
+        print("\n[END] Payroll generation complete\n")        
+
+
 
 class Payroll(models.Model):
     employee = models.ForeignKey("Employee", on_delete=models.CASCADE)
