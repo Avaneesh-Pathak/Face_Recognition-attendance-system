@@ -154,9 +154,6 @@ class Department(models.Model):
 # ============================================================
 # 💰 SALARY & PAYROLL
 # ============================================================
-# ============================================================
-# 🔁 SHIFT WINDOW (DAY + NIGHT SAFE)
-# ============================================================
 def get_shift_window(day: date, work_rule):
     start_time = work_rule.shift_start_time
     end_time = work_rule.shift_end_time

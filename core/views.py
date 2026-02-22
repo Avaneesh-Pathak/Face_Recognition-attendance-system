@@ -68,6 +68,9 @@ from .forms import ( UserRegistrationForm, EmployeeRegistrationForm, AttendanceS
     LeaveTypeForm, LeaveApplicationForm, LeaveApprovalForm, LeaveWorkflowStageForm,
     JoiningDetailForm, ResignationForm, NotificationForm,PayrollFilterForm
     )
+from decimal import Decimal, ROUND_HALF_UP
+import calendar
+from django.db.models import Sum
 from django.views.decorators.http import require_POST, require_GET
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib import messages
@@ -1907,8 +1910,6 @@ def attendance_calendar_data(request, employee_id, year, month):
     })
 
 
-
-
 @login_required
 @require_POST
 def update_attendance(request, att_id):
@@ -2411,13 +2412,110 @@ def salary_structure_create(request):
         'title': 'Create Salary Structure'
     })
 
+
+class PayrollForm(forms.ModelForm):
+    class Meta:
+        model = Payroll
+        fields = [
+            # Pay structure
+            'basic_pay',
+            'allowances',
+            'deductions',
+
+            # Attendance
+            'present_days',
+            'half_days',
+            'absent_days',
+            'overtime_hours',
+
+            # Document
+            'payslip_pdf',
+
+            # Status
+            'status',
+            'paid_date',
+        ]
+
+        widgets = {
+            'paid_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
+    # -------------------------------
+    # FIELD-LEVEL VALIDATIONS
+    # -------------------------------
+
+    def clean_basic_pay(self):
+        val = self.cleaned_data.get('basic_pay', Decimal('0'))
+        if val < 0:
+            raise forms.ValidationError("Basic pay cannot be negative.")
+        return val
+
+    def clean_allowances(self):
+        val = self.cleaned_data.get('allowances', Decimal('0'))
+        if val < 0:
+            raise forms.ValidationError("Allowances cannot be negative.")
+        return val
+
+    def clean_deductions(self):
+        val = self.cleaned_data.get('deductions', Decimal('0'))
+        if val < 0:
+            raise forms.ValidationError("Deductions cannot be negative.")
+        return val
+
+    def clean_overtime_hours(self):
+        val = self.cleaned_data.get('overtime_hours', Decimal('0'))
+        if val < 0:
+            raise forms.ValidationError("Overtime hours cannot be negative.")
+        return val
+
+    def clean_present_days(self):
+        val = self.cleaned_data.get('present_days', Decimal('0'))
+        if val < 0:
+            raise forms.ValidationError("Present days cannot be negative.")
+        return val
+
+    def clean_half_days(self):
+        val = self.cleaned_data.get('half_days', Decimal('0'))
+        if val < 0:
+            raise forms.ValidationError("Half days cannot be negative.")
+        return val
+
+    def clean_absent_days(self):
+        val = self.cleaned_data.get('absent_days', Decimal('0'))
+        if val < 0:
+            raise forms.ValidationError("Absent days cannot be negative.")
+        return val
+
+    # -------------------------------
+    # FORM-LEVEL VALIDATION
+    # -------------------------------
+
+    def clean(self):
+        cleaned = super().clean()
+
+        status = cleaned.get('status')
+        paid_date = cleaned.get('paid_date')
+
+        # Rule: Paid payroll MUST have paid_date
+        if status == 'paid' and not paid_date:
+            raise forms.ValidationError(
+                "Paid date is required when payroll status is PAID."
+            )
+
+        return cleaned
+
 @login_required
 @finance_required
 def payroll_list(request):
     form = PayrollFilterForm(request.GET or None)
     payrolls = Payroll.objects.select_related(
         'employee__user'
-    ).order_by('-month', 'employee__user__first_name')
+    ).only(
+        'employee__face_image',
+        'employee__employee_id',
+        'employee__user__first_name',
+        'employee__user__last_name'
+    )
 
     if form.is_valid():
         month = form.cleaned_data.get('month')
@@ -2449,65 +2547,154 @@ def payroll_list(request):
 @finance_required
 def generate_payroll(request):
     if request.method == 'POST':
-        month = int(request.POST.get('month'))
-        year = int(request.POST.get('year'))
-        employee_id = request.POST.get('employee', '').strip()
-
         try:
-            # ---------------------------------------
-            # ALL EMPLOYEES
-            # ---------------------------------------
-            if employee_id == "":
-                Payroll.objects.generate_salary(
-                    year=year,
-                    month=month
-                )
+            month = int(request.POST.get('month'))
+            year = int(request.POST.get('year'))
+            employee_id = request.POST.get('employee', '').strip()
 
+            if not (1 <= month <= 12):
+                raise ValueError("Invalid month selected.")
+
+            if year < 2000 or year > 2100:
+                raise ValueError("Invalid year selected.")
+
+            if employee_id == "":
+                Payroll.objects.generate_salary(year=year, month=month)
                 messages.success(
                     request,
-                    f"Payroll generated for ALL employees "
+                    f"Payroll generated for all employees "
                     f"({calendar.month_name[month]} {year})"
                 )
-
-            # ---------------------------------------
-            # SINGLE EMPLOYEE
-            # ---------------------------------------
             else:
-                emp = Employee.objects.get(id=int(employee_id))
-
-                Payroll.objects.generate_salary(
-                    year=year,
-                    month=month,
-                    employee=emp
-                )
-
+                emp = Employee.objects.get(id=employee_id)
+                Payroll.objects.generate_salary(year=year, month=month, employee=emp)
                 messages.success(
                     request,
                     f"Payroll generated for {emp.user.get_full_name()} "
                     f"({calendar.month_name[month]} {year})"
                 )
 
+            return redirect('payroll_list')
+
         except Employee.DoesNotExist:
-            messages.error(request, "Invalid employee selected.")
+            messages.error(request, "Selected employee does not exist.")
 
-        except Exception as e:
-            messages.error(request, f"Payroll error: {e}")
+        except ValueError as e:
+            messages.error(request, str(e))
 
-        return redirect('payroll_list')
+        except Exception:
+            messages.error(
+                request,
+                "Payroll generation failed. Please check salary structure, work rule, or attendance."
+            )
 
     employees = Employee.objects.filter(
         employment_status='active',
         is_active=True
     ).select_related('user')
-    employees_count = Employee.objects.filter(
-        employment_status='active',
-        is_active=True
-    ).count()
+
     return render(request, 'ems/generate_payroll.html', {
         'title': 'Generate Payroll',
         'employees': employees,
-        'employees_count': employees_count,
     })
+
+@login_required
+@finance_required
+def payroll_update(request, pk):
+    payroll = get_object_or_404(Payroll, pk=pk)
+
+    if payroll.status == 'paid':
+        messages.error(request, "Paid payrolls cannot be edited.")
+        return redirect('employee_salary_history', payroll.employee_id)
+
+    if request.method == 'POST':
+        form = PayrollForm(
+            request.POST,
+            request.FILES,
+            instance=payroll
+        )
+
+        if form.is_valid():
+            payroll = form.save(commit=False)
+
+            # Salary recalculation
+            payroll.calculated_salary = (
+                payroll.basic_pay +
+                payroll.allowances -
+                payroll.deductions
+            )
+            payroll.net_salary = payroll.calculated_salary
+
+            # Convert hourly → paid days
+            try:
+                rule = payroll.employee.work_rule
+                structure = payroll.employee.salary_structure
+
+                full_day_hours = Decimal(rule.full_day_hours or 0)
+                if full_day_hours > 0 and structure.base_salary > 0:
+                    total_days = calendar.monthrange(
+                        payroll.month.year,
+                        payroll.month.month
+                    )[1]
+
+                    hourly_rate = (
+                        structure.base_salary /
+                        (Decimal(total_days) * full_day_hours)
+                    )
+
+                    worked_hours = Decimal(payroll.basic_pay) / hourly_rate
+
+                    payroll.present_days = (
+                        worked_hours / full_day_hours
+                    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+                    payroll.absent_days = Decimal(total_days) - payroll.present_days
+
+            except Exception as e:
+                messages.warning(
+                    request,
+                    f"Paid days auto-calculation skipped: {str(e)}"
+                )
+
+            payroll.save()
+            messages.success(request, "Payroll updated successfully.")
+            return redirect('employee_salary_history', payroll.employee_id)
+
+        # ❌ Show all errors directly on frontend
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(
+                    request,
+                    f"{field.replace('_', ' ').title()}: {error}"
+                )
+
+        for error in form.non_field_errors():
+            messages.error(request, error)
+
+        return redirect('employee_salary_history', payroll.employee_id)
+
+    return redirect('employee_salary_history', payroll.employee_id)
+
+
+@login_required
+@finance_required
+def payroll_delete(request, pk):
+    payroll = get_object_or_404(Payroll, pk=pk)
+
+    if payroll.status == 'paid' and not request.user.is_superuser:
+        messages.error(request, "Only Admin can delete paid payrolls.")
+        return redirect('employee_salary_history', payroll.employee_id)
+
+    if request.method == 'POST':
+        emp_id = payroll.employee_id
+        payroll.delete()
+        messages.success(request, "Payroll deleted successfully.")
+        return redirect('employee_salary_history', emp_id)
+
+    messages.error(request, "Invalid request.")
+    return redirect('employee_salary_history', payroll.employee_id)
+
+
 
 @login_required
 def my_salary(request):
@@ -2660,19 +2847,65 @@ def payroll_expense_api(request):
         'totals': totals
     })
 
+
+
 @login_required
-# @finance_required
+@finance_required
 def employee_salary_history(request, employee_id):
     emp = get_object_or_404(
-        Employee.objects.select_related('user'),
+        Employee.objects.select_related('user', 'work_rule'),
         id=employee_id
     )
 
-    qs = Payroll.objects.filter(
+    payrolls = Payroll.objects.filter(
         employee=emp
     ).order_by('-month')
 
-    totals = qs.aggregate(
+    # -------------------------------------------------
+    # ✅ AUTO-FIX PAID DAYS (ADMIN-EQUIVALENT LOGIC)
+    # -------------------------------------------------
+    for p in payrolls:
+        try:
+            # Only fix if missing or zero
+            if not p.present_days or p.present_days == 0:
+                rule = emp.work_rule
+                structure = emp.salary_structure
+
+                full_day_hours = Decimal(rule.full_day_hours or 0)
+                if full_day_hours <= 0 or structure.base_salary <= 0:
+                    continue
+
+                total_days = calendar.monthrange(
+                    p.month.year,
+                    p.month.month
+                )[1]
+
+                hourly_rate = (
+                    structure.base_salary /
+                    (Decimal(total_days) * full_day_hours)
+                )
+
+                if hourly_rate <= 0:
+                    continue
+
+                worked_hours = Decimal(p.basic_pay) / hourly_rate
+
+                p.present_days = (
+                    worked_hours / full_day_hours
+                ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+                p.absent_days = (
+                    Decimal(total_days) - p.present_days
+                ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+                # 🔐 Persist fix so modal + future loads are correct
+                p.save(update_fields=["present_days", "absent_days"])
+
+        except Exception:
+            # Never break page rendering
+            continue
+
+    totals = payrolls.aggregate(
         total_basic=Sum('basic_pay') or 0,
         total_allowances=Sum('allowances') or 0,
         total_deductions=Sum('deductions') or 0,
@@ -2681,12 +2914,10 @@ def employee_salary_history(request, employee_id):
 
     return render(request, 'ems/employee_salary_history.html', {
         'employee': emp,
-        'payrolls': qs,
+        'payrolls': payrolls,
         'totals': totals,
         'title': f"Salary History – {emp.user.get_full_name()}"
     })
-
-
 # ============================================================
 # 📝 LEAVE MANAGEMENT VIEWS
 # ============================================================

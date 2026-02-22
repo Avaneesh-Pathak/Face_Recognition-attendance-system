@@ -51,6 +51,8 @@ urlpatterns = [
     path('payroll/expense/', views.payroll_expense_chart, name='payroll_expense_chart'),
     path('api/payroll/expense/', views.payroll_expense_api, name='payroll_expense_api'),
     path('payroll/history/<int:employee_id>/', views.employee_salary_history, name='employee_salary_history'),
+    path('payroll/<int:pk>/edit/', views.payroll_update, name='payroll_update'),
+    path('payroll/<int:pk>/delete/', views.payroll_delete, name='payroll_delete'),
     
     # 📝 Leave Management URLs
     path('leave-types/', views.leave_type_list, name='leave_type_list'),

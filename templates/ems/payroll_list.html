@@ -1,105 +1,156 @@
 {% extends 'base.html' %}
 
-{% block page_title %}Payroll Management{% endblock %}
+{% block page_title %}Payroll Management Dashboard{% endblock %}
 
 {% block content %}
-<!-- <div class="row mb-4">
-    <div class="col-xl-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-2">
-                    <div class="bg-primary-soft p-2 rounded me-3">
-                        <i class="fas fa-money-bill-wave text-primary"></i>
-                    </div>
-                    <span class="text-muted small text-uppercase fw-bold">Total Net Payroll</span>
-                </div>
-                <h3 class="fw-bold mb-0">₹{{ total_net }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-2">
-                    <div class="bg-info-soft p-2 rounded me-3">
-                        <i class="fas fa-wallet text-info"></i>
-                    </div>
-                    <span class="text-muted small text-uppercase fw-bold">Basic Salary</span>
-                </div>
-                <h3 class="fw-bold mb-0">₹{{ total_basic }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-2">
-                    <div class="bg-success-soft p-2 rounded me-3">
-                        <i class="fas fa-plus-circle text-success"></i>
-                    </div>
-                    <span class="text-muted small text-uppercase fw-bold">Allowances</span>
-                </div>
-                <h3 class="fw-bold mb-0">₹{{ total_allowances }}</h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-xl-3 col-md-6">
-        <div class="card border-0 shadow-sm h-100">
-            <div class="card-body">
-                <div class="d-flex align-items-center mb-2">
-                    <div class="bg-danger-soft p-2 rounded me-3">
-                        <i class="fas fa-minus-circle text-danger"></i>
-                    </div>
-                    <span class="text-muted small text-uppercase fw-bold">Deductions</span>
-                </div>
-                <h3 class="fw-bold mb-0">₹{{ total_deductions }}</h3>
-            </div>
-        </div>
-    </div>
-</div> -->
+<style>
+    /* Modern UI Utilities */
+    :root {
+        --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+        --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        --hover-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    }
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <h5 class="mb-0 fw-bold text-dark">Payroll Records</h5>
+    .bg-gradient-primary { background: var(--primary-gradient); }
+    .bg-gradient-success { background: var(--success-gradient); }
+
+    .card-modern {
+        border: none;
+        border-radius: 1rem;
+        box-shadow: var(--card-shadow);
+        transition: all 0.3s ease;
+        background: #fff;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--hover-shadow);
+    }
+
+    .icon-box {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-size: 1.25rem;
+    }
+
+    /* Soft Backgrounds */
+    .bg-primary-soft { background-color: rgba(59, 130, 246, 0.1) !important; color: #3b82f6 !important; }
+    .bg-success-soft { background-color: rgba(16, 185, 129, 0.1) !important; color: #10b981 !important; }
+    .bg-danger-soft { background-color: rgba(239, 68, 68, 0.1) !important; color: #ef4444 !important; }
+    .bg-warning-soft { background-color: rgba(245, 158, 11, 0.1) !important; color: #f59e0b !important; }
+    .bg-info-soft { background-color: rgba(14, 165, 233, 0.1) !important; color: #0ea5e9 !important; }
+
+    /* Table Styling */
+    .table-modern tbody tr {
+        transition: all 0.2s ease;
+    }
+    .table-modern tbody tr:hover {
+        background-color: #f8fafc;
+        transform: scale(1.001);
+    }
+    .table-modern th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        color: #64748b;
+        border-bottom: 2px solid #e2e8f0;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+
+    .badge-modern {
+        padding: 0.5em 0.8em;
+        font-weight: 600;
+        border-radius: 6px;
+    }
+
+    /* Auto-style Django Form Fields */
+    .django-filter-form select, 
+    .django-filter-form input {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        line-height: 1.5;
+        color: #475569;
+        background-color: #fff;
+        background-clip: padding-box;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+    .django-filter-form select:focus, 
+    .django-filter-form input:focus {
+        border-color: #3b82f6;
+        outline: 0;
+        box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+    }
+</style>
+
+
+<!-- Main Content Area -->
+<div class="card card-modern overflow-hidden">
+    
+    <!-- Header -->
+    <div class="card-header bg-white py-4 border-0 d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="d-flex align-items-center">
+            <div class="icon-box bg-primary-soft me-3" style="width: 40px; height: 40px;">
+                <i class="fas fa-list-ul text-primary"></i>
+            </div>
+            <h5 class="mb-0 fw-bold text-dark">Payroll Records</h5>
+        </div>
         <div class="d-flex gap-2">
-            <a href="{% url 'payroll_expense_chart' %}" class="btn btn-outline-secondary">
-                <i class="fas fa-chart-pie me-2"></i>Expense Chart
+            <a href="{% url 'payroll_expense_chart' %}" class="btn btn-light text-dark fw-medium shadow-sm border rounded-3">
+                <i class="fas fa-chart-pie me-2 text-primary"></i> Expense Chart
             </a>
-            <a href="{% url 'generate_payroll' %}" class="btn btn-primary">
-                <i class="fas fa-plus me-2"></i>Generate Payroll
+            <a href="{% url 'generate_payroll' %}" class="btn btn-primary bg-gradient-primary border-0 fw-bold shadow-sm rounded-3">
+                <i class="fas fa-bolt me-2"></i> Generate Payroll
             </a>
         </div>
     </div>
-    <div class="card-body p-0">
-        <!-- Filter Section -->
-        <div class="p-3 bg-light border-bottom">
-            <form class="row g-3 align-items-end" method="get">
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted">Month</label>
-                    {{ form.month }}
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label small fw-bold text-muted">Year</label>
-                    {{ form.year }}
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold text-muted">Status</label>
-                    {{ form.status }}
-                </div>
-                <div class="col-md-3">
-                    <button class="btn btn-primary me-2">Apply</button>
-                    <a class="btn btn-outline-secondary" href="{% url 'payroll_list' %}">Reset</a>
-                </div>
-            </form>
-        </div>
 
+    <!-- Filter Section -->
+    <div class="bg-light px-4 py-3 border-top border-bottom">
+        <form class="row g-3 align-items-end django-filter-form" method="get">
+            <div class="col-md-3 col-sm-6">
+                <label class="form-label small fw-bold text-uppercase text-muted mb-1"><i class="fas fa-calendar-alt me-1"></i> Month</label>
+                {{ form.month }}
+            </div>
+            <div class="col-md-2 col-sm-6">
+                <label class="form-label small fw-bold text-uppercase text-muted mb-1"><i class="fas fa-calendar-week me-1"></i> Year</label>
+                {{ form.year }}
+            </div>
+            <div class="col-md-3 col-sm-12">
+                <label class="form-label small fw-bold text-uppercase text-muted mb-1"><i class="fas fa-filter me-1"></i> Status</label>
+                {{ form.status }}
+            </div>
+            <div class="col-md-4 col-sm-12 text-md-end mt-3 mt-md-0">
+                <button type="submit" class="btn btn-dark fw-medium px-4 rounded-3 shadow-sm me-2">
+                    <i class="fas fa-search me-1"></i> Apply
+                </button>
+                <a href="{% url 'payroll_list' %}" class="btn btn-white text-secondary fw-medium px-3 rounded-3 shadow-sm border">
+                    <i class="fas fa-redo-alt me-1"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="bg-light">
+            <table class="table table-modern align-middle mb-0">
+                <thead class="bg-white">
                     <tr>
                         <th class="ps-4">Employee</th>
                         <th>Period</th>
-                        <th>Breakdown</th>
+                        <th>Gross Breakdown</th>
                         <th>Net Salary</th>
                         <th>Status</th>
                         <th>Dates</th>
@@ -109,56 +160,93 @@
                 <tbody>
                     {% for p in payrolls %}
                     <tr>
-                        <td class="ps-4">
-                            <a href="{% url 'employee_salary_history' p.employee.id %}"
-                                class="text-decoration-none text-dark">
-                                <div class="d-flex align-items-center">
-                                    <div class="avatar-initials bg-primary-soft text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
-                                        style="width: 40px; height: 40px;">
-                                        {{ p.employee.user.first_name|first }}
-                                    </div>
-                                    <div>
-                                        <h6 class="mb-0 fw-bold small">{{ p.employee.user.get_full_name }}</h6>
-                                        <small class="text-muted">{{ p.employee.employee_id }}</small>
-                                    </div>
+                        <td class="ps-4 py-3">
+                        <a href="{% url 'employee_salary_history' p.employee.id %}"
+                            class="text-decoration-none text-dark d-block">
+
+                            <div class="d-flex align-items-center">
+
+                            {% if p.employee.face_image %}
+                                <!-- Face / Profile Image -->
+                                <img
+                                src="{{ p.employee.face_image.url }}"
+                                alt="{{ p.employee.user.get_full_name }}"
+                                class="rounded-circle shadow-sm me-3"
+                                style="width: 42px; height: 42px; object-fit: cover;"
+                                >
+                            {% else %}
+                                <!-- Initials Fallback -->
+                                <div
+                                class="avatar-initials bg-gradient-primary text-white shadow-sm rounded-circle me-3
+                                        d-flex align-items-center justify-content-center fw-bold"
+                                style="width: 42px; height: 42px; font-size: 1.1rem;">
+                                {{ p.employee.user.first_name|first }}
                                 </div>
-                            </a>
+                            {% endif %}
+
+                            <div>
+                                <h6 class="mb-0 fw-bold hover-primary">
+                                {{ p.employee.user.get_full_name }}
+                                </h6>
+                                <small class="text-muted font-monospace">
+                                <i class="fas fa-id-badge me-1"></i>{{ p.employee.employee_id }}
+                                </small>
+                            </div>
+
+                            </div>
+                        </a>
                         </td>
                         <td>
-                            <span class="fw-medium">{{ p.month|date:"F Y" }}</span>
+                            <div class="fw-bold text-dark">{{ p.month|date:"F" }}</div>
+                            <small class="text-muted">{{ p.month|date:"Y" }}</small>
                         </td>
                         <td>
-                            <div class="small">
-                                <div class="text-success"><i class="fas fa-plus me-1" style="width:12px"></i>
-                                    {{p.basic_pay|add:p.allowances }}</div>
-                                <div class="text-danger"><i class="fas fa-minus me-1" style="width:12px"></i>{{p.deductions }}</div>
+                            <div class="d-flex flex-column gap-1 small fw-medium">
+                                <span class="text-success bg-success-soft px-2 py-1 rounded d-inline-block" style="width: max-content;">
+                                    <i class="fas fa-arrow-up me-1"></i> ₹{{ p.basic_pay|add:p.allowances }}
+                                </span>
+                                <span class="text-danger bg-danger-soft px-2 py-1 rounded d-inline-block" style="width: max-content;">
+                                    <i class="fas fa-arrow-down me-1"></i> ₹{{ p.deductions }}
+                                </span>
                             </div>
                         </td>
                         <td>
-                            <span class="fw-bold text-primary">₹{{ p.net_salary }}</span>
+                            <span class="badge bg-primary-soft text-primary fs-6 px-3 py-2 border border-primary border-opacity-25 shadow-sm">
+                                ₹{{ p.net_salary }}
+                            </span>
                         </td>
                         <td>
-                            <span
-                                class="badge {% if p.status == 'paid' %}bg-success-soft text-success{% elif p.status == 'processed' %}bg-info-soft text-info{% else %}bg-warning-soft text-warning{% endif %}">
+                            <span class="badge badge-modern 
+                                {% if p.status == 'paid' %}bg-success-soft
+                                {% elif p.status == 'processed' %}bg-info-soft
+                                {% else %}bg-warning-soft{% endif %}">
+                                <i class="fas fa-circle ms-n1 me-1" style="font-size: 8px; vertical-align: middle;"></i>
                                 {{ p.status|title }}
                             </span>
                         </td>
                         <td>
-                            <div class="small text-muted">
-                                <div>Paid: {{ p.paid_date|default:"-" }}</div>
-                                <div>Next: {{ p.next_pay_date|default:"-" }}</div>
+                            <div class="small">
+                                <div class="text-dark fw-medium mb-1">
+                                    <span class="text-muted" style="width: 40px; display: inline-block;">Paid:</span> 
+                                    {% if p.paid_date %}<i class="fas fa-check-circle text-success me-1"></i>{{ p.paid_date }}{% else %}-{% endif %}
+                                </div>
+                                <div class="text-dark fw-medium">
+                                    <span class="text-muted" style="width: 40px; display: inline-block;">Next:</span> 
+                                    {% if p.next_pay_date %}<i class="fas fa-calendar-day text-info me-1"></i>{{ p.next_pay_date }}{% else %}-{% endif %}
+                                </div>
                             </div>
                         </td>
                         <td class="text-end pe-4">
-                            <div class="btn-group">
-                                <a href="{% url 'payroll_slip_pdf' p.pk %}" class="btn btn-sm btn-outline-secondary"
-                                    title="Download Slip">
+                            <div class="btn-group shadow-sm rounded-3">
+                                <!-- Download PDF -->
+                                <a href="{% url 'payroll_slip_pdf' p.pk %}" class="btn btn-light btn-sm text-primary border-0" title="Download Payslip" data-bs-toggle="tooltip">
                                     <i class="fas fa-file-pdf"></i>
                                 </a>
+                                
+                                <!-- Mark as Paid Action -->
                                 {% if p.status != 'paid' %}
-                                <a href="{% url 'pay_salary' p.pk %}" class="btn btn-sm btn-success"
-                                    title="Mark as Paid">
-                                    <i class="fas fa-check"></i>
+                                <a href="{% url 'pay_salary' p.pk %}" class="btn btn-success btn-sm border-0 bg-gradient-success text-white" title="Mark as Paid" data-bs-toggle="tooltip">
+                                    <i class="fas fa-check-double"></i>
                                 </a>
                                 {% endif %}
                             </div>
@@ -167,12 +255,14 @@
                     {% empty %}
                     <tr>
                         <td colspan="7" class="text-center py-5">
-                            <div class="empty-state">
-                                <i class="fas fa-file-invoice-dollar"></i>
-                                <h6>No Payroll Records</h6>
-                                <p class="small">Generate payroll to get started.</p>
-                                <a href="{% url 'generate_payroll' %}" class="btn btn-primary mt-2">
-                                    <i class="fas fa-plus me-2"></i>Generate
+                            <div class="empty-state py-5">
+                                <div class="icon-box bg-light mx-auto mb-4" style="width: 80px; height: 80px; font-size: 2.5rem;">
+                                    <i class="fas fa-file-invoice-dollar text-muted opacity-50"></i>
+                                </div>
+                                <h5 class="fw-bold text-dark">No Payroll Records Found</h5>
+                                <p class="text-muted mb-4">You haven't generated any payrolls for the selected filters yet.</p>
+                                <a href="{% url 'generate_payroll' %}" class="btn btn-primary bg-gradient-primary px-4 py-2 rounded-pill shadow-sm">
+                                    <i class="fas fa-plus me-2"></i> Generate Now
                                 </a>
                             </div>
                         </td>
@@ -183,17 +273,59 @@
         </div>
     </div>
 
+    <!-- Active Pagination Logic -->
     {% if payrolls.has_other_pages %}
-    <div class="card-footer bg-white py-3">
-        <!-- Pagination logic here if needed, simplified for now -->
+    <div class="card-footer bg-white border-top py-4">
         <nav>
-            <ul class="pagination justify-content-center mb-0 pagination-sm">
-                <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
-                <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
+            <ul class="pagination justify-content-center mb-0">
+                {% if payrolls.has_previous %}
+                <li class="page-item">
+                    <a class="page-link border-0 bg-light text-dark rounded-circle mx-1 d-flex align-items-center justify-content-center shadow-sm"
+                        href="?page={{ payrolls.previous_page_number }}{% if request.GET.month %}&month={{ request.GET.month }}{% endif %}{% if request.GET.year %}&year={{ request.GET.year }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                        style="width: 40px; height: 40px; transition: 0.2s;">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for i in payrolls.paginator.page_range %}
+                    {% if payrolls.number == i %}
+                    <li class="page-item active">
+                        <span class="page-link border-0 bg-primary text-white rounded-circle mx-1 d-flex align-items-center justify-content-center shadow"
+                            style="width: 40px; height: 40px;">{{ i }}</span>
+                    </li>
+                    {% else %}
+                    <li class="page-item">
+                        <a class="page-link border-0 bg-light text-dark rounded-circle mx-1 d-flex align-items-center justify-content-center shadow-sm"
+                            href="?page={{ i }}{% if request.GET.month %}&month={{ request.GET.month }}{% endif %}{% if request.GET.year %}&year={{ request.GET.year }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                            style="width: 40px; height: 40px; transition: 0.2s;">{{ i }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if payrolls.has_next %}
+                <li class="page-item">
+                    <a class="page-link border-0 bg-light text-dark rounded-circle mx-1 d-flex align-items-center justify-content-center shadow-sm"
+                        href="?page={{ payrolls.next_page_number }}{% if request.GET.month %}&month={{ request.GET.month }}{% endif %}{% if request.GET.year %}&year={{ request.GET.year }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}" 
+                        style="width: 40px; height: 40px; transition: 0.2s;">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
             </ul>
         </nav>
     </div>
     {% endif %}
 </div>
+
+<!-- Scripts -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialize tooltips with smooth modern animation
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl, { animation: true })
+        });
+    });
+</script>
 {% endblock %}

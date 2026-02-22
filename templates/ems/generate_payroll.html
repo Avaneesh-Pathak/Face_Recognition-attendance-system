@@ -1,94 +1,214 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title mb-0">{{ title }}</h5>
-            </div>
-            <div class="card-body">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i>
-                    This will generate payroll for all active employees for the selected month.
-                    Existing payroll records for the same month will be updated.
+<style>
+    /* Modern UI Utilities */
+    :root {
+        --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    .bg-gradient-primary {
+        background: var(--primary-gradient);
+    }
+
+    .card-modern {
+        border: none;
+        border-radius: 1.25rem;
+        box-shadow: var(--card-shadow);
+        background: #ffffff;
+    }
+
+    .bg-primary-soft { background-color: rgba(59, 130, 246, 0.1) !important; color: #3b82f6 !important; }
+    .bg-info-soft { background-color: rgba(14, 165, 233, 0.1) !important; color: #0ea5e9 !important; }
+    .bg-warning-soft { background-color: rgba(245, 158, 11, 0.1) !important; color: #d97706 !important; }
+    
+    .icon-box-lg {
+        width: 64px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 16px;
+        font-size: 1.75rem;
+    }
+
+    /* Modern Form Inputs */
+    .form-control, .form-select {
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        border: 1px solid #e2e8f0;
+        background-color: #f8fafc;
+        transition: all 0.2s ease;
+    }
+
+    .form-control:focus, .form-select:focus {
+        background-color: #ffffff;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+
+    .input-group-text {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-right: none;
+        color: #64748b;
+    }
+
+    .input-group .form-control, .input-group .form-select {
+        border-left: none;
+        padding-left: 0;
+    }
+
+    .input-group:focus-within .input-group-text {
+        border-color: #3b82f6;
+        color: #3b82f6;
+        background-color: #ffffff;
+    }
+
+    /* Button Loading State */
+    .btn-is-loading {
+        pointer-events: none;
+        opacity: 0.8;
+    }
+    .btn-is-loading .normal-text { display: none; }
+    .btn-is-loading .loading-text { display: inline-block !important; }
+</style>
+
+<div class="container-fluid py-2">
+    <div class="row justify-content-center">
+        <div class="col-xl-6 col-lg-8 col-md-10">
+            
+            <!-- Page Header -->
+            <div class="text-center mb-4">
+                <div class="icon-box-lg bg-primary-soft mx-auto mb-3 shadow-sm">
+                    <i class="fas fa-cogs"></i>
                 </div>
+                <h2 class="fw-bold text-dark mb-1">{{ title|default:"Generate Payroll" }}</h2>
+                <p class="text-muted">Automate and process employee salaries efficiently</p>
+            </div>
 
-                <form method="post">
-                    {% csrf_token %}
+            <!-- Main Generation Card -->
+            <div class="card card-modern overflow-hidden mb-4">
+                <!-- Top Accent Line -->
+                <div class="bg-gradient-primary" style="height: 5px;"></div>
+                
+                <div class="card-body p-4 p-md-5">
                     
-                    <div class="mb-3">
-                        <label for="month" class="form-label">Month</label>
-                        <select name="month" id="month" class="form-control" required>
-                            <option value="">Select Month</option>
-                            <option value="1">January</option>
-                            <option value="2">February</option>
-                            <option value="3">March</option>
-                            <option value="4">April</option>
-                            <option value="5">May</option>
-                            <option value="6">June</option>
-                            <option value="7">July</option>
-                            <option value="8">August</option>
-                            <option value="9">September</option>
-                            <option value="10">October</option>
-                            <option value="11">November</option>
-                            <option value="12">December</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="year" class="form-label">Year</label>
-                        <input type="number" name="year" id="year" class="form-control" 
-                               min="2020" max="2030" value="2026" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="employee" class="form-label fw-semibold">
-                            Employee <span class="text-muted">(optional)</span>
-                        </label>
-
-                        <select name="employee" id="employee" class="form-select">
-                            <option value="">— All Employees —</option>
-                            {% for emp in employees %}
-                                <option value="{{ emp.id }}">   
-                                    {{ emp.user.get_full_name }} ({{ emp.employee_id }})
-                                </option>
-                            {% endfor %}
-                        </select>
-
-                        <div class="form-text">
-                            Select an employee to generate payroll only for that person.
-                            Leave this blank to generate payroll for <strong>all employees</strong>.
+                    <!-- Info Alert -->
+                    <div class="alert bg-info-soft border-0 border-start border-info border-4 rounded-end d-flex align-items-center p-3 mb-4 shadow-sm">
+                        <i class="fas fa-info-circle fs-4 me-3"></i>
+                        <div class="small fw-medium">
+                            This process generates payroll for active employees for the selected period. 
+                            <strong>Existing unlocked records</strong> for the same month will be recalculated and updated.
                         </div>
                     </div>
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Warning:</strong> This action cannot be undone. Please verify the month and year before proceeding.
-                    </div>
-                    
-                    <div class="d-flex justify-content-between">
-                        <a href="{% url 'payroll_list' %}" class="btn btn-secondary">Cancel</a>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-cogs"></i> Generate Payroll
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
 
-        <!-- Statistics -->
-        <div class="card mt-4">
-            <div class="card-header">
-                <h6 class="card-title mb-0">Current Statistics</h6>
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-6">
-                        <h5>{{ employees_count }}</h5>
-                        <small class="text-muted">Active Employees</small>
-                    </div>
-                    
+                    <form method="post" id="payrollGenerateForm">
+                        {% csrf_token %}
+                        
+                        <div class="row g-4 mb-4">
+                            <!-- Month Field -->
+                            <div class="col-md-6">
+                                <label for="month" class="form-label fw-bold text-dark small text-uppercase tracking-wide">Target Month</label>
+                                <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                                    <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                    <select name="month" id="month" class="form-select" required>
+                                        <option value="">Select Month</option>
+                                        <option value="1">January</option>
+                                        <option value="2">February</option>
+                                        <option value="3">March</option>
+                                        <option value="4">April</option>
+                                        <option value="5">May</option>
+                                        <option value="6">June</option>
+                                        <option value="7">July</option>
+                                        <option value="8">August</option>
+                                        <option value="9">September</option>
+                                        <option value="10">October</option>
+                                        <option value="11">November</option>
+                                        <option value="12">December</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Year Field -->
+                            <div class="col-md-6">
+                                <label for="year" class="form-label fw-bold text-dark small text-uppercase tracking-wide">Target Year</label>
+                                <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                                    <span class="input-group-text"><i class="fas fa-calendar-week"></i></span>
+                                    <input type="number" name="year" id="year" class="form-control fw-bold" 
+                                           min="2020" max="2030" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Employee Filter -->
+                        <div class="mb-4">
+                            <label for="employee" class="form-label fw-bold text-dark small text-uppercase tracking-wide">
+                                Employee Target <span class="badge bg-light text-secondary ms-1 fw-normal border">Optional</span>
+                            </label>
+                            <div class="input-group shadow-sm rounded-3 overflow-hidden mb-2">
+                                <span class="input-group-text"><i class="fas fa-user-tie"></i></span>
+                                <select name="employee" id="employee" class="form-select">
+                                    <option value="">— Generate for ALL Active Employees —</option>
+                                    <optgroup label="Specific Employee">
+                                        {% for emp in employees %}
+                                            <option value="{{ emp.id }}">   
+                                                {{ emp.user.get_full_name }} ({{ emp.employee_id }})
+                                            </option>
+                                        {% endfor %}
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="form-text text-muted small">
+                                <i class="fas fa-lightbulb text-warning me-1"></i> 
+                                Select a specific person to generate a single payroll, or leave blank to process the entire company.
+                            </div>
+                        </div>
+
+                        <!-- Warning Alert -->
+                        <div class="alert bg-warning-soft border-0 rounded-3 p-3 mb-4 d-flex align-items-start">
+                            <i class="fas fa-exclamation-triangle mt-1 me-3 fs-5"></i>
+                            <div>
+                                <strong class="d-block mb-1">Verify Before Processing</strong>
+                                <span class="small opacity-75">Generating payroll affects financials and attendance tallies. Ensure the month and year are correct before proceeding.</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Actions -->
+                        <div class="d-flex align-items-center justify-content-between pt-3 border-top">
+                            <a href="{% url 'payroll_list' %}" class="btn btn-light text-secondary px-4 fw-medium shadow-sm">
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary bg-gradient-primary border-0 px-4 py-2 shadow fw-bold rounded-3" id="submitBtn">
+                                <span class="normal-text"><i class="fas fa-bolt me-2"></i> Process Payroll</span>
+                                <span class="loading-text" style="display: none;">
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    Processing...
+                                </span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
+
+            <!-- Supporting Statistics -->
+            <div class="row justify-content-center mt-2">
+                <div class="col-md-6">
+                    <div class="card bg-white border-0 shadow-sm rounded-4 text-center p-3" style="transition: transform 0.2s;">
+                        <div class="d-flex align-items-center justify-content-center">
+                            <div class="bg-success-soft text-success rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px; font-size: 1.25rem;">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="text-start">
+                                <h3 class="fw-black text-dark mb-0 lh-1">{{ employees_count }}</h3>
+                                <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.5px;">Eligible Active Employees</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -99,8 +219,26 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Set current month and year as default
         const now = new Date();
-        document.querySelector('#month').value = now.getMonth() + 1;
-        document.querySelector('#year').value = now.getFullYear();
+        const monthSelect = document.querySelector('#month');
+        const yearInput = document.querySelector('#year');
+        
+        if (!monthSelect.value) {
+            monthSelect.value = now.getMonth() + 1; // 1-12
+        }
+        if (!yearInput.value) {
+            yearInput.value = now.getFullYear();
+        }
+
+        // Add loading state to button on submit
+        const form = document.getElementById('payrollGenerateForm');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', function() {
+            // Only show loading if form is valid
+            if (form.checkValidity()) {
+                submitBtn.classList.add('btn-is-loading');
+            }
+        });
     });
 </script>
 {% endblock %}

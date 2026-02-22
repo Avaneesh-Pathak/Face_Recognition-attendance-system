@@ -1,39 +1,235 @@
 {% extends 'base.html' %}
+
+{% block page_title %}Monthly Salary Expense{% endblock %}
+
 {% block content %}
-<div class="container mt-4">
-  <div class="card shadow-sm">
-    <div class="card-header">
-      <h5 class="mb-0">Monthly Salary Expense (Last 12 months)</h5>
+<style>
+    /* Modern UI Utilities */
+    :root {
+        --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    .bg-gradient-primary {
+        background: var(--primary-gradient);
+    }
+
+    .card-modern {
+        border: none;
+        border-radius: 1.25rem;
+        box-shadow: var(--card-shadow);
+        background: #ffffff;
+    }
+
+    .bg-primary-soft { background-color: rgba(59, 130, 246, 0.1) !important; color: #3b82f6 !important; }
+
+    .icon-box {
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-size: 1.25rem;
+    }
+
+    /* Chart Container specific */
+    .chart-container {
+        position: relative; 
+        height: 450px; 
+        width: 100%;
+    }
+
+    /* Loader */
+    .loader-overlay {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(255,255,255,0.8);
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border-radius: 1rem;
+        transition: opacity 0.3s ease;
+    }
+</style>
+
+<div class="container-fluid py-2">
+    <!-- Header Section -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Financial Analytics</h3>
+            <p class="text-muted mb-0">Track your organization's monthly payroll expenses</p>
+        </div>
+        <a href="{% url 'payroll_list' %}" class="btn btn-light text-secondary fw-medium shadow-sm border rounded-pill px-4">
+            <i class="fas fa-arrow-left me-2"></i> Back to Payroll
+        </a>
     </div>
-    <div class="card-body">
-      <canvas id="expenseChart" height="110"></canvas>
+
+    <!-- Chart Card -->
+    <div class="card card-modern overflow-hidden">
+        <!-- Accent Line -->
+        <div class="bg-gradient-primary" style="height: 4px;"></div>
+
+        <div class="card-header bg-white py-4 border-0 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center">
+                <div class="icon-box bg-primary-soft me-3 shadow-sm">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div>
+                    <h5 class="mb-0 fw-bold text-dark">Monthly Salary Expense</h5>
+                    <small class="text-muted fw-medium text-uppercase tracking-wide" style="font-size: 0.75rem;">Last 12 Months Overview</small>
+                </div>
+            </div>
+            
+            <!-- Optional interactive badge -->
+            <span class="badge bg-light text-primary border border-primary border-opacity-25 px-3 py-2 rounded-pill shadow-sm">
+                <i class="fas fa-circle text-success me-1" style="font-size: 8px; vertical-align: middle;"></i> Live Data
+            </span>
+        </div>
+
+        <div class="card-body p-4 p-md-5 pt-0 position-relative">
+            
+            <!-- Loading State -->
+            <div id="chartLoader" class="loader-overlay">
+                <div class="spinner-border text-primary shadow-sm mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                <h6 class="text-muted fw-bold">Compiling Financial Data...</h6>
+            </div>
+
+            <!-- Error State (Hidden by default) -->
+            <div id="chartError" class="loader-overlay" style="display: none; background: #fff;">
+                <div class="icon-box bg-danger-soft text-danger mb-3" style="width: 64px; height: 64px; font-size: 2rem;">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <h5 class="text-dark fw-bold">Failed to load chart data</h5>
+                <p class="text-muted small">Please check your connection and try again.</p>
+                <button onclick="window.location.reload()" class="btn btn-outline-primary btn-sm rounded-pill mt-2 px-4">Retry</button>
+            </div>
+
+            <!-- Canvas Wrapper -->
+            <div class="chart-container mt-2">
+                <canvas id="expenseChart"></canvas>
+            </div>
+
+        </div>
     </div>
-  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-(async () => {
-  const res = await fetch("{% url 'payroll_expense_api' %}");
-  const data = await res.json();
-  const ctx = document.getElementById('expenseChart').getContext('2d');
-  new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: data.labels,
-      datasets: [{
-        label: 'Total Net Salary',
-        data: data.totals,
-        borderWidth: 2,
-        tension: 0.3
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: true } },
-      scales: { y: { beginAtZero: true } }
-    }
-  });
-})();
+document.addEventListener("DOMContentLoaded", function() {
+    (async () => {
+        const loader = document.getElementById('chartLoader');
+        const errorScreen = document.getElementById('chartError');
+        
+        try {
+            // Fetch API Data
+            const res = await fetch("{% url 'payroll_expense_api' %}");
+            if (!res.ok) throw new Error("Network response was not ok");
+            const data = await res.json();
+            
+            // Hide Loader
+            loader.style.opacity = '0';
+            setTimeout(() => loader.style.display = 'none', 300);
+
+            // Setup Chart.js
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            
+            // Create beautiful gradient fill for the line chart
+            const gradient = ctx.createLinearGradient(0, 0, 0, 450);
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)'); // Primary blue with opacity
+            gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)'); // Fades to transparent
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: ' Total Net Salary',
+                        data: data.totals,
+                        borderColor: '#3b82f6', // Solid Primary Blue
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#3b82f6',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 8,
+                        pointHoverBackgroundColor: '#3b82f6',
+                        pointHoverBorderColor: '#ffffff',
+                        pointHoverBorderWidth: 3,
+                        fill: true,
+                        tension: 0.4 // Makes the line smoothly curved
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, // Allows it to fit the custom container height
+                    interaction: {
+                        intersect: false,
+                        mode: 'index',
+                    },
+                    plugins: { 
+                        legend: { 
+                            display: false // Hidden because the title explains it already
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)', // Dark slate modern tooltip
+                            titleFont: { size: 13, family: "'Inter', sans-serif" },
+                            bodyFont: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let value = context.parsed.y;
+                                    // Formats the tooltip number nicely (e.g., ₹ 1,50,000)
+                                    return '₹ ' + value.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                                }
+                            }
+                        }
+                    },
+                    scales: { 
+                        x: { 
+                            grid: {
+                                display: false, // Removes vertical grid lines for cleaner look
+                                drawBorder: false
+                            },
+                            ticks: {
+                                font: { family: "'Inter', sans-serif", weight: '500' },
+                                color: '#64748b'
+                            }
+                        },
+                        y: { 
+                            beginAtZero: true,
+                            grid: {
+                                color: '#e2e8f0',
+                                borderDash: [5, 5], // Dashed horizontal lines
+                                drawBorder: false
+                            },
+                            ticks: {
+                                font: { family: "'Inter', sans-serif" },
+                                color: '#64748b',
+                                callback: function(value) {
+                                    // Compact formatting for Y axis (e.g. 100K, 150K) if numbers are large
+                                    if (value >= 1000) {
+                                        return '₹' + (value / 1000).toFixed(1) + 'k';
+                                    }
+                                    return '₹' + value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+        } catch (error) {
+            console.error("Error fetching chart data: ", error);
+            loader.style.display = 'none';
+            errorScreen.style.display = 'flex';
+        }
+    })();
+});
 </script>
 {% endblock %}
