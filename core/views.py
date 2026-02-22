@@ -119,6 +119,15 @@ from core.utils.payslip_email import email_payslip
 from core.face_system import get_face_system
 from core.models import OfficeLocation
 from core.utils.location import is_inside_office
+
+from django.template.loader import render_to_string
+from django.contrib.auth.decorators import login_required
+from weasyprint import HTML
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from django.shortcuts import get_object_or_404
+
 # Setup logging
 logger = logging.getLogger(__name__)
 handler = logging.FileHandler('registration.log')
@@ -740,6 +749,38 @@ def employee_profile(request, pk):
         "year": today.year,   
         "month": today.month, 
     })
+
+
+
+@login_required
+@hr_required # Assuming this is your custom decorator
+def employee_id_card(request, pk):
+    # Retrieve data
+    employee = get_object_or_404(
+        Employee.objects.select_related(
+            "user", "department", "manager", "work_rule"
+        ),
+        pk=pk
+    )
+
+    # Render context into HTML string
+    html_string = render_to_string(
+        "ems/employee_id_card.html",
+        {"employee": employee}
+    )
+
+    # Prepare response headers
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="ID_{employee.employee_id}.pdf"'
+
+    # Generate the PDF
+    # base_url is critical here; it ensures images properly map to their static/media routes!
+    HTML(
+        string=html_string,
+        base_url=request.build_absolute_uri("/")
+    ).write_pdf(response)
+
+    return response
 
 @login_required
 def attendance_summary_api(request):
@@ -1642,7 +1683,6 @@ def generate_excel_report(queryset, start_date, end_date):
     return response
 
 
-
 def attendance_settings(request):
     settings_obj, created = AttendanceSettings.objects.get_or_create(pk=1)
 
@@ -1706,7 +1746,6 @@ def attendance_history_page(request):
     return render(request, 'attendance_history.html', context)
 
 
-
 def get_work_date(attendance, rule):
     """
     Logical work date:
@@ -1727,7 +1766,6 @@ def get_work_date(attendance, rule):
             return ts.date() - timedelta(days=1)
 
     return ts.date()
-
 
 @login_required
 def attendance_calendar(request, employee_id, year, month):
@@ -1840,7 +1878,6 @@ def attendance_calendar(request, employee_id, year, month):
     }
 
     return render(request, "attendance_calendar.html", context)
-
 
 
 def attendance_day_detail(request, emp_id, date):
@@ -2675,7 +2712,6 @@ def payroll_update(request, pk):
 
     return redirect('employee_salary_history', payroll.employee_id)
 
-
 @login_required
 @finance_required
 def payroll_delete(request, pk):
@@ -2693,7 +2729,6 @@ def payroll_delete(request, pk):
 
     messages.error(request, "Invalid request.")
     return redirect('employee_salary_history', payroll.employee_id)
-
 
 
 @login_required
@@ -2847,8 +2882,6 @@ def payroll_expense_api(request):
         'totals': totals
     })
 
-
-
 @login_required
 @finance_required
 def employee_salary_history(request, employee_id):
@@ -2918,6 +2951,8 @@ def employee_salary_history(request, employee_id):
         'totals': totals,
         'title': f"Salary History – {emp.user.get_full_name()}"
     })
+
+
 # ============================================================
 # 📝 LEAVE MANAGEMENT VIEWS
 # ============================================================

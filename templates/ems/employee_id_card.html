@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    /* Reset and Base */
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #ffffff;
+    }
+
+    /* Set exact dimensions for WeasyPrint */
+    @page {
+        size: 85.6mm 54mm;
+        margin: 0;
+    }
+
+    /* Card Container */
+    .card {
+        width: 85.6mm;
+        height: 54mm;
+        box-sizing: border-box;
+        position: relative;
+        overflow: hidden;
+        background-color: #ffffff;
+    }
+
+    /* Top Header Ribbon */
+    .header {
+        background-color: #1f3c88;
+        color: #ffffff;
+        text-align: center;
+        font-weight: bold;
+        font-size: 10.5pt;
+        height: 9mm;
+        line-height: 9mm;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Decorative Accent Bar */
+    .accent-bar {
+        position: absolute;
+        top: 9mm;
+        left: 0;
+        width: 100%;
+        height: 1.2mm;
+        background-color: #ff9800; /* Optional: gives the card a premium pop */
+    }
+
+    /* Two-Column Layout (WeasyPrint fully supports display: table) */
+    .body-container {
+        display: table;
+        width: 100%;
+        height: 38.8mm; /* 54mm total - 9mm header - 6.2mm footer */
+    }
+
+    .left-col {
+        display: table-cell;
+        width: 32mm;
+        vertical-align: top;
+        text-align: center;
+        padding-top: 4mm;
+    }
+
+    .right-col {
+        display: table-cell;
+        vertical-align: top;
+        padding-top: 3.5mm;
+        padding-right: 3mm;
+    }
+
+    /* Profile Photo Container */
+    .photo-wrapper {
+        width: 18mm;
+        height: 18mm;
+        margin: 0 auto 1.5mm auto;
+        border-radius: 50%;
+        border: 1.5px solid #1f3c88;
+        padding: 1px;
+        background-color: #ffffff;
+    }
+
+    .photo-wrapper img {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover; /* Keeps image correctly proportioned */
+    }
+
+    /* Name and Role */
+    .name {
+        font-size: 8pt;
+        font-weight: bold;
+        color: #222;
+        line-height: 1.2;
+        margin: 0 1mm;
+        word-wrap: break-word;
+    }
+
+    .role {
+        font-size: 6pt;
+        color: #1f3c88;
+        font-weight: bold;
+        margin-top: 1mm;
+        text-transform: uppercase;
+    }
+
+    /* Right Side Information Table */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+
+    td {
+        font-size: 6.5pt;
+        padding: 1.2mm 0;
+        border-bottom: 0.5px dashed #ccc;
+        vertical-align: top;
+        color: #333;
+        line-height: 1.2;
+        word-wrap: break-word;
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    .label {
+        font-weight: bold;
+        color: #1f3c88;
+        width: 12mm; /* Constrains the label width */
+    }
+
+    /* Bottom Footer */
+    .footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 6.2mm;
+        background-color: #f8f9fa;
+        color: #555;
+        text-align: center;
+        font-size: 5.5pt;
+        line-height: 6.2mm;
+        border-top: 1px solid #e0e0e0;
+        font-weight: bold;
+    }
+</style>
+</head>
+
+<body>
+<div class="card">
+    <div class="header">NELSON HOSPITAL</div>
+    <div class="accent-bar"></div>
+
+    <div class="body-container">
+        <!-- LEFT COLUMN: Identity -->
+        <div class="left-col">
+            <div class="photo-wrapper">
+                {% if employee.face_image %}
+                    <img src="{{ employee.face_image.url }}" alt="Photo">
+                {% else %}
+                    <!-- Dynamic fallback avatar if user has no picture uploaded -->
+                    <img src="https://ui-avatars.com/api/?name={{ employee.user.get_full_name|urlencode }}&background=1f3c88&color=fff&size=100" alt="No Photo">
+                {% endif %}
+            </div>
+            <div class="name">{{ employee.user.get_full_name }}</div>
+            <div class="role">{{ employee.role }}</div>
+        </div>
+
+        <!-- RIGHT COLUMN: Data -->
+        <div class="right-col">
+            <table>
+                <tr>
+                    <td class="label">Emp ID</td>
+                    <td>{{ employee.employee_id }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Dept</td>
+                    <td>{{ employee.department.name }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Manager</td>
+                    <td>
+                        {% if employee.manager %}
+                            {{ employee.manager.user.get_full_name }}
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="label">Contact</td>
+                    <td>{{ employee.phone_number }}</td>
+                </tr>
+                <tr>
+                    <td class="label">Shift</td>
+                    <td>{{ employee.work_rule }}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer">
+        AUTHORIZED EMPLOYEE • CARRY WHILE ON DUTY
+    </div>
+</div>
+</body>
+</html>

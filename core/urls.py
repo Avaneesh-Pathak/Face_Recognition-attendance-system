@@ -7,6 +7,8 @@ urlpatterns = [
     path('employees/', views.employee_list, name='employee_list'),
     path('employees/<int:pk>/edit/', views.employee_update, name='employee_update'),
     path('employees/<int:pk>/delete/', views.employee_delete, name='employee_delete'),
+    path('employees/<int:pk>/id-card/', views.employee_id_card, name='employee_id_card'),
+
 
     path('api/check-username/', views.check_username, name='check_username'),
     path("employees/<int:pk>/profile/",views.employee_profile,name="employee_profile"),
