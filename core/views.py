@@ -189,6 +189,15 @@ def register(request):
                     assigned_location=form.cleaned_data.get("assigned_location"),
                 )
 
+                SalaryStructure.objects.create(
+                    employee=employee,
+                    base_salary=form.cleaned_data.get("base_salary") or Decimal("0.00"),
+                    hra=form.cleaned_data.get("hra") or Decimal("0.00"),
+                    allowances=form.cleaned_data.get("allowances") or Decimal("0.00"),
+                    deductions=form.cleaned_data.get("deductions") or Decimal("0.00"),
+                )
+
+
                 face_image = request.FILES.get("face_image")
 
                 if not face_image and request.POST.get("captured_image"):
@@ -255,22 +264,60 @@ def employee_list(request):
         "user", "department", "salary_structure"
     )
 
+    # ==========================
+    # READ FILTER PARAMS
+    # ==========================
+    department_id = request.GET.get("department")
+    role = request.GET.get("role")
+    sort_salary = request.GET.get("sort_salary")
+
+    # ==========================
+    # APPLY FILTERS
+    # ==========================
+    if department_id:
+        employees = employees.filter(department_id=department_id)
+
+    if role:
+        employees = employees.filter(role=role)
+
+    # ==========================
+    # SALARY SORT
+    # ==========================
+    if sort_salary == "highest":
+        employees = employees.order_by("-salary_structure__base_salary")
+    elif sort_salary == "lowest":
+        employees = employees.order_by("salary_structure__base_salary")
+
+    # ==========================
+    # KPIs (AFTER FILTERING)
+    # ==========================
     total_employees = employees.count()
 
     active_employees = employees.filter(
-        employment_status="active"
+        employment_status="Active"
     ).count()
 
     inactive_employees = employees.exclude(
-        employment_status="active"
+        employment_status="Active"
     ).count()
 
     total_payroll = employees.aggregate(
         total=Sum("salary_structure__base_salary")
     )["total"] or 0
 
+    # ==========================
+    # CONTEXT REQUIRED BY TEMPLATE
+    # ==========================
     context = {
         "employees": employees,
+        "departments": Department.objects.all(),
+        "roles": Employee.ROLE_CHOICES,
+
+        # keep dropdown selections
+        "selected_dept": department_id,
+        "selected_role": role,
+        "selected_sort": sort_salary,
+
         "kpi": {
             "total": total_employees,
             "active": active_employees,
@@ -278,7 +325,10 @@ def employee_list(request):
             "payroll": total_payroll,
         }
     }
+
     return render(request, "ems/employee_list.html", context)
+
+
 
 class EmployeeUpdateForm(forms.ModelForm):
     face_image = forms.ImageField(required=False)
@@ -383,18 +433,18 @@ def employee_update(request, pk):
                         employee.face_image.delete(save=False)
 
                     employee.face_image = request.FILES["face_image"]
+                    employee.save(update_fields=["face_image"])
 
                     face_sys = get_face_system()
-                    emb = face_sys.get_embedding(employee.face_image)
+                    emb = face_sys.get_embedding(employee.face_image.path)
 
-                    employee.face_encoding = (
-                        json.dumps({"status": "FACE_PENDING"})
-                        if emb is None
-                        else json.dumps([emb])
-                    )
-
-                    if emb:
+                    if emb is None:
+                        employee.face_encoding = json.dumps({"status": "FACE_PENDING"})
+                    else:
+                        employee.face_encoding = json.dumps([emb])
                         face_sys.load_from_db()
+                    
+                    employee.save(update_fields=["face_encoding"])
 
                 employee.save()
 
@@ -1747,11 +1797,6 @@ def attendance_history_page(request):
 
 
 def get_work_date(attendance, rule):
-    """
-    Logical work date:
-    - Day shift → same date
-    - Night shift → early morning belongs to previous day
-    """
     ts = timezone.localtime(attendance.timestamp)
 
     if not rule:
@@ -1761,58 +1806,77 @@ def get_work_date(attendance, rule):
     end = rule.shift_end_time
 
     # Night shift (crosses midnight)
-    if end <= start:
-        if ts.time() < end:
-            return ts.date() - timedelta(days=1)
+    if end <= start and ts.time() < end:
+        return ts.date() - timedelta(days=1)
 
     return ts.date()
 
 @login_required
 def attendance_calendar(request, employee_id, year, month):
     employee = get_object_or_404(Employee, id=employee_id)
+    rule = employee.work_rule
 
     year = int(year)
     month = int(month)
 
     start_date = date(year, month, 1)
-    end_day = monthrange(year, month)[1]
+    end_day = calendar.monthrange(year, month)[1]
     end_date = date(year, month, end_day)
 
-    rule = employee.work_rule
-
-    # 🚨 EXTENDED RANGE (CRITICAL FOR NIGHT SHIFT)
-    attendance_records = Attendance.objects.filter(
+    # Extended range for night shift safety
+    records = Attendance.objects.filter(
         employee=employee,
         timestamp__gte=start_date - timedelta(days=1),
         timestamp__lte=end_date + timedelta(days=1),
     ).order_by("timestamp")
 
-    # -----------------------------
-    # BUILD DAILY ATTENDANCE (FIXED)
-    # -----------------------------
+    # ------------------------------------
+    # SEQUENTIAL PAIRING (PERMANENT FIX)
+    # ------------------------------------
     daily_attendance = {}
+    open_checkin = None
+    open_work_date = None
 
-    for record in attendance_records:
-        work_date = get_work_date(record, rule)
+    for rec in records:
+        ts = timezone.localtime(rec.timestamp)
+        work_date = get_work_date(rec, rule)
 
-        if not (start_date <= work_date <= end_date):
-            continue
+        if rec.attendance_type == "check_in":
+            open_checkin = ts
+            open_work_date = work_date
 
-        daily_attendance.setdefault(work_date, {
-            "check_in": None,
-            "check_out": None,
-        })
+            daily_attendance.setdefault(work_date, {
+                "check_in": None,
+                "check_out": None,
+            })
 
-        ts = timezone.localtime(record.timestamp)
+            # earliest check-in wins
+            if (
+                not daily_attendance[work_date]["check_in"]
+                or ts < daily_attendance[work_date]["check_in"]
+            ):
+                daily_attendance[work_date]["check_in"] = ts
 
-        if record.attendance_type == "check_in":
-            daily_attendance[work_date]["check_in"] = ts
-        elif record.attendance_type == "check_out":
-            daily_attendance[work_date]["check_out"] = ts
+        elif rec.attendance_type == "check_out" and open_checkin:
+            # checkout closes the last open check-in (CRITICAL)
+            daily_attendance.setdefault(open_work_date, {
+                "check_in": open_checkin,
+                "check_out": None,
+            })
 
-    # -----------------------------
-    # CALENDAR RENDER DATA
-    # -----------------------------
+            # latest checkout wins
+            if (
+                not daily_attendance[open_work_date]["check_out"]
+                or ts > daily_attendance[open_work_date]["check_out"]
+            ):
+                daily_attendance[open_work_date]["check_out"] = ts
+
+            open_checkin = None
+            open_work_date = None
+
+    # ------------------------------------
+    # BUILD CALENDAR DATA
+    # ------------------------------------
     month_data = []
     total_present = total_absent = total_holiday = 0
     total_work_seconds = 0
@@ -1829,12 +1893,15 @@ def attendance_calendar(request, employee_id, year, month):
         present = False
         daily_hours = None
 
-        if check_in and check_out and check_out > check_in:
-            delta = check_out - check_in
-            daily_hours = str(delta).split(".")[0]
-            total_work_seconds += delta.total_seconds()
+        # PERMANENT PRESENCE RULE
+        if check_in:
             present = True
             total_present += 1
+
+            if check_out and check_out > check_in:
+                delta = check_out - check_in
+                total_work_seconds += delta.total_seconds()
+                daily_hours = str(delta).split(".")[0]
         else:
             if is_sunday:
                 total_holiday += 1
@@ -1858,7 +1925,7 @@ def attendance_calendar(request, employee_id, year, month):
         "employee": employee,
         "year": year,
         "month": month,
-        "month_name": month_name[month],
+        "month_name": calendar.month_name[month],
         "data": month_data,
 
         "total_present": total_present,
@@ -1878,7 +1945,6 @@ def attendance_calendar(request, employee_id, year, month):
     }
 
     return render(request, "attendance_calendar.html", context)
-
 
 def attendance_day_detail(request, emp_id, date):
     try:
@@ -1921,12 +1987,28 @@ def attendance_calendar_data(request, employee_id, year, month):
     end_day = calendar.monthrange(year, month)[1]
     end_date = date(year, month, end_day)
 
-    present_days = set()
+    records = Attendance.objects.filter(
+        employee=emp,
+        timestamp__gte=start_date - timedelta(days=1),
+        timestamp__lte=end_date + timedelta(days=1),
+    ).order_by("timestamp")
 
-    for rec in Attendance.objects.filter(employee=emp):
-        work_date = get_work_date(rec, rule)
-        if start_date <= work_date <= end_date and rec.attendance_type == "check_in":
-            present_days.add(work_date.day)
+    present_days = set()
+    open_checkin = None
+    open_work_date = None
+
+    for rec in records:
+        wd = get_work_date(rec, rule)
+
+        if rec.attendance_type == "check_in":
+            open_checkin = rec
+            open_work_date = wd
+            if start_date <= wd <= end_date:
+                present_days.add(wd.day)
+
+        elif rec.attendance_type == "check_out" and open_checkin:
+            open_checkin = None
+            open_work_date = None
 
     data = []
     for d in range(1, end_day + 1):
@@ -1945,7 +2027,6 @@ def attendance_calendar_data(request, employee_id, year, month):
         "month_name": calendar.month_name[month],
         "data": data,
     })
-
 
 @login_required
 @require_POST
