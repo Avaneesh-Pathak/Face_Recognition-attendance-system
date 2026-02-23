@@ -15,7 +15,7 @@
           <i class="fas fa-calendar-check me-2"></i>
           Attendance Calendar – {{ employee.user.get_full_name }}
         </h4>
-
+        {% if user.is_superuser or user.is_staff or user.employee.role in "Admin HR Finance" %}
         <!-- Employee Search Dropdown -->
         <div class="w-100 w-md-auto">
           <select id="employeeSelect" class="form-select form-select-sm border-primary">
@@ -27,6 +27,7 @@
             {% endfor %}
           </select>
         </div>
+        {% endif %}
       </div>
     </div>
 

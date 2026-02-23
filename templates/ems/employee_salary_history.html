@@ -260,7 +260,7 @@
                 <a href="{% url 'payroll_slip_pdf' p.pk %}" class="btn btn-light btn-sm text-primary border-0" title="Download Slip" data-bs-toggle="tooltip">
                   <i class="fas fa-file-pdf"></i>
                 </a>
-
+                {% if user.is_superuser or user.is_staff or user.employee.role in "Admin HR Finance" %}
                 {% if p.status != 'paid' %}
                   <!-- Edit -->
                   <button class="btn btn-light btn-sm text-warning border-0 border-start"
@@ -270,7 +270,7 @@
                     <i class="fas fa-pen"></i>
                   </button>
                 {% endif %}
-
+                  {% endif %}
                 {% if request.user.is_superuser %}
                   <!-- Delete -->
                   <button class="btn btn-light btn-sm text-danger border-0 border-start"
@@ -280,6 +280,7 @@
                     <i class="fas fa-trash-alt"></i>
                   </button>
                 {% endif %}
+
               </div>
             </td>
           </tr>

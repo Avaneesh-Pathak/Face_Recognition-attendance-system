@@ -243,23 +243,26 @@
 
             <!-- EMPLOYEES -->
             <div class="nav-section">Employees</div>
+             {% if user.is_superuser or user.is_staff or user.employee.role in "Admin HR Finance" %}
             <a href="{% url 'register' %}" class="nav-link {% if 'register' in request.path %}active{% endif %}">
                 <i class="fas fa-user-plus"></i> <span>Register</span>
             </a>
+            {% endif %}
             
-            {% if user.is_superuser or user.is_staff or user.employee.role in "Admin HR Finance" %}
+            {% if user.is_superuser or user.is_staff or user.employee.role in "Admin HR Finance Manager" %}
             <a href="{% url 'employee_list' %}" class="nav-link {% if 'employee_list' in request.path %}active{% endif %}">
                 <i class="fas fa-users"></i> <span>Employees</span>
             </a>
+            
             {% endif %}
-
             <a href="{% url 'department_list' %}" class="nav-link {% if 'departments' in request.path %}active{% endif %}">
                 <i class="fas fa-sitemap"></i> <span>Departments</span>
             </a>
+            {% if user.is_superuser or user.is_staff or user.employee.role in "Admin HR Finance" %}
             <a href="{% url 'joining_detail_list' %}" class="nav-link {% if 'joining' in request.path %}active{% endif %}">
                 <i class="fas fa-file-contract"></i> <span>Joining Details</span>
             </a>
-
+            {% endif %}
             <!-- ATTENDANCE -->
             <!-- <div class="nav-section">Attendance</div>
             <a href="{% url 'attendance_history_all' %}" class="nav-link {% if 'history' in request.path %}active{% endif %}">

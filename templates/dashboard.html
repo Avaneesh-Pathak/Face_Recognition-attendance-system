@@ -127,7 +127,32 @@
                 </div>
             </div>
             {% endif %}
-
+            {% if employee %}
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="status-box status-green">
+                        <small>Attendance %</small>
+                        <h4>{{ attendance_percentage }}%</h4>
+                        <span>This Month</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="status-box status-blue">
+                        <small>Weekly Hours</small>
+                        <h4>{{ total_hours_week }}h</h4>
+                        <span>Mon–Today</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="status-box status-purple">
+                        <small>Monthly Hours</small>
+                        <h4>{{ total_hours_month }}h</h4>
+                        <span>Total Worked</span>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if user.is_superuser or user.is_staff or user.employee.role in "Admin HR Finance" %}
             <!-- Analytics Charts -->
             <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px;">
                 <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
@@ -167,6 +192,7 @@
                     {% endif %}
                 </div>
             </div>
+            {% endif %}
         </div>
 
         <!-- Sidebar Area (RHS) -->
