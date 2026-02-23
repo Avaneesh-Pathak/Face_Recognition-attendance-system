@@ -75,17 +75,28 @@ class EmployeeRegistrationForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={"class": "form-select"})
     )
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # ✅ Always load active locations
+        self.fields["assigned_location"].queryset = (
+            OfficeLocation.objects.filter(is_active=True)
+        )
+
+        # ✅ Always required (INDOOR + OUTDOOR)
+        self.fields["assigned_location"].required = True
+
     def clean(self):
         cleaned = super().clean()
         location_type = cleaned.get("location_type")
-        assigned_location = cleaned.get("assigned_location")
-        if location_type == "INDOOR" and not assigned_location:
-            raise forms.ValidationError(
-                "Assigned office location is required for Indoor employees."
-            )
+        location = cleaned.get("assigned_location")
 
-        if cleaned.get('password1') != cleaned.get('password2'):
-            raise ValidationError("Passwords do not match")
+        # ✅ VALIDATION RULE
+        if not location:
+            raise forms.ValidationError(
+                "Assigned office location is required for all employees."
+            )   
+
         return cleaned
     
 

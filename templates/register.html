@@ -672,24 +672,5 @@
     }
 </script>
 
-<!-- Location -->
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    const locationType = document.getElementById("id_location_type");
-    const locationField = document.getElementById("locationField");
 
-    function toggleLocation() {
-        if (locationType.value === "INDOOR") {
-            locationField.style.display = "block";
-        } else {
-            locationField.style.display = "none";
-            const select = locationField.querySelector("select");
-            if (select) select.value = "";
-        }
-    }
-
-    locationType.addEventListener("change", toggleLocation);
-    toggleLocation(); // initial load
-});
-</script>
 {% endblock %}

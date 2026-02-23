@@ -1093,7 +1093,16 @@ def mark_attendance(request):
         lat = float(lat)
         lng = float(lng)
 
+        # 🔒 Employee must have assigned location (INDOOR + OUTDOOR)
+        if not employee.assigned_location:
+            return JsonResponse({
+                "success": False,
+                "message": "No office location assigned to your profile",
+                "color": "red"
+            })
+
         active_offices = OfficeLocation.objects.filter(is_active=True)
+
         matched_office = next(
             (o for o in active_offices if is_inside_office(lat, lng, o)),
             None
@@ -1106,13 +1115,17 @@ def mark_attendance(request):
                 "color": "red"
             })
 
+        # 🔐 INDOOR → ONLY assigned office
         if employee.location_type == "INDOOR":
-            if not employee.assigned_location or employee.assigned_location_id != matched_office.id:
+            if matched_office.id != employee.assigned_location_id:
                 return JsonResponse({
                     "success": False,
                     "message": "Attendance allowed only at your assigned office",
                     "color": "red"
                 })
+
+        # 🌍 OUTDOOR → ANY authorized office (NO restriction)
+        # (nothing needed here)
 
         # ----------------------------------------------------
         # 🔒 ATTENDANCE LOGIC (PERMANENT FIX)
