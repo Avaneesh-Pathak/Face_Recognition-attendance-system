@@ -198,7 +198,7 @@
                         </div>
                     </div>
                 </div>
-
+                {% if user.is_superuser or user.is_staff or user.employee.role in "Admin HR Finance Manager" %}
                 <!-- 2. Job & Department -->
                 <div class="card modern-card mb-4">
                     <div class="card-header-modern">
@@ -232,6 +232,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- 3. Salary Structure -->
                 <div class="card modern-card mb-4">
@@ -247,28 +248,28 @@
                                 <label class="form-label fw-semibold">Base Salary</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text fw-bold">₹</span>
-                                    <input type="number" step="0.01" name="base_salary" value="{{ salary.base_salary|default:'' }}" class="form-control">
+                                    <input type="number" readonly step="0.01" name="base_salary" value="{{ salary.base_salary|default:'' }}" class="form-control">
                                 </div>
                             </div>
                             <div class="col-md-3 col-6">
                                 <label class="form-label fw-semibold">HRA</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text fw-bold">₹</span>
-                                    <input type="number" step="0.01" name="hra" value="{{ salary.hra|default:'' }}" class="form-control">
+                                    <input type="number" readonly step="0.01" name="hra" value="{{ salary.hra|default:'' }}" class="form-control">
                                 </div>
                             </div>
                             <div class="col-md-3 col-6">
                                 <label class="form-label fw-semibold">Allowances</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text fw-bold">₹</span>
-                                    <input type="number" step="0.01" name="allowances" value="{{ salary.allowances|default:'' }}" class="form-control">
+                                    <input type="number" readonly step="0.01" name="allowances" value="{{ salary.allowances|default:'' }}" class="form-control">
                                 </div>
                             </div>
                             <div class="col-md-3 col-6">
                                 <label class="form-label fw-semibold">Deductions</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text fw-bold text-danger">-</span>
-                                    <input type="number" step="0.01" name="deductions" value="{{ salary.deductions|default:'' }}" class="form-control">
+                                    <input type="number" readonly step="0.01" name="deductions" value="{{ salary.deductions|default:'' }}" class="form-control">
                                 </div>
                             </div>
                         </div>

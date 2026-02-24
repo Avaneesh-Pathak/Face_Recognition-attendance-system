@@ -185,14 +185,6 @@
                     <td>{{ employee.department.name }}</td>
                 </tr>
                 <tr>
-                    <td class="label">Manager</td>
-                    <td>
-                        {% if employee.manager %}
-                            {{ employee.manager.user.get_full_name }}
-                        {% else %}-{% endif %}
-                    </td>
-                </tr>
-                <tr>
                     <td class="label">Contact</td>
                     <td>{{ employee.phone_number }}</td>
                 </tr>

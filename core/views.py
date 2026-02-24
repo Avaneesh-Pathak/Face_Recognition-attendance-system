@@ -1962,10 +1962,12 @@ def attendance_day_detail(request, emp_id, date):
     ]
 
     return JsonResponse({
+        "date": date_obj.strftime("%d %B %Y"),
         "logs": [
             {
                 "type": log.get_attendance_type_display(),
                 "timestamp": timezone.localtime(log.timestamp).strftime("%I:%M %p"),
+                "date": timezone.localtime(log.timestamp).strftime("%d-%m-%Y"),
                 "location": log.location or "—",
                 "confidence": f"{log.confidence_score * 100:.1f}%" if log.confidence_score else "—",
             }

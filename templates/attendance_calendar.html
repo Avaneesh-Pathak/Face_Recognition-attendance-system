@@ -221,8 +221,8 @@ document.addEventListener("DOMContentLoaded", function() {
         .then(data => {
           if (data.logs && data.logs.length > 0) {
             let html = `<div class="table-responsive"><table class="table table-bordered align-middle">
-                          <thead class="table-light"><tr><th>Type</th><th>Time</th></tr></thead><tbody>`;
-            data.logs.forEach(log => html += `<tr><td>${log.type}</td><td>${log.timestamp}</td></tr>`);
+                          <thead class="table-light"><tr><th>Type</th><th>Time</th><th>Date</th></tr></thead><tbody>`;
+            data.logs.forEach(log => html += `<tr><td>${log.type}</td><td>${log.timestamp}</td><td>${log.date}</td></tr>`);
             html += "</tbody></table></div>";
             modalBody.innerHTML = html;
           } else {

@@ -294,7 +294,7 @@
                 </div>
             </div>
             {% endif %}
-            {% if request.user.is_superuser or request.user.employee.role in "Admin HR" %}
+            {% if user.is_superuser or user.is_staff or user.employee.role in "Admin" %}
             <li class="nav-item">
                 <a href="{% url 'office_location_list' %}" class="nav-link">
                     <i class="fas fa-map-marker-alt me-2"></i>
@@ -308,7 +308,7 @@
             <a href="{% url 'reports' %}" class="nav-link {% if 'reports' in request.path %}active{% endif %}">
                 <i class="fas fa-chart-pie"></i> <span>Reports</span>
             </a>
-            {% if user.is_staff %}
+            {% if request.user.is_superuser or request.user.employee.role in "Admin HR" %}
             <a href="{% url 'attendance_settings' %}" class="nav-link {% if 'settings' in request.path %}active{% endif %}">
                 <i class="fas fa-cog"></i> <span>Settings</span>
             </a>
