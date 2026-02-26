@@ -1,204 +1,227 @@
+{% load static %}
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+
 <style>
-    /* Reset and Base */
     body {
         margin: 0;
         padding: 0;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-        background-color: #ffffff;
+        font-family: Helvetica, Arial, sans-serif;
+        background: #ffffff;
     }
 
-    /* Set exact dimensions for WeasyPrint */
+    /* Vertical ID Card */
     @page {
-        size: 85.6mm 54mm;
+        size: 54mm 85.6mm;
         margin: 0;
     }
 
-    /* Card Container */
     .card {
-        width: 85.6mm;
-        height: 54mm;
-        box-sizing: border-box;
+        width: 54mm;
+        height: 85.6mm;
         position: relative;
+        background: #ffffff;
         overflow: hidden;
-        background-color: #ffffff;
+        border: 1px solid #cfd8dc;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Optional: adds a slight shadow to the card for web viewing */
     }
 
-    /* Top Header Ribbon */
-    .header {
-        background-color: #1f3c88;
-        color: #ffffff;
-        text-align: center;
-        font-weight: bold;
-        font-size: 10.5pt;
-        height: 9mm;
-        line-height: 9mm;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    /* Decorative Accent Bar */
-    .accent-bar {
+    /* -----------------------------
+       STYLISH ANIMATION (Blue Flowing Line)
+    ----------------------------- */
+    .flowing-line {
         position: absolute;
-        top: 9mm;
+        top: -10px;
         left: 0;
         width: 100%;
-        height: 1.2mm;
-        background-color: #ff9800; /* Optional: gives the card a premium pop */
+        height: 2px;
+        background: #00e5ff; /* Bright cyan/blue core */
+        /* Creates a glowing blue trail effect */
+        box-shadow: 0 0 10px 2px #0b4ea2, 0 10px 20px 4px rgba(11, 78, 162, 0.5);
+        z-index: 100;
+        pointer-events: none; /* Ensures the line doesn't block text selection */
+        animation: scanFlow 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
     }
 
-    /* Two-Column Layout (WeasyPrint fully supports display: table) */
-    .body-container {
-        display: table;
-        width: 100%;
-        height: 38.8mm; /* 54mm total - 9mm header - 6.2mm footer */
+    @keyframes scanFlow {
+        0% {
+            top: -20px;
+            opacity: 0;
+        }
+        10% {
+            opacity: 1;
+        }
+        90% {
+            opacity: 1;
+        }
+        100% {
+            top: 100%;
+            opacity: 0;
+        }
     }
 
-    .left-col {
-        display: table-cell;
-        width: 32mm;
-        vertical-align: top;
+    /* Hide animation when physically printing the ID Card */
+    @media print {
+        .flowing-line {
+            display: none !important;
+        }
+        .card {
+            box-shadow: none;
+            border: none;
+        }
+    }
+
+    /* Header */
+    .header {
+        height: 11mm;
+        background: #082c58; /* hospital blue */
         text-align: center;
-        padding-top: 4mm;
     }
 
-    .right-col {
-        display: table-cell;
-        vertical-align: top;
-        padding-top: 3.5mm;
-        padding-right: 3mm;
+    .header img {
+        height: 10mm;
+        margin-top: 0.5mm;
     }
 
-    /* Profile Photo Container */
+    /* Thin red accent like original card */
+    .accent-bar {
+        height: 1mm;
+        background: #e53935;
+    }
+
+    /* Photo */
     .photo-wrapper {
-        width: 18mm;
-        height: 18mm;
-        margin: 0 auto 1.5mm auto;
-        border-radius: 50%;
-        border: 1.5px solid #1f3c88;
-        padding: 1px;
-        background-color: #ffffff;
+        width: 22mm;
+        height: 22mm;
+        margin: 4mm auto 2mm auto;
+        border: 2px solid #0b4ea2;
+        background: #ffffff;
+        position: relative;
+        z-index: 10;
     }
 
     .photo-wrapper img {
         width: 100%;
         height: 100%;
-        border-radius: 50%;
-        object-fit: cover; /* Keeps image correctly proportioned */
+        object-fit: cover;
     }
 
-    /* Name and Role */
+    /* Name & Role */
     .name {
-        font-size: 8pt;
+        text-align: center;
+        font-size: 9pt;
         font-weight: bold;
-        color: #222;
-        line-height: 1.2;
-        margin: 0 1mm;
-        word-wrap: break-word;
+        color: #000;
+        margin-top: 1mm;
     }
 
     .role {
-        font-size: 6pt;
-        color: #1f3c88;
+        text-align: center;
+        font-size: 6.5pt;
         font-weight: bold;
-        margin-top: 1mm;
+        color: #0b4ea2;
         text-transform: uppercase;
+        margin-bottom: 2mm;
     }
 
-    /* Right Side Information Table */
+    /* Details */
     table {
-        width: 100%;
+        width: 92%;
+        margin: auto;
         border-collapse: collapse;
-        table-layout: fixed;
     }
 
     td {
-        font-size: 6.5pt;
+        font-size: 6.8pt;
         padding: 1.2mm 0;
-        border-bottom: 0.5px dashed #ccc;
-        vertical-align: top;
-        color: #333;
-        line-height: 1.2;
-        word-wrap: break-word;
-    }
-
-    tr:last-child td {
-        border-bottom: none;
+        border-bottom: 0.5px solid #e0e0e0;
     }
 
     .label {
+        width: 18mm;
         font-weight: bold;
-        color: #1f3c88;
-        width: 12mm; /* Constrains the label width */
+        color: #000;
     }
 
-    /* Bottom Footer */
+    /* Footer like original ID */
     .footer {
         position: absolute;
         bottom: 0;
         left: 0;
         width: 100%;
-        height: 6.2mm;
-        background-color: #f8f9fa;
-        color: #555;
+        height: 12mm;
+        background: #082c58;
+        color: #ffffff;
         text-align: center;
-        font-size: 5.5pt;
-        line-height: 6.2mm;
-        border-top: 1px solid #e0e0e0;
-        font-weight: bold;
+        font-size: 5.8pt;
+        line-height: 1.3;
+        padding-top: 1.5mm;
+        box-sizing: border-box;
+    }
+
+    .footer span {
+        display: block;
     }
 </style>
 </head>
 
 <body>
+
 <div class="card">
-    <div class="header">NELSON HOSPITAL</div>
+    
+    <!-- ANIMATED FLOWING LINE -->
+    <div class="flowing-line"></div>
+
+    <!-- HEADER -->
+    <div class="header">
+        <img src="{% static 'logo/logo.png' %}" alt="Nelson Hospital">
+    </div>
+
     <div class="accent-bar"></div>
 
-    <div class="body-container">
-        <!-- LEFT COLUMN: Identity -->
-        <div class="left-col">
-            <div class="photo-wrapper">
-                {% if employee.face_image %}
-                    <img src="{{ employee.face_image.url }}" alt="Photo">
-                {% else %}
-                    <!-- Dynamic fallback avatar if user has no picture uploaded -->
-                    <img src="https://ui-avatars.com/api/?name={{ employee.user.get_full_name|urlencode }}&background=1f3c88&color=fff&size=100" alt="No Photo">
-                {% endif %}
-            </div>
-            <div class="name">{{ employee.user.get_full_name }}</div>
-            <div class="role">{{ employee.role }}</div>
-        </div>
-
-        <!-- RIGHT COLUMN: Data -->
-        <div class="right-col">
-            <table>
-                <tr>
-                    <td class="label">Emp ID</td>
-                    <td>{{ employee.employee_id }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Dept</td>
-                    <td>{{ employee.department.name }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Contact</td>
-                    <td>{{ employee.phone_number }}</td>
-                </tr>
-                <tr>
-                    <td class="label">Shift</td>
-                    <td>{{ employee.work_rule }}</td>
-                </tr>
-            </table>
-        </div>
+    <!-- PHOTO -->
+    <div class="photo-wrapper">
+        {% if employee.face_image %}
+            <img src="{{ employee.face_image.url }}">
+        {% else %}
+            <img src="https://ui-avatars.com/api/?name={{ employee.user.get_full_name|urlencode }}&background=0b4ea2&color=fff">
+        {% endif %}
     </div>
 
+    <!-- NAME & ROLE -->
+    <div class="name">{{ employee.user.get_full_name }}</div>
+    <div class="role">{{ employee.role }}</div>
+
+    <!-- DETAILS -->
+    <table>
+        <tr>
+            <td class="label">Emp Code</td>
+            <td>{{ employee.employee_id }}</td>
+        </tr>
+        <tr>
+            <td class="label">Department</td>
+            <td>{{ employee.department.name }}</td>
+        </tr>
+        <tr>
+            <td class="label">Contact</td>
+            <td>{{ employee.phone_number }}</td>
+        </tr>
+        <tr>
+            <td class="label">Shift</td>
+            <td>{{ employee.work_rule }}</td>
+        </tr>
+    </table>
+
+    <!-- FOOTER WITH ADDRESS -->
     <div class="footer">
-        AUTHORIZED EMPLOYEE • CARRY WHILE ON DUTY
+        <span>B1/37 Sec-F, Kapoorthala, Aliganj</span>
+        <span>Lucknow – 226024</span>
+        <span>Call: 8756111125 • 26 • 30</span>
     </div>
+
 </div>
+
 </body>
 </html>

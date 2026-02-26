@@ -1076,7 +1076,10 @@ def mark_attendance(request):
                 "message": "Employee not found",
                 "color": "red"
             })
-
+        
+        is_flexible = bool(
+            employee.work_rule and employee.work_rule.flexible_attendance
+        )
         # ----------------------------------------------------
         # 📍 Location Validation
         # ----------------------------------------------------
@@ -1143,54 +1146,60 @@ def mark_attendance(request):
             # --------------------------------------------
             open_checkin = get_open_checkin(employee)
 
+            # =====================================================
+            # 🟢 FLEXIBLE STAFF (Gardener / Cleaning)
+            # =====================================================
+            if is_flexible:
+                att_type = "check_out" if open_checkin else "check_in"
             # --------------------------------------------
             # 2️⃣ If open shift → CHECK-OUT
             # --------------------------------------------
-            if open_checkin:
-                worked_hours = (now - open_checkin.timestamp).total_seconds() / 3600
-
-                if worked_hours < min_hours:
-                    mins_left = int((min_hours - worked_hours) * 60)
-                    
-                    return JsonResponse({
-                        "success": False,
-                        "message": f"Wait {mins_left} minutes to checkout",
-                        "color": "yellow"
-                    })
-
-                att_type = "check_out"
-
-            # --------------------------------------------
-            # 3️⃣ No open shift → CHECK-IN (8h lock)
-            # --------------------------------------------
             else:
-                last_checkout = Attendance.objects.filter(
-                    employee=employee,
-                    attendance_type="check_out"
-                ).order_by("-timestamp").first()
+                if open_checkin:
+                    worked_hours = (now - open_checkin.timestamp).total_seconds() / 3600
 
-                if last_checkout:
-                    remaining_minutes = int(
-                        (REST_HOURS_AFTER_CHECKOUT * 60) -
-                        ((now - last_checkout.timestamp).total_seconds() / 60)
-                    )
-
-                    if remaining_minutes > 0:
-                        hours_left = remaining_minutes // 60
-                        minutes_left = remaining_minutes % 60
-
-                        if hours_left > 0:
-                            message = f"Next check-in allowed after {hours_left}h {minutes_left}m"
-                        else:
-                            message = f"Next check-in allowed after {minutes_left} minutes"
-
+                    if worked_hours < min_hours:
+                        mins_left = int((min_hours - worked_hours) * 60)
+                        
                         return JsonResponse({
                             "success": False,
-                            "message": message,
+                            "message": f"Wait {mins_left} minutes to checkout",
                             "color": "yellow"
                         })
 
-                att_type = "check_in"
+                    att_type = "check_out"
+
+                # --------------------------------------------
+                # 3️⃣ No open shift → CHECK-IN (8h lock)
+                # --------------------------------------------
+                else:
+                    last_checkout = Attendance.objects.filter(
+                        employee=employee,
+                        attendance_type="check_out"
+                    ).order_by("-timestamp").first()
+
+                    if last_checkout:
+                        remaining_minutes = int(
+                            (REST_HOURS_AFTER_CHECKOUT * 60) -
+                            ((now - last_checkout.timestamp).total_seconds() / 60)
+                        )
+
+                        if remaining_minutes > 0:
+                            hours_left = remaining_minutes // 60
+                            minutes_left = remaining_minutes % 60
+
+                            if hours_left > 0:
+                                message = f"Next check-in allowed after {hours_left}h {minutes_left}m"
+                            else:
+                                message = f"Next check-in allowed after {minutes_left} minutes"
+
+                            return JsonResponse({
+                                "success": False,
+                                "message": message,
+                                "color": "yellow"
+                            })
+
+                    att_type = "check_in"
 
             # --------------------------------------------
             # 4️⃣ Create Attendance Record
@@ -3637,3 +3646,6 @@ def workrule_delete(request, pk):
         "rule": rule,
         "title": "Delete Work Rule"
     })
+
+
+    

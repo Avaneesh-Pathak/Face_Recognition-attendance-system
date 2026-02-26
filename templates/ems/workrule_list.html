@@ -4,102 +4,121 @@
 {% block title %}Work Rules | Configuration{% endblock %}
 
 {% block content %}
-<div class="container-fluid px-4 fade-in-up" style="max-width: 1200px;">
+<div class="container page-container fade-in-up">
     
     <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
+    <div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 mt-4 pb-3 border-bottom">
         <div>
-            <h2 class="fw-bold text-dark mb-1">
-                <i class="fas fa-clipboard-list text-primary me-2"></i>Work Rules
+            <span class="badge bg-primary-gradient mb-2 px-3 py-2 rounded-pill shadow-sm">Schedule Management</span>
+            <h2 class="fw-bolder text-dark mb-1 header-title">
+                Work Rules
             </h2>
-            <p class="text-muted mb-0">Manage shift timings, overtime rates, and working day patterns.</p>
+            <p class="text-muted mb-0 fs-6">Manage shift timings, overtime rates, and working day patterns.</p>
         </div>
-        <a href="{% url 'workrule_create' %}" class="btn btn-primary btn-lg shadow-sm rounded-pill">
-            <i class="fas fa-plus me-2"></i>Create New Rule
+        <a href="{% url 'workrule_create' %}" class="btn btn-primary-gradient mt-3 mt-md-0 btn-lg shadow-lg rounded-pill fw-bold hover-scale">
+            <i class="fas fa-plus-circle me-2"></i>Create New Rule
         </a>
     </div>
 
-    <!-- Search Bar -->
-    <div class="card border-0 shadow-sm mb-4 search-card">
-        <div class="card-body p-3">
-            <div class="input-group">
-                <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
-                <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Search rules by name, shift type, or ID...">
-            </div>
+    <!-- Toolbar: Search Bar -->
+    <div class="modern-card p-2 mb-4 mx-auto search-container">
+        <div class="input-group input-group-lg border-0">
+            <span class="input-group-text bg-transparent border-0 text-primary fs-4 ps-3">
+                <i class="fas fa-search"></i>
+            </span>
+            <input type="text" id="searchInput" class="form-control border-0 bg-transparent shadow-none fw-semibold" placeholder="Search rules by name, shift type, or pattern...">
         </div>
     </div>
 
     <!-- Rules Table Card -->
-    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+    <div class="card modern-card overflow-hidden border-0 mb-5">
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="rulesTable">
-                    <thead class="bg-light">
+                <table class="table table-borderless align-middle mb-0 custom-table" id="rulesTable">
+                    <thead class="table-light-modern">
                         <tr>
-                            <th class="ps-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Rule Name</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Working Pattern</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Shift Timing</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Overtime (OT)</th>
-                            <th class="text-end pe-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Actions</th>
+                            <th class="ps-4 text-uppercase text-muted text-xs font-weight-bolder py-3">Rule Name</th>
+                            <th class="text-uppercase text-muted text-xs font-weight-bolder py-3">Working Pattern</th>
+                            <th class="text-uppercase text-muted text-xs font-weight-bolder py-3">Shift Timing</th>
+                            <th class="text-uppercase text-muted text-xs font-weight-bolder py-3">Overtime (OT)</th>
+                            <th class="text-end pe-4 text-uppercase text-muted text-xs font-weight-bolder py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for r in rules %}
-                        <tr>
+                        <tr class="table-row-hover">
                             <!-- Rule Name -->
-                            <td class="ps-4">
+                            <td class="ps-4 py-3">
                                 <div class="d-flex align-items-center">
-                                    <div class="icon-shape bg-primary-soft text-primary rounded-3 me-3">
-                                        <i class="fas fa-business-time"></i>
+                                    <div class="icon-box bg-primary-soft text-primary me-3 shadow-sm">
+                                        <i class="fas fa-briefcase"></i>
                                     </div>
-                                    <h6 class="mb-0 text-sm fw-bold text-dark">{{ r.name }}</h6>
+                                    <div>
+                                        <h6 class="mb-0 fw-bold text-dark fs-6">{{ r.name }}</h6>
+                                        <small class="text-muted">ID: #{{ r.id }}</small>
+                                    </div>
                                 </div>
                             </td>
 
                             <!-- Working Days -->
-                            <td>
-                                <span class="badge bg-info-soft text-info border border-info-soft">
+                            <td class="py-3">
+                                <span class="badge badge-modern bg-info-soft text-info border-info-soft px-3 py-2 rounded-pill">
                                     <i class="fas fa-calendar-week me-1"></i> {{ r.get_working_days_display }}
                                 </span>
                             </td>
 
                             <!-- Shift Timing -->
-                            <td>
-                                <div class="d-flex flex-column">
-                                    <span class="text-sm fw-bold text-dark">
-                                        {{ r.shift_start_time|time:"H:i" }} <span class="text-muted mx-1">to</span> {{ r.shift_end_time|time:"H:i" }}
+                            <td class="py-3">
+                                {% if r.flexible_attendance %}
+                                    <span class="badge badge-modern bg-warning-soft text-warning border-warning-soft px-3 py-2 rounded-pill">
+                                        <i class="fas fa-infinity me-1"></i> Flexible Timing
                                     </span>
-                                    <span class="text-xs text-muted">
-                                        Total: {{ r.full_day_hours }} Hrs
+                                {% else %}
+                                    <div class="d-inline-flex align-items-center bg-light rounded-pill px-3 py-2 border">
+                                        <i class="far fa-clock text-secondary me-2"></i>
+                                        <span class="fw-semibold text-dark">{{ r.shift_start_time|time:"H:i" }}</span>
+                                        <span class="mx-2 text-muted">—</span>
+                                        <span class="fw-semibold text-dark">{{ r.shift_end_time|time:"H:i" }}</span>
+                                    </div>
+                                {% endif %}
+                            </td>
+
+                            <!-- Overtime Rate -->
+                            <td class="py-3">
+                                <div class="d-flex align-items-center">
+                                    <div class="icon-shape-small bg-success-soft text-success rounded-circle me-2">
+                                        <i class="fas fa-rupee-sign"></i>
+                                    </div>
+                                    <span class="text-dark fw-bold fs-6">
+                                        {{ r.overtime_rate }}<span class="text-muted fw-normal text-sm">/hr</span>
                                     </span>
                                 </div>
                             </td>
 
-                            <!-- Overtime Rate -->
-                            <td>
-                                <span class="text-success fw-bold text-sm">
-                                    ₹ {{ r.overtime_rate }}<span class="text-muted fw-normal">/hr</span>
-                                </span>
-                            </td>
-
                             <!-- Actions -->
-                            <td class="text-end pe-4">
-                                <a href="{% url 'workrule_update' r.id %}" class="btn btn-link text-primary p-0 me-3" data-bs-toggle="tooltip" title="Edit Rule">
-                                    <i class="fas fa-edit fa-lg"></i>
-                                </a>
-                                <button onclick="confirmDelete('{% url 'workrule_delete' r.id %}', '{{ r.name|escapejs }}')" class="btn btn-link text-danger p-0 border-0 bg-transparent" data-bs-toggle="tooltip" title="Delete Rule">
-                                    <i class="fas fa-trash-alt fa-lg"></i>
-                                </button>
+                            <td class="text-end pe-4 py-3">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{% url 'workrule_update' r.id %}" class="btn btn-icon btn-light-primary rounded-circle" data-bs-toggle="tooltip" title="Edit Rule">
+                                        <i class="fas fa-pen"></i>
+                                    </a>
+                                    <button onclick="confirmDelete('{% url 'workrule_delete' r.id %}', '{{ r.name|escapejs }}')" class="btn btn-icon btn-light-danger rounded-circle border-0" data-bs-toggle="tooltip" title="Delete Rule">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
                             <td colspan="5" class="text-center py-5">
-                                <div class="empty-state">
-                                    <i class="fas fa-clipboard-check fa-3x text-muted mb-3 opacity-50"></i>
-                                    <h5 class="text-muted">No Work Rules Found</h5>
-                                    <p class="text-secondary small">Define your first shift pattern to get started.</p>
-                                    <a href="{% url 'workrule_create' %}" class="btn btn-sm btn-outline-primary mt-2">Add Work Rule</a>
+                                <div class="empty-state py-4">
+                                    <div class="empty-state-icon bg-light text-muted mx-auto mb-3 shadow-sm rounded-circle d-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+                                        <i class="fas fa-clipboard-list fa-2x opacity-50"></i>
+                                    </div>
+                                    <h4 class="text-dark fw-bold">No Work Rules Found</h4>
+                                    <p class="text-muted mb-4">You haven't defined any shift patterns or working rules yet.</p>
+                                    <a href="{% url 'workrule_create' %}" class="btn btn-primary-gradient rounded-pill px-4 shadow-sm hover-scale">
+                                        <i class="fas fa-plus me-2"></i>Add First Work Rule
+                                    </a>
                                 </div>
                             </td>
                         </tr>
@@ -111,42 +130,117 @@
     </div>
 </div>
 
-<!-- Styles -->
+<!-- Modern Custom CSS -->
 <style>
-    /* Soft Colors for Badges & Icons */
-    .bg-primary-soft { background-color: rgba(67, 97, 238, 0.1); color: #4361ee; }
-    .bg-info-soft { background-color: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
-    .border-info-soft { border-color: rgba(13, 202, 240, 0.2) !important; }
+    /* Premium Color Palette */
+    :root {
+        --primary: #4f46e5;
+        --primary-light: #818cf8;
+        --secondary: #64748b;
+        --success: #10b981;
+        --info: #0ea5e9;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --dark: #0f172a;
+        --light-bg: #f8fafc;
+        --card-radius: 20px;
+    }
 
-    /* Icon Shape */
-    .icon-shape {
-        width: 36px;
-        height: 36px;
+    body { background-color: var(--light-bg); }
+    .page-container { max-width: 1200px; }
+
+    /* Gradients & Animations */
+    .bg-primary-gradient { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; }
+    .btn-primary-gradient { background: linear-gradient(135deg, var(--primary), var(--primary-light)); border: none; color: white; transition: all 0.3s ease; }
+    .btn-primary-gradient:hover { background: linear-gradient(135deg, #4338ca, #6366f1); transform: translateY(-3px); box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4) !important; color: white;}
+    
+    .fade-in-up { animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Modern Cards */
+    .modern-card {
+        background: #ffffff;
+        border-radius: var(--card-radius);
+        box-shadow: 0 10px 40px rgba(0,0,0,0.03);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* Search Toolbar Container */
+    .search-container {
+        border: 2px solid #e2e8f0;
+        background-color: #ffffff;
+        transition: all 0.3s ease;
+    }
+    .search-container:focus-within {
+        border-color: var(--primary-light);
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+    }
+    .search-container input::placeholder { color: #94a3b8; font-weight: 500; }
+
+    /* Custom Table Styles */
+    .table-light-modern {
+        background-color: #f8fafc;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .table-light-modern th { letter-spacing: 0.5px; }
+    
+    .custom-table tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+        transition: all 0.2s ease;
+    }
+    .custom-table tbody tr:last-child { border-bottom: none; }
+    
+    .table-row-hover:hover {
+        background-color: #f8fafc;
+        transform: scale(1.001);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    }
+
+    /* Icons & Soft Backgrounds */
+    .icon-box {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
+        font-size: 1.1rem;
+    }
+    .icon-shape-small {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
     }
 
-    /* Table Styles */
-    .table thead th {
-        border-bottom-width: 1px;
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        background-color: #f8f9fa;
-        letter-spacing: 0.5px;
-    }
-    .table tbody tr { transition: background-color 0.2s ease; }
-    .table tbody tr:hover { background-color: #f8faff; }
+    .bg-primary-soft { background: rgba(79, 70, 229, 0.1); color: var(--primary); }
+    .bg-info-soft { background: rgba(14, 165, 233, 0.1); color: var(--info); }
+    .bg-warning-soft { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+    .bg-success-soft { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+    
+    .border-info-soft { border: 1px solid rgba(14, 165, 233, 0.2); }
+    .border-warning-soft { border: 1px solid rgba(245, 158, 11, 0.2); }
 
-    /* Animations */
-    .fade-in-up { animation: fadeInUp 0.5s ease-out; }
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(15px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+    .badge-modern { font-weight: 600; letter-spacing: 0.3px; }
 
-    /* Search Input Focus */
-    .search-card .form-control:focus { box-shadow: none; border-color: #e2e8f0; }
+    /* Action Buttons */
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+    }
+    .btn-light-primary { background-color: rgba(79, 70, 229, 0.05); color: var(--primary); }
+    .btn-light-primary:hover { background-color: var(--primary); color: white; transform: translateY(-2px); }
+    
+    .btn-light-danger { background-color: rgba(239, 68, 68, 0.05); color: var(--danger); }
+    .btn-light-danger:hover { background-color: var(--danger); color: white; transform: translateY(-2px); }
+
+    .hover-scale:hover { transform: translateY(-2px); transition: transform 0.2s; }
 </style>
 
 <!-- Scripts -->
@@ -155,7 +249,7 @@
     // 1. Search Functionality
     document.getElementById('searchInput').addEventListener('keyup', function() {
         const value = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#rulesTable tbody tr');
+        const rows = document.querySelectorAll('#rulesTable tbody tr:not(.empty-state-row)'); // Exclude empty state
         
         rows.forEach(row => {
             const text = row.textContent.toLowerCase();
@@ -163,16 +257,23 @@
         });
     });
 
-    // 2. SweetAlert Delete Confirmation
+    // 2. SweetAlert Delete Confirmation (Modernized)
     function confirmDelete(deleteUrl, name) {
         Swal.fire({
-            title: 'Delete Work Rule?',
-            html: `Are you sure you want to delete <b>${name}</b>?<br><small class="text-muted">Employees assigned to this rule may need re-assignment.</small>`,
+            title: '<h3 class="fw-bold mb-0">Delete Work Rule?</h3>',
+            html: `Are you sure you want to delete <b class="text-dark">${name}</b>?<br><span class="text-muted mt-2 d-block text-sm">Employees assigned to this rule may need re-assignment.</span>`,
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#dc3545',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Yes, delete it!'
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#f1f5f9',
+            confirmButtonText: '<i class="fas fa-trash-alt me-2"></i> Yes, delete it',
+            cancelButtonText: '<span class="text-dark fw-semibold">Cancel</span>',
+            customClass: {
+                popup: 'rounded-4 shadow-lg border-0',
+                confirmButton: 'btn btn-danger rounded-pill px-4 shadow-sm',
+                cancelButton: 'btn btn-light rounded-pill px-4 border shadow-sm'
+            },
+            buttonsStyling: false
         }).then((result) => {
             if (result.isConfirmed) {
                 window.location.href = deleteUrl;

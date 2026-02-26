@@ -1,24 +1,17 @@
 # models.py
-from django.db import models
-from django.contrib.auth.models import User
-from django.utils import timezone
-from dateutil.relativedelta import relativedelta
-from django.core.validators import MinValueValidator
-from django.core.exceptions import ValidationError
-from decimal import Decimal, ROUND_HALF_UP
-from decimal import Decimal
-from datetime import date, datetime, timedelta
-import calendar
 import json
-
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import date, datetime, time, timedelta
 import calendar
+from django.db import models
 from django.utils import timezone
+from decimal import Decimal, ROUND_HALF_UP
+from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
-
-from core.utils.payslip_pdf import generate_payslip_pdf
+from dateutil.relativedelta import relativedelta
 from core.utils.payslip_email import email_payslip
+from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
+from datetime import date, datetime, time, timedelta
+from core.utils.payslip_pdf import generate_payslip_pdf
 
 
 class OfficeLocation(models.Model):
@@ -598,7 +591,10 @@ class WorkRule(models.Model):
         decimal_places=2,
         default=Decimal("100.00")
     )
-
+    flexible_attendance = models.BooleanField(
+        default=False,
+        help_text="Allow check-in/check-out at any time (for gardener/cleaning staff)"
+    )
     count_weekend_overtime = models.BooleanField(default=True)
     count_holiday_overtime = models.BooleanField(default=True)
 

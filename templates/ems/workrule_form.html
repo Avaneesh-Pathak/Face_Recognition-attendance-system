@@ -4,17 +4,18 @@
 {% block title %}{{ title }} | Configuration{% endblock %}
 
 {% block content %}
-<div class="container fade-in-up" style="max-width: 1100px;">
+<div class="container page-container fade-in-up">
     
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
+    <!-- Header Section -->
+    <div class="page-header d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-5 mt-4 pb-3 border-bottom">
         <div>
-            <h2 class="fw-bold text-dark mb-1">
-                <i class="fas fa-clock text-primary me-2"></i>{{ title }}
+            <span class="badge bg-primary-gradient mb-2 px-3 py-2 rounded-pill shadow-sm">Work Rule Setup</span>
+            <h2 class="fw-bolder text-dark mb-1 header-title">
+                {{ title }}
             </h2>
-            <p class="text-muted mb-0">Define shift timings, working days, and overtime rules.</p>
+            <p class="text-muted mb-0 fs-6">Define shift timings, working days, and overtime financial rules.</p>
         </div>
-        <a href="{% url 'workrule_list' %}" class="btn btn-outline-secondary rounded-pill px-4">
+        <a href="{% url 'workrule_list' %}" class="btn btn-light-modern mt-3 mt-md-0 rounded-pill px-4 fw-semibold shadow-sm">
             <i class="fas fa-arrow-left me-2"></i>Back to Rules
         </a>
     </div>
@@ -24,48 +25,51 @@
 
         <div class="row g-4">
             
-            <!-- SECTION 1: General Schedule -->
-            <div class="col-lg-12">
-                <div class="card modern-card">
+            <!-- SECTION 1: General Schedule & Pattern -->
+            <div class="col-lg-8">
+                <div class="card modern-card card-accent-primary h-100">
                     <div class="card-header-modern">
                         <div class="icon-box bg-primary-soft text-primary">
-                            <i class="fas fa-calendar-alt"></i>
+                            <i class="fas fa-calendar-day"></i>
                         </div>
-                        <h5 class="mb-0">General Schedule</h5>
+                        <div>
+                            <h5 class="mb-0 fw-bold">General Schedule</h5>
+                            <small class="text-muted">Basic details and working days</small>
+                        </div>
                     </div>
                     <div class="card-body p-4">
-                        <div class="row g-4 align-items-center">
+                        <div class="row g-4">
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold required-field">Rule Name</label>
+                                <label class="form-label fw-semibold required-field text-dark">Rule Name</label>
                                 <div class="input-group input-group-modern">
                                     <span class="input-group-text"><i class="fas fa-tag"></i></span>
                                     {{ form.name }}
                                 </div>
-                                <div class="form-text">e.g., "General Shift", "Night Ops", "Support Team"</div>
+                                <div class="form-text text-muted fs-7">e.g., "General Shift", "Night Ops"</div>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-semibold">Working Pattern</label>
-                                {{ form.working_days }}
+                                <label class="form-label fw-semibold text-dark">Working Pattern</label>
+                                <div class="input-group input-group-modern">
+                                    <span class="input-group-text"><i class="fas fa-layer-group"></i></span>
+                                    {{ form.working_days }}
+                                </div>
                             </div>
 
-                            <!-- Toggles for Weekends -->
-                            <div class="col-md-12 mt-3">
-                                <div class="p-3 bg-light rounded-3 d-flex flex-wrap gap-4 border border-light">
-                                    <div class="d-flex align-items-center">
-                                        <div class="form-check form-switch custom-switch">
-                                            {{ form.saturday_is_working }}
-                                            <label class="form-check-label fw-semibold ms-2" for="{{ form.saturday_is_working.id_for_label }}">
-                                                Saturday Working
-                                            </label>
-                                        </div>
+                            <!-- Weekend Toggles -->
+                            <div class="col-12">
+                                <label class="form-label fw-semibold text-dark mb-3">Weekend Configuration</label>
+                                <div class="toggle-wrapper p-3 rounded-4 d-flex flex-wrap gap-4">
+                                    <div class="form-check form-switch custom-switch modern-switch">
+                                        {{ form.saturday_is_working }}
+                                        <label class="form-check-label fw-semibold ms-2 text-dark" for="{{ form.saturday_is_working.id_for_label }}">
+                                            Saturday Working
+                                        </label>
                                     </div>
-                                    <div class="d-flex align-items-center">
-                                        <div class="form-check form-switch custom-switch">
-                                            {{ form.sunday_is_working }}
-                                            <label class="form-check-label fw-semibold ms-2" for="{{ form.sunday_is_working.id_for_label }}">
-                                                Sunday Working
-                                            </label>
-                                        </div>
+                                    <div class="form-check form-switch custom-switch modern-switch">
+                                        {{ form.sunday_is_working }}
+                                        <label class="form-check-label fw-semibold ms-2 text-dark" for="{{ form.sunday_is_working.id_for_label }}">
+                                            Sunday Working
+                                        </label>
                                     </div>
                                 </div>
                             </div>
@@ -74,77 +78,81 @@
                 </div>
             </div>
 
-            <!-- SECTION 2: Standard Shift Timing -->
-            <div class="col-lg-6">
-                <div class="card modern-card h-100">
+            <!-- SECTION 2: Flexible Attendance (Pulled out to grid) -->
+            <div class="col-lg-4">
+                <div class="card modern-card card-accent-warning h-100">
+                    <div class="card-header-modern">
+                        <div class="icon-box bg-warning-soft text-warning">
+                            <i class="fas fa-infinity"></i>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 fw-bold">Flexible Attendance</h5>
+                            <small class="text-muted">Bypass fixed hours</small>
+                        </div>
+                    </div>
+                    <div class="card-body p-4 d-flex flex-column justify-content-center">
+                        <div class="alert alert-warning-modern border-0 rounded-4 p-3 mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Ideal for <b>gardeners, cleaners,</b> or staff with no fixed shifts.
+                        </div>
+                        
+                        <div class="form-check form-switch custom-switch modern-switch switch-lg mx-auto">
+                            {{ form.flexible_attendance }}
+                            <label class="form-check-label fw-bold ms-2 text-dark" for="{{ form.flexible_attendance.id_for_label }}">
+                                Enable Flexible Timing
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: Standard Shift Timing -->
+            <div class="col-lg-12">
+                <div class="card modern-card card-accent-info">
                     <div class="card-header-modern">
                         <div class="icon-box bg-info-soft text-info">
-                            <i class="fas fa-sun"></i>
+                            <i class="fas fa-clock"></i>
                         </div>
-                        <h5 class="mb-0">Day Shift Timing</h5>
+                        <div>
+                            <h5 class="mb-0 fw-bold">Shift Timing Parameters</h5>
+                            <small class="text-muted">Define start/end times and hour calculations</small>
+                        </div>
                     </div>
                     <div class="card-body p-4">
-                        <div class="row g-3">
-                            <div class="col-6">
-                                <label class="form-label fw-semibold">Start Time</label>
+                        <div class="row g-4 align-items-center">
+                            <!-- Times -->
+                            <div class="col-md-6 col-lg-3">
+                                <label class="form-label fw-semibold text-dark">Start Time</label>
                                 <div class="input-group input-group-modern">
-                                    <span class="input-group-text"><i class="far fa-clock"></i></span>
+                                    <span class="input-group-text text-info"><i class="far fa-play-circle"></i></span>
                                     {{ form.shift_start_time }}
                                 </div>
                             </div>
-                            <div class="col-6">
-                                <label class="form-label fw-semibold">End Time</label>
+                            <div class="col-md-6 col-lg-3">
+                                <label class="form-label fw-semibold text-dark">End Time</label>
                                 <div class="input-group input-group-modern">
-                                    <span class="input-group-text"><i class="far fa-clock"></i></span>
+                                    <span class="input-group-text text-danger"><i class="far fa-stop-circle"></i></span>
                                     {{ form.shift_end_time }}
                                 </div>
                             </div>
-                            <div class="col-12"><hr class="text-muted opacity-25 my-1"></div>
-                            <div class="col-6">
-                                <label class="form-label fw-semibold">Full Day (Hrs)</label>
-                                {{ form.full_day_hours }}
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label fw-semibold">Half Day (Hrs)</label>
-                                {{ form.half_day_hours }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECTION 3: Night Shift Configuration -->
-            <div class="col-lg-6">
-                <div class="card modern-card h-100">
-                    <div class="card-header-modern">
-                        <div class="icon-box bg-purple-soft text-purple">
-                            <i class="fas fa-moon"></i>
-                        </div>
-                        <h5 class="mb-0">Night Shift Config</h5>
-                    </div>
-                    <div class="card-body p-4">
-                        <div class="row g-3">
-                            <div class="col-6">
-                                <label class="form-label fw-semibold">Start Time</label>
+                            
+                            <!-- Divider for mobile -->
+                            <div class="col-12 d-lg-none"><hr class="text-muted opacity-25 my-1"></div>
+                            
+                            <!-- Hours -->
+                            <div class="col-md-6 col-lg-3">
+                                <label class="form-label fw-semibold text-dark">Full Day (Hrs)</label>
                                 <div class="input-group input-group-modern">
-                                    <span class="input-group-text"><i class="fas fa-cloud-moon"></i></span>
-                                    {{ form.night_shift_start }}
+                                    <span class="input-group-text"><i class="fas fa-hourglass-full"></i></span>
+                                    {{ form.full_day_hours }}
                                 </div>
                             </div>
-                            <div class="col-6">
-                                <label class="form-label fw-semibold">End Time</label>
+                            <div class="col-md-6 col-lg-3">
+                                <label class="form-label fw-semibold text-dark">Half Day (Hrs)</label>
                                 <div class="input-group input-group-modern">
-                                    <span class="input-group-text"><i class="fas fa-cloud-sun"></i></span>
-                                    {{ form.night_shift_end }}
+                                    <span class="input-group-text"><i class="fas fa-hourglass-half"></i></span>
+                                    {{ form.half_day_hours }}
                                 </div>
-                            </div>
-                            <div class="col-12 mt-4">
-                                <label class="form-label fw-semibold">Bonus Multiplier</label>
-                                <div class="input-group input-group-modern">
-                                    <span class="input-group-text">x</span>
-                                    {{ form.night_bonus_multiplier }}
-                                </div>
-                                <div class="form-text text-end">e.g., 1.25 for 25% extra pay</div>
                             </div>
                         </div>
                     </div>
@@ -153,33 +161,36 @@
 
             <!-- SECTION 4: Overtime & Financials -->
             <div class="col-lg-12">
-                <div class="card modern-card mb-5">
+                <div class="card modern-card card-accent-success mb-4">
                     <div class="card-header-modern">
                         <div class="icon-box bg-success-soft text-success">
                             <i class="fas fa-coins"></i>
                         </div>
-                        <h5 class="mb-0">Overtime (OT) Rules</h5>
+                        <div>
+                            <h5 class="mb-0 fw-bold">Overtime (OT) Rules</h5>
+                            <small class="text-muted">Financial configuration for extra hours</small>
+                        </div>
                     </div>
                     <div class="card-body p-4">
-                        <div class="row align-items-center">
-                            <div class="col-md-4 mb-3 mb-md-0">
-                                <label class="form-label fw-semibold">OT Rate (Hourly)</label>
-                                <div class="input-group input-group-modern">
-                                    <span class="input-group-text fw-bold">₹</span>
+                        <div class="row align-items-center g-4">
+                            <div class="col-md-5 col-lg-4">
+                                <label class="form-label fw-semibold text-dark">OT Rate (Hourly)</label>
+                                <div class="input-group input-group-modern input-group-lg">
+                                    <span class="input-group-text fw-bold text-success bg-success-soft border-success-soft">₹</span>
                                     {{ form.overtime_rate }}
                                 </div>
                             </div>
-                            <div class="col-md-8">
-                                <div class="d-flex flex-column flex-sm-row gap-4 ms-md-4">
-                                    <div class="form-check form-switch custom-switch">
+                            <div class="col-md-7 col-lg-8">
+                                <div class="toggle-wrapper p-3 rounded-4 d-flex flex-column flex-sm-row gap-4">
+                                    <div class="form-check form-switch custom-switch modern-switch">
                                         {{ form.count_weekend_overtime }}
-                                        <label class="form-check-label ms-2" for="{{ form.count_weekend_overtime.id_for_label }}">
+                                        <label class="form-check-label fw-semibold ms-2" for="{{ form.count_weekend_overtime.id_for_label }}">
                                             Include Weekend OT
                                         </label>
                                     </div>
-                                    <div class="form-check form-switch custom-switch">
+                                    <div class="form-check form-switch custom-switch modern-switch">
                                         {{ form.count_holiday_overtime }}
-                                        <label class="form-check-label ms-2" for="{{ form.count_holiday_overtime.id_for_label }}">
+                                        <label class="form-check-label fw-semibold ms-2" for="{{ form.count_holiday_overtime.id_for_label }}">
                                             Include Holiday OT
                                         </label>
                                     </div>
@@ -193,11 +204,11 @@
         </div>
 
         <!-- Sticky Footer for Actions -->
-        <div class="form-actions text-center pb-5">
-            <button type="submit" class="btn btn-primary btn-lg px-5 shadow-lg rounded-pill hover-scale">
-                <i class="fas fa-save me-2"></i>Save Work Rule
+        <div class="form-actions text-center pb-5 mt-3">
+            <button type="submit" class="btn btn-primary-gradient btn-lg px-5 shadow-lg rounded-pill hover-scale fw-bold">
+                <i class="fas fa-check-circle me-2"></i>Save Work Rule
             </button>
-            <a href="{% url 'workrule_list' %}" class="btn btn-link text-secondary text-decoration-none mt-2 d-block">
+            <a href="{% url 'workrule_list' %}" class="btn btn-link text-muted text-decoration-none mt-3 d-block hover-text-primary fw-semibold">
                 Cancel and Return
             </a>
         </div>
@@ -205,100 +216,139 @@
     </form>
 </div>
 
-<!-- Modern CSS -->
+<!-- Modern Custom CSS -->
 <style>
+    /* Premium Color Palette */
     :root {
-        --primary: #4361ee;
-        --card-radius: 16px;
-        --input-radius: 10px;
+        --primary: #4f46e5;
+        --primary-light: #818cf8;
+        --secondary: #64748b;
+        --success: #10b981;
+        --info: #0ea5e9;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --dark: #0f172a;
+        --light-bg: #f8fafc;
+        --card-radius: 20px;
+        --input-radius: 12px;
     }
+
+    body { background-color: var(--light-bg); }
+    .page-container { max-width: 1140px; }
+
+    /* Gradients */
+    .bg-primary-gradient { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; }
+    .btn-primary-gradient { background: linear-gradient(135deg, var(--primary), var(--primary-light)); border: none; color: white; transition: all 0.3s ease; }
+    .btn-primary-gradient:hover { background: linear-gradient(135deg, #4338ca, #6366f1); transform: translateY(-3px); box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4) !important; color: white;}
 
     /* Layout & Animation */
-    .fade-in-up { animation: fadeInUp 0.4s ease-out; }
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(15px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+    .fade-in-up { animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* Modern Card */
+    /* Modern Card Design */
     .modern-card {
-        background: #fff;
-        border: 0;
+        background: #ffffff;
+        border: none;
         border-radius: var(--card-radius);
-        box-shadow: 0 5px 20px rgba(0,0,0,0.03);
-        border: 1px solid rgba(0,0,0,0.02);
+        box-shadow: 0 10px 40px rgba(0,0,0,0.03);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        position: relative;
+        overflow: hidden;
     }
+    .modern-card:hover { box-shadow: 0 15px 50px rgba(0,0,0,0.06); }
+    
+    /* Top Card Accents */
+    .card-accent-primary::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; background: var(--primary); }
+    .card-accent-warning::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; background: var(--warning); }
+    .card-accent-info::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; background: var(--info); }
+    .card-accent-success::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; background: var(--success); }
+
     .card-header-modern {
-        padding: 18px 25px;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
+        padding: 24px 28px 10px;
+        background: #fff;
         display: flex;
         align-items: center;
-        background: #fff;
-        border-radius: var(--card-radius) var(--card-radius) 0 0;
+        border-bottom: none;
     }
 
     /* Icon Boxes */
     .icon-box {
-        width: 38px;
-        height: 38px;
-        border-radius: 8px;
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-right: 12px;
-        font-size: 1.1rem;
+        margin-right: 16px;
+        font-size: 1.25rem;
     }
-    .bg-primary-soft { background: rgba(67, 97, 238, 0.1); color: var(--primary); }
-    .bg-info-soft { background: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
-    .bg-purple-soft { background: rgba(111, 66, 193, 0.1); color: #6f42c1; }
-    .bg-success-soft { background: rgba(25, 135, 84, 0.1); color: #198754; }
+    .bg-primary-soft { background: rgba(79, 70, 229, 0.1); color: var(--primary); }
+    .bg-info-soft { background: rgba(14, 165, 233, 0.1); color: var(--info); }
+    .bg-warning-soft { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+    .bg-success-soft { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+    .border-success-soft { border-color: rgba(16, 185, 129, 0.2) !important; }
+    
+    .alert-warning-modern { background: rgba(245, 158, 11, 0.05); color: #d97706; }
 
-    /* Input Styling */
+    /* Input & Form Styling */
+    .form-label { font-size: 0.9rem; letter-spacing: 0.3px; color: var(--secondary); }
     .form-control, .form-select {
         border-radius: var(--input-radius);
-        border: 1px solid #e2e8f0;
-        padding: 0.6rem 1rem;
+        border: 2px solid #e2e8f0;
+        padding: 0.7rem 1.2rem;
+        font-weight: 500;
+        color: var(--dark);
+        background-color: #f8fafc;
         transition: all 0.2s;
     }
     .form-control:focus, .form-select:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
+        border-color: var(--primary-light);
+        background-color: #fff;
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
     }
     
-    /* Input Group Icons */
+    /* Modern Input Groups */
     .input-group-modern .input-group-text {
-        background: #f8f9fa;
-        border: 1px solid #e2e8f0;
+        background: #f1f5f9;
+        border: 2px solid #e2e8f0;
         border-right: none;
-        color: #6c757d;
+        color: var(--secondary);
         border-top-left-radius: var(--input-radius);
         border-bottom-left-radius: var(--input-radius);
+        font-size: 1.1rem;
     }
-    .input-group-modern .form-control {
-        border-left: none;
-    }
+    .input-group-modern .form-control, 
+    .input-group-modern .form-select { border-left: none; padding-left: 0; }
+    .input-group-modern .form-control:focus { border-left: none; }
 
-    /* Custom Toggles */
-    .custom-switch .form-check-input {
-        width: 3em;
-        height: 1.5em;
+    /* Custom Toggles / Switches */
+    .toggle-wrapper { background: #f8fafc; border: 1px dashed #cbd5e1; }
+    .modern-switch .form-check-input {
+        width: 3.5em;
+        height: 1.75em;
         cursor: pointer;
-        margin-top: 0;
-        background-color: #e9ecef;
-        border-color: #dee2e6;
+        background-color: #cbd5e1;
+        border: none;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        transition: background-color 0.3s;
     }
-    .custom-switch .form-check-input:checked {
-        background-color: var(--primary);
-        border-color: var(--primary);
-    }
+    .modern-switch .form-check-input:checked { background-color: var(--success); }
+    .switch-lg .form-check-input { width: 4.5em; height: 2.25em; }
+    .modern-switch label { cursor: pointer; padding-top: 2px;}
+
+    /* Utilities */
+    .btn-light-modern { background: #fff; color: var(--dark); border: 1px solid #e2e8f0; }
+    .btn-light-modern:hover { background: #f1f5f9; }
     .hover-scale:hover { transform: translateY(-2px); transition: transform 0.2s; }
-    .required-field::after { content: "*"; color: #dc3545; margin-left: 4px; }
+    .hover-text-primary:hover { color: var(--primary) !important; }
+    .required-field::after { content: "*"; color: var(--danger); margin-left: 4px; font-weight: bold;}
+    .fs-7 { font-size: 0.85rem; }
 </style>
 
-<!-- Scripts to initialize form widgets -->
+<!-- Scripts to initialize form widgets dynamically -->
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // 1. Auto-style all inputs
+        // 1. Auto-style standard inputs
         const inputs = document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea');
         inputs.forEach(input => {
             input.classList.add('form-control');
@@ -312,16 +362,23 @@
             c.setAttribute('role', 'switch');
         });
 
-        // 3. Ensure Time Inputs render correctly
-        // Since Django standard TimeWidget renders as text="text", we force type="time" via JS
-        // based on common ID patterns or manually selecting specific fields.
+        // 3. Force Time Inputs for shift timing fields
         const timeFields = [
-            'id_shift_start_time', 'id_shift_end_time', 
-            'id_night_shift_start', 'id_night_shift_end'
+            'id_shift_start_time', 'id_shift_end_time'
         ];
         timeFields.forEach(id => {
             const el = document.getElementById(id);
             if(el) el.setAttribute('type', 'time');
+        });
+        
+        // 4. Force Number inputs for hours/rates
+        const numFields = ['id_full_day_hours', 'id_half_day_hours', 'id_overtime_rate'];
+        numFields.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) {
+                el.setAttribute('type', 'number');
+                if(id !== 'id_overtime_rate') el.setAttribute('step', '0.5'); // Allow half hours
+            }
         });
     });
 </script>
