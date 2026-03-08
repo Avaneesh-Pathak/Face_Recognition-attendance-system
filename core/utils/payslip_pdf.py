@@ -29,14 +29,20 @@ TEXT_BODY = colors.Color(0.1, 0.1, 0.1)
 
 def money(val):
     try:
-        return Decimal(val).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return Decimal(str(val)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     except:
         return Decimal("0.00")
-
 
 def format_currency(val):
     return f"{money(val):,}"
 
+def clean_number(val):
+    """Removes trailing zeros for whole numbers (e.g., 11.0 -> 11, but 11.5 -> 11.5)"""
+    try:
+        v = float(val)
+        return int(v) if v.is_integer() else round(v, 2)
+    except:
+        return 0
 
 def number_to_words(amount):
     try:
@@ -116,13 +122,8 @@ def generate_payslip_pdf(payroll):
     styles.add(ParagraphStyle("Td", fontSize=9, textColor=TEXT_BODY))
     styles.add(ParagraphStyle("TdMoney", fontSize=9, alignment=TA_RIGHT))
     styles.add(ParagraphStyle("TdMoneyBold", fontSize=9, fontName="Helvetica-Bold", alignment=TA_RIGHT))
-    styles.add(
-        ParagraphStyle(
-            name="CompSubRight",
-            parent=styles["CompSub"],
-            alignment=TA_RIGHT
-        )
-    )
+    styles.add(ParagraphStyle(name="CompSubRight", parent=styles["CompSub"], alignment=TA_RIGHT))
+    
     emp = payroll.employee
     user = emp.user
 
@@ -151,7 +152,7 @@ def generate_payslip_pdf(payroll):
                 "Reg. No: RMEE2227209<br/>"
                 "B1/37, Sector F, Kapoorthala,<br/>"
                 "Lucknow – 226024",
-                styles["CompSubRight"]   # ✅ right aligned
+                styles["CompSubRight"]
             )]
         ],
         style=[
@@ -176,7 +177,7 @@ def generate_payslip_pdf(payroll):
 
 
     # -------------------------------------------------
-    # TITLE BAR
+    # TITLE BAR 
     # -------------------------------------------------
 
     elements.append(Table(
@@ -196,6 +197,7 @@ def generate_payslip_pdf(payroll):
             Paragraph(l1, styles["Label"]), Paragraph(str(v1), styles["Value"]),
             Paragraph(l2, styles["Label"]), Paragraph(str(v2), styles["Value"])
         ]
+        
     structure = emp.salary_structure
     emp_table = Table([
         info("Name", user.get_full_name().title(), "Employee ID", emp.employee_id),
@@ -215,33 +217,23 @@ def generate_payslip_pdf(payroll):
     elements.append(Spacer(1, 8 * mm))
 
     # -------------------------------------------------
-    # ATTENDANCE
+    # HR METRICS & ATTENDANCE (Direct from Enterprise Engine)
     # -------------------------------------------------
 
     total_days = calendar.monthrange(payroll.month.year, payroll.month.month)[1]
 
-    # --- FIX: derive paid days from worked hours (PDF only) ---
-    rule = emp.work_rule
-    full_day_hours = Decimal(rule.full_day_hours or 0)
-
-    if full_day_hours > 0 and structure.base_salary:
-        # hourly_rate used in payroll generation
-        hourly_rate = (
-            structure.base_salary /
-            (Decimal(total_days) * full_day_hours)
-        )
-
-        worked_hours = Decimal(payroll.basic_pay) / hourly_rate
-
-        paid_days = int(
-            (worked_hours / full_day_hours)
-            .quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-        )
-    else:
-        paid_days = 0
-
-    paid_days = max(0, min(paid_days, total_days))
-    lop_days = total_days - paid_days
+    # Calculate exact payable days tracking late penalties and half days
+    exact_paid_days = max(Decimal("0.0"), (
+        payroll.present_days 
+        + payroll.paid_leave_days_count 
+        + (payroll.half_days * Decimal("0.5")) 
+        - payroll.late_penalty_deduction
+    ))
+    
+    exact_lop_days = max(Decimal("0.0"), Decimal(str(total_days)) - exact_paid_days)
+    
+    # Calculate Total Overtime (Regular + Holiday Premium)
+    total_ot_hours = (payroll.overtime_hours or Decimal("0.0")) + (payroll.holiday_overtime_hours or Decimal("0.0"))
 
     def metric(lbl, val):
         return Table([[Paragraph(lbl, styles["Label"])],
@@ -251,30 +243,34 @@ def generate_payslip_pdf(payroll):
                             ('ALIGN', (0, 0), (-1, -1), 'CENTER')])
 
     elements.append(Table([[
-        metric("TOTAL DAYS", total_days),
-        metric("PAID DAYS", paid_days),
-        metric("LOSS OF PAY", lop_days),
-        metric("OVERTIME (HRS)", payroll.overtime_hours or 0)
+        metric("TOTAL DAYS", clean_number(total_days)),
+        metric("PAID DAYS", clean_number(exact_paid_days)),
+        metric("LOSS OF PAY", clean_number(exact_lop_days)),
+        metric("OVERTIME (HRS)", clean_number(total_ot_hours))
     ]], colWidths=[47.5 * mm] * 4))
 
     elements.append(Spacer(1, 8 * mm))
 
     # -------------------------------------------------
-    # PAY CALCULATIONS
+    # PAY CALCULATIONS (Direct from Enterprise Engine)
     # -------------------------------------------------
 
     paid_basic = money(payroll.basic_pay)
 
-    ot_rate = getattr(getattr(emp, "work_rule", None), "overtime_rate", 0)
-    ot_amt = money((payroll.overtime_hours or 0) * ot_rate)
+    # Overtime Math
+    ot_rate = Decimal(str(getattr(getattr(emp, "work_rule", None), "overtime_rate", 0)))
+    reg_ot_pay = (payroll.overtime_hours or Decimal("0.0")) * ot_rate
+    hol_ot_pay = (payroll.holiday_overtime_hours or Decimal("0.0")) * ot_rate * Decimal("1.5")
+    
+    total_ot_amt = money(reg_ot_pay + hol_ot_pay)
 
     allowances = money(payroll.allowances)
     deductions = money(payroll.deductions)
 
-    total_earn = paid_basic + ot_amt + allowances
-
+    total_earn = paid_basic + total_ot_amt + allowances
     total_ded = deductions
 
+    # Use the Net Salary exactly as calculated in the database
     net_val = money(payroll.net_salary)
 
 
@@ -290,14 +286,14 @@ def generate_payslip_pdf(payroll):
     rows = [
         ("Basic Earned", paid_basic),
         ("House Rent Allowance", allowances),
-        ("Overtime Pay", ot_amt),
-        ("Special Allowance", 0)
+        ("Overtime Pay", total_ot_amt),
+        ("Special Allowance", Decimal("0.00"))
     ]
 
     ded_rows = [
-        ("Provident Fund", 0),
-        ("Professional Tax", 0),
-        ("Income Tax (TDS)", 0),
+        ("Provident Fund", Decimal("0.00")),
+        ("Professional Tax", Decimal("0.00")),
+        ("Income Tax (TDS)", Decimal("0.00")),
         ("Other Deductions", deductions)
     ]
 

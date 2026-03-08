@@ -294,7 +294,7 @@
                 </div>
             </div>
             {% endif %}
-            {% if user.is_superuser or user.is_staff or user.employee.role in "Admin" %}
+            {% if user.is_superuser  or user.employee.role in "Admin" %}
             <li class="nav-item">
                 <a href="{% url 'office_location_list' %}" class="nav-link">
                     <i class="fas fa-map-marker-alt me-2"></i>

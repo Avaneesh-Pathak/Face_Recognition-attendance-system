@@ -351,7 +351,6 @@ class EmployeeUpdateForm(forms.ModelForm):
             'department',
             'position',
             'manager',
-            'role',
             'phone_number',
             'employment_status',
             'work_rule',

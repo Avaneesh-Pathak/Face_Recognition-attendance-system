@@ -233,7 +233,7 @@
       <!-- RIGHT: Actions -->
       <div class="d-flex align-items-center gap-2">
 
-        {% if request.user.is_superuser or request.user.employee.role != 'Employee' %}
+        {% if user.is_superuser  or user.employee.role in "Admin" %}
         <button type="button"
                 class="btn btn-primary rounded-pill px-4 shadow-sm"
                 onclick="openModal('create')">
@@ -337,7 +337,7 @@
               {% endif %}
             </td>
             
-            {% if request.user.is_superuser or request.user.employee.role != 'Employee' %}
+            {% if user.is_superuser  or user.employee.role in "Admin" %}
             <td class="text-end pe-4">
               <button class="btn btn-sm btn-light border text-primary me-1 shadow-sm action-btn" data-bs-toggle="tooltip" title="Edit Record"
                       onclick="openModal('edit', {
