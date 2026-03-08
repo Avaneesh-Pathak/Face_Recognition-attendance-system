@@ -13,7 +13,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from datetime import date, datetime, time, timedelta
 from core.utils.payslip_pdf import generate_payslip_pdf
-
+from collections import defaultdict
+from django.db import models, transaction
 
 class OfficeLocation(models.Model):
     name = models.CharField(max_length=100)
@@ -542,20 +543,6 @@ def get_employee_rule_from_rule(rule):
 
 #         print("\n[END] Payroll generation complete\n")        
 
-from collections import defaultdict
-from django.db import models, transaction
-from django.db.models import Q
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import date, datetime, timedelta
-import calendar
-
-from collections import defaultdict
-from django.db import models, transaction
-from django.db.models import Q
-from decimal import Decimal, ROUND_HALF_UP
-from datetime import date, datetime, timedelta
-import calendar
-from django.utils import timezone
 
 class EnterprisePayrollManager(models.Manager):
     """
@@ -834,7 +821,7 @@ class EnterprisePayrollManager(models.Manager):
         print("✅ [END] Payroll Generation Complete. 10x Speed Achieved.\n")
 
 
-        
+
 class Payroll(models.Model):
     employee = models.ForeignKey("Employee", on_delete=models.CASCADE)
     month = models.DateField(help_text="First day of month")

@@ -1826,11 +1826,15 @@ def attendance_calendar(request, employee_id, year, month):
     year = int(year)
     month = int(month)
 
-    start_date = date(year, month, 1)
-    end_day = calendar.monthrange(year, month)[1]
-    end_date = date(year, month, end_day)
+    # Use Calendar to get a perfect grid (Lists of weeks containing date objects)
+    # firstweekday=0 means Monday is the first day of the week
+    cal = calendar.Calendar(firstweekday=0) 
+    month_days = cal.monthdatescalendar(year, month) 
 
-    # Extended range for night shift safety
+    # Determine exact query range (From the first visible grid day to the last)
+    start_date = month_days[0][0]
+    end_date = month_days[-1][-1]
+
     records = Attendance.objects.filter(
         employee=employee,
         timestamp__gte=start_date - timedelta(days=1),
@@ -1858,73 +1862,79 @@ def attendance_calendar(request, employee_id, year, month):
             })
 
             # earliest check-in wins
-            if (
-                not daily_attendance[work_date]["check_in"]
-                or ts < daily_attendance[work_date]["check_in"]
-            ):
+            if not daily_attendance[work_date]["check_in"] or ts < daily_attendance[work_date]["check_in"]:
                 daily_attendance[work_date]["check_in"] = ts
 
         elif rec.attendance_type == "check_out" and open_checkin:
-            # checkout closes the last open check-in (CRITICAL)
             daily_attendance.setdefault(open_work_date, {
                 "check_in": open_checkin,
                 "check_out": None,
             })
 
             # latest checkout wins
-            if (
-                not daily_attendance[open_work_date]["check_out"]
-                or ts > daily_attendance[open_work_date]["check_out"]
-            ):
+            if not daily_attendance[open_work_date]["check_out"] or ts > daily_attendance[open_work_date]["check_out"]:
                 daily_attendance[open_work_date]["check_out"] = ts
 
             open_checkin = None
             open_work_date = None
 
     # ------------------------------------
-    # BUILD CALENDAR DATA
+    # BUILD PERFECT CALENDAR DATA
     # ------------------------------------
     month_data = []
     total_present = total_absent = total_holiday = 0
     total_work_seconds = 0
+    today = timezone.localdate()
 
-    for d in range(1, end_day + 1):
-        day_date = date(year, month, d)
-        weekday = calendar.day_name[day_date.weekday()]
-        is_sunday = weekday == "Sunday"
+    for week in month_days:
+        for day_date in week:
+            is_current_month = day_date.month == month
+            is_future = day_date > today
+            is_sunday = day_date.weekday() == 6 # 6 is Sunday
+            is_today = day_date == today
 
-        record = daily_attendance.get(day_date)
-        check_in = record["check_in"] if record else None
-        check_out = record["check_out"] if record else None
+            record = daily_attendance.get(day_date)
+            check_in = record["check_in"] if record else None
+            check_out = record["check_out"] if record else None
 
-        present = False
-        daily_hours = None
+            present = False
+            daily_hours = None
 
-        # PERMANENT PRESENCE RULE
-        if check_in:
-            present = True
-            total_present += 1
+            if check_in:
+                present = True
+                if is_current_month:
+                    total_present += 1
 
-            if check_out and check_out > check_in:
-                delta = check_out - check_in
-                total_work_seconds += delta.total_seconds()
-                daily_hours = str(delta).split(".")[0]
-        else:
-            if is_sunday:
-                total_holiday += 1
+                if check_out and check_out > check_in:
+                    delta = check_out - check_in
+                    if is_current_month:
+                        total_work_seconds += delta.total_seconds()
+                    
+                    # Format as Xh Ym
+                    hours, remainder = divmod(delta.seconds, 3600)
+                    minutes, _ = divmod(remainder, 60)
+                    daily_hours = f"{int(hours)}h {int(minutes)}m"
             else:
-                total_absent += 1
+                # Don't count future dates as absent
+                if is_current_month and not is_future:
+                    if is_sunday:
+                        total_holiday += 1
+                    else:
+                        total_absent += 1
 
-        month_data.append({
-            "day": d,
-            "day_name": weekday[:3],
-            "present": present,
-            "holiday": is_sunday and not present,
-            "daily_hours": daily_hours,
-        })
+            month_data.append({
+                "date_str": day_date.strftime("%Y-%m-%d"),
+                "day": day_date.day,
+                "day_name": calendar.day_name[day_date.weekday()][:3],
+                "is_current_month": is_current_month,
+                "is_future": is_future,
+                "is_today": is_today,
+                "present": present,
+                "holiday": is_sunday and not present,
+                "daily_hours": daily_hours,
+            })
 
     total_working_hours = round(total_work_seconds / 3600, 2)
-
     settings = AttendanceSettings.objects.first()
     expected_hours = total_present * (settings.max_daily_hours if settings else 8)
 
@@ -1934,24 +1944,21 @@ def attendance_calendar(request, employee_id, year, month):
         "month": month,
         "month_name": calendar.month_name[month],
         "data": month_data,
-
         "total_present": total_present,
         "total_absent": total_absent,
         "total_holiday": total_holiday,
         "total_working_hours": total_working_hours,
         "total_expected_hours": round(expected_hours, 2),
-
         "next_month": month + 1 if month < 12 else 1,
         "next_year": year if month < 12 else year + 1,
         "previous_month": month - 1 if month > 1 else 12,
         "previous_year": year if month > 1 else year - 1,
-
         "day_names": list(calendar.day_name),
-        "first_day_offset": (calendar.weekday(year, month, 1) + 1) % 7,
         "all_employees": Employee.objects.all().order_by("user__first_name"),
     }
 
     return render(request, "attendance_calendar.html", context)
+
 
 def attendance_day_detail(request, emp_id, date):
     try:
