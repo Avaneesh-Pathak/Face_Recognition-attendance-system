@@ -136,7 +136,63 @@
     </div>
   </div>
 </div>
+<div class="modal fade" id="attendanceFormModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
 
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">
+          <i class="fas fa-user-clock me-2"></i>
+          <span id="formModalTitle">Add Attendance</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form id="attendanceForm">
+
+        {% csrf_token %}
+
+        <div class="modal-body">
+
+          <input type="hidden" id="attendanceId">
+
+          <div class="mb-3">
+            <label class="form-label">Type</label>
+            <select id="attendanceType" class="form-select">
+              <option value="check_in">Check In</option>
+              <option value="check_out">Check Out</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Time</label>
+            <input type="datetime-local" id="attendanceTime" class="form-control">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Location</label>
+            <input type="text" id="attendanceLocation" class="form-control">
+          </div>
+
+        </div>
+
+        <div class="modal-footer">
+
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            Cancel
+          </button>
+
+          <button type="submit" class="btn btn-success">
+            Save Attendance
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+</div>
 <!-- 🔹 Styles -->
 <style>
 .calendar-container {
@@ -206,72 +262,215 @@
 <!-- 🔹 Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+<script>
+const CAN_EDIT_ATTENDANCE = {{ can_edit_attendance|yesno:"true,false" }};
+</script>
 
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-  // 1. Initialize Choices JS for Employee Search
-  const empSelect = document.getElementById("employeeSelect");
-  if (empSelect) {
-    new Choices(empSelect, { searchEnabled: true, itemSelectText: '' });
-    empSelect.addEventListener("change", function() {
-      if (this.value) {
-        window.location.href = `/attendance-calendar/${this.value}/{{ year }}/{{ month }}/`;
-      }
-    });
-  }
 
-  // 2. Click Day -> Open Modal Data
-  document.querySelectorAll(".calendar-cell[data-date]").forEach(cell => {
-    cell.addEventListener("click", function() {
-      const date = this.dataset.date;
-      const empId = "{{ employee.id }}";
-      
-      document.getElementById("modalDateTitle").innerText = date;
-      const modalBody = document.getElementById("attendanceDetailContent");
-      
-      const modal = new bootstrap.Modal(document.getElementById("attendanceModal"));
-      modal.show();
+document.addEventListener("DOMContentLoaded", function(){
 
-      modalBody.innerHTML = `
-        <div class="spinner-border text-primary my-4" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>`;
+let empId = "{{ employee.id }}";
 
-      fetch(`/attendance-day-detail/${empId}/${date}/`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.logs && data.logs.length > 0) {
-            let html = `
-              <div class="table-responsive m-0">
-                <table class="table table-hover table-striped mb-0 text-start align-middle">
-                  <thead class="table-light">
-                    <tr><th>Type</th><th>Time</th><th>Location</th></tr>
-                  </thead>
-                  <tbody>`;
-            data.logs.forEach(log => {
-                let badgeClass = log.type.includes("In") ? "bg-success" : "bg-danger";
-                html += `
-                <tr>
-                  <td><span class="badge ${badgeClass}">${log.type}</span></td>
-                  <td class="fw-bold">${log.timestamp}</td>
-                  <td class="small text-muted">${log.location}</td>
-                </tr>`;
-            });
-            html += "</tbody></table></div>";
-            modalBody.innerHTML = html;
-          } else {
-            modalBody.innerHTML = `
-              <div class="py-4">
-                <i class="fas fa-folder-open text-muted fs-1 mb-3"></i>
-                <p class="text-muted mb-0">No attendance records for this date.</p>
-              </div>`;
-          }
-        })
-        .catch(() => {
-            modalBody.innerHTML = "<p class='text-danger py-4'><i class='fas fa-exclamation-triangle'></i> Error loading details.</p>"
-        });
-    });
-  });
+
+// CLICK CALENDAR DAY
+document.querySelectorAll(".calendar-cell[data-date]").forEach(cell=>{
+
+cell.addEventListener("click",function(){
+
+let date = this.dataset.date;
+
+let modal = new bootstrap.Modal(document.getElementById("attendanceModal"));
+modal.show();
+
+let body = document.getElementById("attendanceDetailContent");
+
+body.innerHTML=`<div class="text-center py-4">
+<div class="spinner-border text-primary"></div>
+</div>`;
+
+
+fetch(`/attendance-day-detail/${empId}/${date}/`)
+.then(res=>res.json())
+.then(data=>{
+
+let html=`<div class="d-flex justify-content-between mb-3">`;
+
+if(CAN_EDIT_ATTENDANCE){
+html+=`
+<button class="btn btn-success btn-sm"
+onclick="openAddModal('${date}')">
+<i class="fas fa-plus"></i> Add Attendance
+</button>
+`;
+}
+
+html+=`</div>
+
+<table class="table table-hover">
+
+<thead>
+<tr>
+<th>Type</th>
+<th>Time</th>
+<th>Location</th>
+<th class="text-end">Actions</th>
+</tr>
+</thead>
+
+<tbody>
+`;
+
+if(data.logs.length){
+
+data.logs.forEach(log=>{
+
+let badge=log.type.includes("In")?"bg-success":"bg-danger";
+
+html+=`
+
+<tr>
+
+<td>
+<span class="badge ${badge}">${log.type}</span>
+</td>
+
+<td>${log.timestamp}</td>
+
+<td>${log.location}</td>
+
+<td class="text-end">
+`;
+
+if(CAN_EDIT_ATTENDANCE){
+
+html+=`
+<button class="btn btn-warning btn-sm"
+onclick="openEditModal(${log.id},'${log.type}','${log.timestamp}','${log.location}')">
+<i class="fas fa-edit"></i>
+</button>
+
+<button class="btn btn-danger btn-sm"
+onclick="deleteAttendance(${log.id})">
+<i class="fas fa-trash"></i>
+</button>
+`;
+
+}
+
+html+=`
+</td>
+
+</tr>
+`;
+
 });
+
+}else{
+
+html+=`
+<tr>
+<td colspan="4" class="text-center text-muted">
+No attendance records
+</td>
+</tr>
+`;
+
+}
+
+html+=`</tbody></table>`;
+
+body.innerHTML=html;
+
+});
+
+});
+
+});
+
+
+
+// OPEN ADD MODAL
+window.openAddModal=function(date){
+
+if(!CAN_EDIT_ATTENDANCE) return;
+
+document.getElementById("attendanceId").value="";
+document.getElementById("attendanceTime").value=date+"T09:00";
+document.getElementById("attendanceLocation").value="";
+document.getElementById("formModalTitle").innerText="Add Attendance";
+
+new bootstrap.Modal(document.getElementById("attendanceFormModal")).show();
+
+}
+
+
+
+// OPEN EDIT MODAL
+window.openEditModal=function(id,type,time,location){
+
+if(!CAN_EDIT_ATTENDANCE) return;
+
+document.getElementById("attendanceId").value=id;
+document.getElementById("attendanceLocation").value=location;
+
+document.getElementById("formModalTitle").innerText="Update Attendance";
+
+new bootstrap.Modal(document.getElementById("attendanceFormModal")).show();
+
+}
+
+
+
+// SAVE ATTENDANCE
+document.getElementById("attendanceForm").addEventListener("submit",function(e){
+
+if(!CAN_EDIT_ATTENDANCE) return;
+
+e.preventDefault();
+
+let id=document.getElementById("attendanceId").value;
+
+let url=id?`/attendance/update/${id}/`:`/attendance/create/`;
+
+let formData=new FormData();
+
+formData.append("employee",empId);
+formData.append("attendance_type",document.getElementById("attendanceType").value);
+formData.append("timestamp",document.getElementById("attendanceTime").value.replace("T"," "));
+formData.append("location",document.getElementById("attendanceLocation").value);
+
+fetch(url,{
+method:"POST",
+headers:{
+"X-CSRFToken":"{{ csrf_token }}"
+},
+body:formData
+})
+.then(()=>location.reload());
+
+});
+
+
+
+// DELETE ATTENDANCE
+window.deleteAttendance=function(id){
+
+if(!CAN_EDIT_ATTENDANCE) return;
+
+if(!confirm("Delete attendance log?")) return;
+
+fetch(`/attendance/delete/${id}/`,{
+method:"POST",
+headers:{
+"X-CSRFToken":"{{ csrf_token }}"
+}
+})
+.then(()=>location.reload());
+
+}
+
+});
+
 </script>
 {% endblock %}

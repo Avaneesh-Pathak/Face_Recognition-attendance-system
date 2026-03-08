@@ -1781,7 +1781,11 @@ def get_attendance_history(request):
 
     return JsonResponse({'data': data})
 
-
+def can_manage_attendance(user):
+    return (
+        user.is_superuser or
+        (hasattr(user, "employee") and user.employee.role == "Admin")
+    )
 @login_required
 def attendance_history_page(request):
     days = int(request.GET.get('days', 30))
@@ -1937,7 +1941,7 @@ def attendance_calendar(request, employee_id, year, month):
     total_working_hours = round(total_work_seconds / 3600, 2)
     settings = AttendanceSettings.objects.first()
     expected_hours = total_present * (settings.max_daily_hours if settings else 8)
-
+    can_edit_attendance = can_manage_attendance(request.user)
     context = {
         "employee": employee,
         "year": year,
@@ -1955,6 +1959,7 @@ def attendance_calendar(request, employee_id, year, month):
         "previous_year": year if month > 1 else year - 1,
         "day_names": list(calendar.day_name),
         "all_employees": Employee.objects.all().order_by("user__first_name"),
+        "can_edit_attendance": can_edit_attendance,
     }
 
     return render(request, "attendance_calendar.html", context)
@@ -1979,7 +1984,7 @@ def attendance_day_detail(request, emp_id, date):
     return JsonResponse({
         "date": date_obj.strftime("%d %B %Y"),
         "logs": [
-            {
+            {   "id": log.id,
                 "type": log.get_attendance_type_display(),
                 "timestamp": timezone.localtime(log.timestamp).strftime("%I:%M %p"),
                 "date": timezone.localtime(log.timestamp).strftime("%d-%m-%Y"),
