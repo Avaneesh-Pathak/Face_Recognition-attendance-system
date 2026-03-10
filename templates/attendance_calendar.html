@@ -1,21 +1,27 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Attendance Calendar{% endblock %}
+{% block title %}Attendance Calendar - {{ employee.user.get_full_name }}{% endblock %}
 
 {% block content %}
+<!-- Include Choices.css in the head dynamically -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+
 <div class="container py-4">
   <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
 
     <!-- 🔹 Header -->
-    <div class="card-header bg-light py-3 border-0">
+    <div class="card-header bg-white py-3 border-bottom border-light">
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
         <h4 class="fw-bold text-primary mb-0">
           <i class="fas fa-calendar-alt me-2"></i>
-          Attendance Calendar – {{ employee.user.get_full_name }}
+          Attendance Calendar – <span class="text-dark">{{ employee.user.get_full_name }}</span>
         </h4>
-        {% if user.is_superuser or user.is_staff or user.employee.role in "Admin HR Finance" %}
-        <div class="w-100 w-md-auto">
+        
+        <!-- Employee Search / Dropdown -->
+        {% if user.is_superuser  or user.employee.role in "Admin" %}
+        {% if can_edit_attendance %}
+        <div class="w-100" style="max-width: 300px;">
           <select id="employeeSelect" class="form-select border-primary shadow-sm">
             <option value="">🔍 Search Employee...</option>
             {% for emp in all_employees %}
@@ -26,60 +32,61 @@
           </select>
         </div>
         {% endif %}
+        {% endif %}
       </div>
     </div>
 
     <!-- 🔹 Month Navigation -->
-    <div class="bg-white border-bottom p-3">
-      <div class="d-flex justify-content-center align-items-center mb-3">
-        <a href="{% url 'attendance_calendar' employee.id previous_year previous_month %}" class="btn btn-primary btn-sm me-3 shadow-sm rounded-circle">
+    <div class="bg-light border-bottom p-3">
+      <div class="d-flex justify-content-center align-items-center mb-0">
+        <a href="{% url 'attendance_calendar' employee.id previous_year previous_month %}" class="btn btn-outline-primary btn-sm me-3 shadow-sm rounded-circle" title="Previous Month">
           <i class="fas fa-chevron-left px-1"></i>
         </a>
-        <h4 class="mb-0 fw-bold text-dark text-uppercase px-3">{{ month_name }} {{ year }}</h4>
-        <a href="{% url 'attendance_calendar' employee.id next_year next_month %}" class="btn btn-primary btn-sm ms-3 shadow-sm rounded-circle">
+        <h4 class="mb-0 fw-bold text-dark text-uppercase px-3 tracking-wide">{{ month_name }} {{ year }}</h4>
+        <a href="{% url 'attendance_calendar' employee.id next_year next_month %}" class="btn btn-outline-primary btn-sm ms-3 shadow-sm rounded-circle" title="Next Month">
           <i class="fas fa-chevron-right px-1"></i>
         </a>
       </div>
     </div>
 
     <!-- 🔹 Summary Cards -->
-    <div class="row text-center mx-0 py-3 bg-light border-bottom">
-      <div class="col-6 col-md-3 mb-2">
-        <div class="card shadow-sm border-success border-2 rounded-3 h-100">
-          <div class="card-body py-2">
-            <h6 class="text-success fw-bold mb-1">Present</h6>
-            <h5 class="fw-bold mb-0">{{ total_present }}</h5>
+    <div class="row text-center mx-0 py-4 bg-white border-bottom">
+      <div class="col-6 col-md-3 mb-3 mb-md-0">
+        <div class="card shadow-sm border-0 border-start border-success border-4 rounded-3 h-100 bg-light">
+          <div class="card-body py-3">
+            <h6 class="text-muted text-uppercase fw-bold mb-1 fs-7">Present</h6>
+            <h4 class="fw-bold text-success mb-0">{{ total_present }}</h4>
           </div>
         </div>
       </div>
-      <div class="col-6 col-md-3 mb-2">
-        <div class="card shadow-sm border-danger border-2 rounded-3 h-100">
-          <div class="card-body py-2">
-            <h6 class="text-danger fw-bold mb-1">Absent</h6>
-            <h5 class="fw-bold mb-0">{{ total_absent }}</h5>
+      <div class="col-6 col-md-3 mb-3 mb-md-0">
+        <div class="card shadow-sm border-0 border-start border-danger border-4 rounded-3 h-100 bg-light">
+          <div class="card-body py-3">
+            <h6 class="text-muted text-uppercase fw-bold mb-1 fs-7">Absent</h6>
+            <h4 class="fw-bold text-danger mb-0">{{ total_absent }}</h4>
           </div>
         </div>
       </div>
-      <div class="col-6 col-md-3 mb-2">
-        <div class="card shadow-sm border-warning border-2 rounded-3 h-100">
-          <div class="card-body py-2">
-            <h6 class="text-warning fw-bold mb-1">Holidays</h6>
-            <h5 class="fw-bold mb-0">{{ total_holiday }}</h5>
+      <div class="col-6 col-md-3 mb-3 mb-md-0">
+        <div class="card shadow-sm border-0 border-start border-warning border-4 rounded-3 h-100 bg-light">
+          <div class="card-body py-3">
+            <h6 class="text-muted text-uppercase fw-bold mb-1 fs-7">Holidays</h6>
+            <h4 class="fw-bold text-warning mb-0">{{ total_holiday }}</h4>
           </div>
         </div>
       </div>
-      <div class="col-6 col-md-3 mb-2">
-        <div class="card shadow-sm border-primary border-2 rounded-3 h-100">
-          <div class="card-body py-2">
-            <h6 class="text-primary fw-bold mb-1">Working Hours</h6>
-            <h6 class="mb-0 fw-bold">{{ total_working_hours }}h / {{ total_expected_hours }}h</h6>
+      <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0 border-start border-primary border-4 rounded-3 h-100 bg-light">
+          <div class="card-body py-3">
+            <h6 class="text-muted text-uppercase fw-bold mb-1 fs-7">Working Hours</h6>
+            <h5 class="fw-bold text-primary mb-0 mt-2">{{ total_working_hours }}h <span class="text-muted fs-6 fw-normal">/ {{ total_expected_hours }}h</span></h5>
           </div>
         </div>
       </div>
     </div>
 
     <!-- 🔹 Calendar Grid -->
-    <div class="card-body p-3 p-md-4">
+    <div class="card-body p-3 p-md-4 bg-light">
       <div class="calendar-container">
         <!-- Weekday header -->
         <div class="calendar-header fw-bold text-center mb-2">
@@ -100,19 +107,19 @@
                  {% else %} absent {% endif %}"
                  data-date="{{ item.date_str }}">
               
-              <div class="fw-bold fs-5">{{ item.day }}</div>
+              <div class="fw-bold fs-5 day-number">{{ item.day }}</div>
 
               {% if item.holiday %}
-                <div class="status-badge text-warning mt-1"><i class="fas fa-umbrella-beach"></i> Holiday</div>
+                <div class="status-badge text-warning mt-1"><i class="fas fa-umbrella-beach mb-1"></i><br>Holiday</div>
               {% elif item.present %}
-                <div class="status-badge text-success mt-1"><i class="fas fa-check-circle"></i> Present</div>
+                <div class="status-badge text-success mt-1"><i class="fas fa-check-circle mb-1"></i><br>Present</div>
                 {% if item.daily_hours %}
-                  <div class="small text-dark mt-1 fw-bold"><i class="far fa-clock"></i> {{ item.daily_hours }}</div>
+                  <div class="small text-dark mt-1 fw-bold bg-white px-2 py-1 rounded-pill shadow-sm"><i class="far fa-clock text-primary"></i> {{ item.daily_hours }}</div>
                 {% endif %}
               {% elif item.is_future %}
-                <div class="status-badge text-secondary mt-1">—</div>
+                <div class="status-badge text-secondary mt-1 opacity-50">—</div>
               {% else %}
-                <div class="status-badge text-danger mt-1"><i class="fas fa-times-circle"></i> Absent</div>
+                <div class="status-badge text-danger mt-1"><i class="fas fa-times-circle mb-1"></i><br>Absent</div>
               {% endif %}
             </div>
           {% endfor %}
@@ -124,353 +131,337 @@
 
 <!-- 🔹 Attendance Detail Modal -->
 <div class="modal fade" id="attendanceModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg">
       <div class="modal-header bg-primary text-white">
         <h5 class="modal-title"><i class="fas fa-list me-2"></i>Logs for <span id="modalDateTitle"></span></h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body p-0">
-        <div id="attendanceDetailContent" class="p-4 text-center">Loading...</div>
+        <div id="attendanceDetailContent" class="p-4 text-center">
+          <div class="spinner-border text-primary" role="status"></div>
+        </div>
       </div>
     </div>
   </div>
 </div>
-<div class="modal fade" id="attendanceFormModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow">
 
-      <div class="modal-header bg-success text-white">
+<!-- 🔹 Add/Edit Attendance Form Modal -->
+<div class="modal fade" id="attendanceFormModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
         <h5 class="modal-title">
           <i class="fas fa-user-clock me-2"></i>
           <span id="formModalTitle">Add Attendance</span>
         </h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
-
       <form id="attendanceForm">
-
         {% csrf_token %}
-
-        <div class="modal-body">
-
+        <div class="modal-body bg-light">
           <input type="hidden" id="attendanceId">
 
           <div class="mb-3">
-            <label class="form-label">Type</label>
-            <select id="attendanceType" class="form-select">
+            <label class="form-label fw-bold text-secondary">Record Type</label>
+            <select id="attendanceType" class="form-select shadow-sm" required>
               <option value="check_in">Check In</option>
               <option value="check_out">Check Out</option>
             </select>
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Time</label>
-            <input type="datetime-local" id="attendanceTime" class="form-control">
+            <label class="form-label fw-bold text-secondary">Date & Time</label>
+            <input type="datetime-local" id="attendanceTime" class="form-control shadow-sm" required>
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Location</label>
-            <input type="text" id="attendanceLocation" class="form-control">
+            <label class="form-label fw-bold text-secondary">Location (Optional)</label>
+            <input type="text" id="attendanceLocation" class="form-control shadow-sm" placeholder="e.g. Office, Remote, Site">
           </div>
-
         </div>
-
-        <div class="modal-footer">
-
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-            Cancel
-          </button>
-
-          <button type="submit" class="btn btn-success">
-            Save Attendance
-          </button>
-
+        <div class="modal-footer bg-white">
+          <button type="button" class="btn btn-secondary shadow-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success shadow-sm px-4">Save Record</button>
         </div>
-
       </form>
-
     </div>
   </div>
 </div>
+
 <!-- 🔹 Styles -->
 <style>
-.calendar-container {
-  overflow-x: auto;
-}
-.calendar-header, .calendar-body {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(100px, 1fr)); /* Perfect 7 Column Grid */
-  gap: 8px;
-  text-align: center;
-}
+.fs-7 { font-size: 0.8rem; }
+.tracking-wide { letter-spacing: 1px; }
+
+.calendar-container { overflow-x: auto; padding-bottom: 10px; }
+.calendar-header, .calendar-body { display: grid; grid-template-columns: repeat(7, minmax(110px, 1fr)); gap: 10px; text-align: center; }
+
 .calendar-cell {
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px 8px;
-  min-height: 90px;
+  min-height: 100px;
   border: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: all 0.25s ease;
   background-color: #fff;
-}
-.calendar-cell.header {
-  background: #f1f5f9;
-  color: #475569;
-  min-height: auto;
-  padding: 10px 0;
-  font-size: 0.85rem;
-  letter-spacing: 1px;
-  cursor: default;
-}
-
-/* Status Colors */
-.calendar-cell.present { border-color: #86efac; background: #f0fdf4; }
-.calendar-cell.absent { border-color: #fca5a5; background: #fef2f2; }
-.calendar-cell.holiday { border-color: #fde047; background: #fefce8; }
-.calendar-cell.future { background: #f8fafc; border-style: dashed; }
-.calendar-cell.out-of-month { opacity: 0.4; filter: grayscale(100%); }
-
-/* Today Indicator */
-.calendar-cell.is-today {
-  box-shadow: 0 0 0 2px #3b82f6;
   position: relative;
 }
 
-.calendar-cell:hover:not(.header) {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  border-color: #3b82f6;
-}
+.calendar-cell.header { background: #f1f5f9; color: #475569; min-height: auto; padding: 12px 0; font-size: 0.85rem; font-weight: 700; letter-spacing: 1px; cursor: default; border: none; }
 
-.status-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-}
+/* Status Colors & Borders */
+.calendar-cell.present { border-color: #86efac; background: #f0fdf4; border-bottom: 4px solid #4ade80; }
+.calendar-cell.absent { border-color: #fca5a5; background: #fef2f2; border-bottom: 4px solid #f87171; }
+.calendar-cell.holiday { border-color: #fde047; background: #fefce8; border-bottom: 4px solid #facc15; }
+.calendar-cell.future { background: #f8fafc; border: 1px dashed #cbd5e1; cursor: default; }
+.calendar-cell.out-of-month { opacity: 0.45; filter: grayscale(80%); }
+
+/* Today Indicator */
+.calendar-cell.is-today { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5); }
+.calendar-cell.is-today .day-number { background-color: #3b82f6; color: #fff; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; margin: 0 auto 5px auto; }
+
+.calendar-cell:not(.header):not(.future):hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); border-color: #3b82f6; }
+
+.status-badge { font-size: 0.75rem; font-weight: 600; line-height: 1.2; }
 
 @media (max-width: 768px) {
-  .calendar-header, .calendar-body { grid-template-columns: repeat(7, minmax(70px, 1fr)); gap: 4px;}
-  .calendar-cell { min-height: 75px; padding: 6px 2px; }
-  .fs-5 { font-size: 1rem !important; }
+  .calendar-header, .calendar-body { grid-template-columns: repeat(7, minmax(70px, 1fr)); gap: 6px;}
+  .calendar-cell { min-height: 85px; padding: 8px 2px; }
+  .fs-5 { font-size: 1.1rem !important; }
   .status-badge { font-size: 0.65rem; }
 }
 </style>
 
 <!-- 🔹 Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css">
+
 <script>
 const CAN_EDIT_ATTENDANCE = {{ can_edit_attendance|yesno:"true,false" }};
-</script>
-
-<script>
-
-document.addEventListener("DOMContentLoaded", function(){
-
 let empId = "{{ employee.id }}";
 
+document.addEventListener("DOMContentLoaded", function() {
 
-// CLICK CALENDAR DAY
-document.querySelectorAll(".calendar-cell[data-date]").forEach(cell=>{
+    // 1. Initialize Choices.js for Employee Dropdown
+    const empSelect = document.getElementById("employeeSelect");
+    if (empSelect) {
+        new Choices(empSelect, { searchEnabled: true, itemSelectText: '' });
+        empSelect.addEventListener('change', function() {
+            if (this.value) {
+                let url = "{% url 'attendance_calendar' 999999 year month %}".replace('999999', this.value);
+                window.location.href = url;
+            }
+        });
+    }
 
-cell.addEventListener("click",function(){
+    // 2. Click Calendar Day
+    document.querySelectorAll(".calendar-cell[data-date]").forEach(cell => {
+        cell.addEventListener("click", function() {
+            if (this.classList.contains("future")) return;
 
-let date = this.dataset.date;
+            let date = this.dataset.date;
+            let modal = new bootstrap.Modal(document.getElementById("attendanceModal"));
+            modal.show();
 
-let modal = new bootstrap.Modal(document.getElementById("attendanceModal"));
-modal.show();
+            let body = document.getElementById("attendanceDetailContent");
+            body.innerHTML = `<div class="text-center py-4"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Loading logs...</p></div>`;
 
-let body = document.getElementById("attendanceDetailContent");
+            fetch(`/attendance-day-detail/${empId}/${date}/`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById("modalDateTitle").innerText = data.date;
 
-body.innerHTML=`<div class="text-center py-4">
-<div class="spinner-border text-primary"></div>
-</div>`;
+                let html = `<div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0 text-secondary">Attendance Logs</h6>`;
 
+                if(CAN_EDIT_ATTENDANCE) {
+                    html += `<button class="btn btn-success btn-sm shadow-sm" onclick="openAddModal('${date}')">
+                               <i class="fas fa-plus"></i> Add Entry
+                             </button>`;
+                }
+                html += `</div>
+                         <div class="table-responsive">
+                           <table class="table table-hover align-middle border text-start">
+                             <thead class="table-light">
+                               <tr>
+                                 <th>Type</th>
+                                 <th>Time</th>
+                                 <th>Location</th>
+                                 ${CAN_EDIT_ATTENDANCE ? '<th class="text-end">Actions</th>' : ''}
+                               </tr>
+                             </thead>
+                             <tbody>`;
 
-fetch(`/attendance-day-detail/${empId}/${date}/`)
-.then(res=>res.json())
-.then(data=>{
+                if(data.logs.length) {
+                    data.logs.forEach(log => {
+                        let badge = log.type.toLowerCase().includes("in") ? "bg-success" : "bg-danger";
+                        
+                        // Fallback processing for empty/null locations
+                        let displayLoc = (log.location && log.location !== "—") ? log.location : "—";
 
-let html=`<div class="d-flex justify-content-between mb-3">`;
+                        html += `<tr>
+                                   <td><span class="badge ${badge}">${log.type}</span></td>
+                                   <td><span class="fw-bold">${log.timestamp}</span><br><small class="text-muted">${log.date}</small></td>
+                                   <td><span class="text-secondary"><i class="fas fa-map-marker-alt me-1"></i>${displayLoc}</span></td>`;
 
-if(CAN_EDIT_ATTENDANCE){
-html+=`
-<button class="btn btn-success btn-sm"
-onclick="openAddModal('${date}')">
-<i class="fas fa-plus"></i> Add Attendance
-</button>
-`;
-}
+                        if(CAN_EDIT_ATTENDANCE){
+                            // Instead of inline passing which breaks HTML quotes, we use safe dataset attributes
+                            let escapedLoc = displayLoc.replace(/"/g, '&quot;'); 
+                            
+                            html += `<td class="text-end text-nowrap">
+                                       <button class="btn btn-warning btn-sm text-dark shadow-sm me-1 edit-log-btn" title="Edit" 
+                                               data-id="${log.id}"
+                                               data-type="${log.type}"
+                                               data-timestamp="${log.timestamp}"
+                                               data-date="${log.date}"
+                                               data-location="${escapedLoc}">
+                                         <i class="fas fa-edit"></i>
+                                       </button>
+                                       <button class="btn btn-danger btn-sm shadow-sm" title="Delete" 
+                                               onclick="deleteAttendance(${log.id})">
+                                         <i class="fas fa-trash"></i>
+                                       </button>
+                                     </td>`;
+                        }
+                        html += `</tr>`;
+                    });
+                } else {
+                    let colSpan = CAN_EDIT_ATTENDANCE ? 5 : 4;
+                    html += `<tr><td colspan="${colSpan}" class="text-center text-muted py-4">No attendance records found for this date.</td></tr>`;
+                }
 
-html+=`</div>
+                html += `</tbody></table></div>`;
+                body.innerHTML = html;
 
-<table class="table table-hover">
+                // Bind Edit Buttons Dynamically (Safe from string quoting errors)
+                document.querySelectorAll('.edit-log-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        openEditModal(
+                            this.dataset.id,
+                            this.dataset.type,
+                            this.dataset.timestamp,
+                            this.dataset.date,
+                            this.dataset.location
+                        );
+                    });
+                });
+            })
+            .catch(err => {
+                body.innerHTML = `<div class="alert alert-danger">Failed to load details. Please try again.</div>`;
+            });
+        });
+    });
 
-<thead>
-<tr>
-<th>Type</th>
-<th>Time</th>
-<th>Location</th>
-<th class="text-end">Actions</th>
-</tr>
-</thead>
+    // Parse DD-MM-YYYY & hh:mm A into YYYY-MM-DDTHH:MM format safely
+    function parseToDateTimeLocal(dateStr, timeStr) {
+        try {
+            let [day, month, year] = dateStr.split('-');
+            let [time, modifier] = timeStr.split(' ');
+            let [hours, minutes] = time.split(':');
+            hours = parseInt(hours, 10);
+            
+            if (modifier.toUpperCase() === 'PM' && hours < 12) hours += 12;
+            if (modifier.toUpperCase() === 'AM' && hours === 12) hours = 0;
+            
+            let hh = hours.toString().padStart(2, '0');
+            return `${year}-${month}-${day}T${hh}:${minutes}`;
+        } catch(e) { return ""; }
+    }
 
-<tbody>
-`;
+    // OPEN ADD MODAL
+    window.openAddModal = function(date) {
+        if(!CAN_EDIT_ATTENDANCE) return;
 
-if(data.logs.length){
+        document.getElementById("attendanceId").value = "";
+        document.getElementById("attendanceTime").value = date + "T09:00"; 
+        document.getElementById("attendanceLocation").value = "";
+        document.getElementById("attendanceType").value = "check_in";
+        document.getElementById("formModalTitle").innerText = "Add Attendance";
 
-data.logs.forEach(log=>{
+        let detailModal = bootstrap.Modal.getInstance(document.getElementById("attendanceModal"));
+        if (detailModal) detailModal.hide();
 
-let badge=log.type.includes("In")?"bg-success":"bg-danger";
+        new bootstrap.Modal(document.getElementById("attendanceFormModal")).show();
+    }
 
-html+=`
+    // OPEN EDIT MODAL
+    window.openEditModal = function(id, typeDisplay, timeStr, dateStr, locationStr) {
+        if(!CAN_EDIT_ATTENDANCE) return;
 
-<tr>
+        document.getElementById("attendanceId").value = id;
+        document.getElementById("attendanceType").value = typeDisplay.toLowerCase().includes('in') ? 'check_in' : 'check_out';
+        document.getElementById("attendanceTime").value = parseToDateTimeLocal(dateStr, timeStr);
+        
+        // Feed the location if exists, otherwise leave blank
+        document.getElementById("attendanceLocation").value = (locationStr && locationStr !== '—') ? locationStr : "";
 
-<td>
-<span class="badge ${badge}">${log.type}</span>
-</td>
+        document.getElementById("formModalTitle").innerText = "Update Attendance";
 
-<td>${log.timestamp}</td>
+        let detailModal = bootstrap.Modal.getInstance(document.getElementById("attendanceModal"));
+        if (detailModal) detailModal.hide();
 
-<td>${log.location}</td>
+        new bootstrap.Modal(document.getElementById("attendanceFormModal")).show();
+    }
 
-<td class="text-end">
-`;
+    // SAVE / UPDATE ATTENDANCE
+    document.getElementById("attendanceForm").addEventListener("submit", function(e) {
+        if(!CAN_EDIT_ATTENDANCE) return;
+        e.preventDefault();
 
-if(CAN_EDIT_ATTENDANCE){
+        let btn = this.querySelector('button[type="submit"]');
+        let ogText = btn.innerHTML;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
+        btn.disabled = true;
 
-html+=`
-<button class="btn btn-warning btn-sm"
-onclick="openEditModal(${log.id},'${log.type}','${log.timestamp}','${log.location}')">
-<i class="fas fa-edit"></i>
-</button>
+        let id = document.getElementById("attendanceId").value;
+        let url = id ? `/attendance/update/${id}/` : `/attendance/create/`;
 
-<button class="btn btn-danger btn-sm"
-onclick="deleteAttendance(${log.id})">
-<i class="fas fa-trash"></i>
-</button>
-`;
+        let formData = new FormData();
+        formData.append("employee", empId);
+        formData.append("attendance_type", document.getElementById("attendanceType").value);
+        
+        let rawTime = document.getElementById("attendanceTime").value; 
+        formData.append("timestamp", rawTime.replace("T", " "));
+        formData.append("location", document.getElementById("attendanceLocation").value);
 
-}
+        fetch(url, {
+            method: "POST",
+            headers: { "X-CSRFToken": "{{ csrf_token }}" },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success || data.ok) {
+                location.reload();
+            } else {
+                alert("Error: " + (data.error || "Failed to save record"));
+                btn.innerHTML = ogText; btn.disabled = false;
+            }
+        }).catch(() => {
+            alert("Network Error: Could not save attendance.");
+            btn.innerHTML = ogText; btn.disabled = false;
+        });
+    });
 
-html+=`
-</td>
+    // DELETE ATTENDANCE
+    window.deleteAttendance = function(id) {
+        if(!CAN_EDIT_ATTENDANCE) return;
+        if(!confirm("Are you sure you want to delete this attendance log? This action cannot be undone.")) return;
 
-</tr>
-`;
-
+        fetch(`/attendance/delete/${id}/`, {
+            method: "POST",
+            headers: { "X-CSRFToken": "{{ csrf_token }}" }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success || data.ok) { location.reload(); }
+            else { alert("Error deleting log."); }
+        });
+    }
 });
-
-}else{
-
-html+=`
-<tr>
-<td colspan="4" class="text-center text-muted">
-No attendance records
-</td>
-</tr>
-`;
-
-}
-
-html+=`</tbody></table>`;
-
-body.innerHTML=html;
-
-});
-
-});
-
-});
-
-
-
-// OPEN ADD MODAL
-window.openAddModal=function(date){
-
-if(!CAN_EDIT_ATTENDANCE) return;
-
-document.getElementById("attendanceId").value="";
-document.getElementById("attendanceTime").value=date+"T09:00";
-document.getElementById("attendanceLocation").value="";
-document.getElementById("formModalTitle").innerText="Add Attendance";
-
-new bootstrap.Modal(document.getElementById("attendanceFormModal")).show();
-
-}
-
-
-
-// OPEN EDIT MODAL
-window.openEditModal=function(id,type,time,location){
-
-if(!CAN_EDIT_ATTENDANCE) return;
-
-document.getElementById("attendanceId").value=id;
-document.getElementById("attendanceLocation").value=location;
-
-document.getElementById("formModalTitle").innerText="Update Attendance";
-
-new bootstrap.Modal(document.getElementById("attendanceFormModal")).show();
-
-}
-
-
-
-// SAVE ATTENDANCE
-document.getElementById("attendanceForm").addEventListener("submit",function(e){
-
-if(!CAN_EDIT_ATTENDANCE) return;
-
-e.preventDefault();
-
-let id=document.getElementById("attendanceId").value;
-
-let url=id?`/attendance/update/${id}/`:`/attendance/create/`;
-
-let formData=new FormData();
-
-formData.append("employee",empId);
-formData.append("attendance_type",document.getElementById("attendanceType").value);
-formData.append("timestamp",document.getElementById("attendanceTime").value.replace("T"," "));
-formData.append("location",document.getElementById("attendanceLocation").value);
-
-fetch(url,{
-method:"POST",
-headers:{
-"X-CSRFToken":"{{ csrf_token }}"
-},
-body:formData
-})
-.then(()=>location.reload());
-
-});
-
-
-
-// DELETE ATTENDANCE
-window.deleteAttendance=function(id){
-
-if(!CAN_EDIT_ATTENDANCE) return;
-
-if(!confirm("Delete attendance log?")) return;
-
-fetch(`/attendance/delete/${id}/`,{
-method:"POST",
-headers:{
-"X-CSRFToken":"{{ csrf_token }}"
-}
-})
-.then(()=>location.reload());
-
-}
-
-});
-
 </script>
 {% endblock %}

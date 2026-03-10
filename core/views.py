@@ -164,30 +164,45 @@ def home(request):
 # =====================================================
 
 def register(request):
-    if request.method == "POST":
-        form = EmployeeRegistrationForm(request.POST)
 
-        if form.is_valid():
+    print("===== REGISTER VIEW START =====")
+
+    if request.method == "POST":
+        print("POST DATA:", request.POST)
+        print("FILES:", request.FILES)
+
+        form = EmployeeRegistrationForm(request.POST, request.FILES)
+
+        if not form.is_valid():
+            print("FORM ERRORS:", form.errors)
+            messages.error(request, f"Form validation failed: {form.errors}")
+        else:
             try:
+                print("Creating user...")
+
                 user = User.objects.create_user(
                     username=form.cleaned_data["username"],
                     email=form.cleaned_data["email"],
                     password=form.cleaned_data["password1"],
-                    first_name=form.cleaned_data["first_name"],
-                    last_name=form.cleaned_data["last_name"],
+                    first_name=form.cleaned_data.get("first_name"),
+                    last_name=form.cleaned_data.get("last_name"),
                 )
+
+                print("User created:", user.username)
 
                 employee = Employee.objects.create(
                     user=user,
-                    department=form.cleaned_data["department"],
-                    position=form.cleaned_data["position"],
-                    manager=form.cleaned_data["manager"],
-                    phone_number=form.cleaned_data["phone_number"],
-                    role=form.cleaned_data["role"],
+                    department=form.cleaned_data.get("department"),
+                    position=form.cleaned_data.get("position"),
+                    manager=form.cleaned_data.get("manager"),
+                    phone_number=form.cleaned_data.get("phone_number"),
+                    role=form.cleaned_data.get("role"),
                     work_rule=form.cleaned_data.get("work_rule"),
-                    location_type=form.cleaned_data["location_type"],
+                    location_type=form.cleaned_data.get("location_type"),
                     assigned_location=form.cleaned_data.get("assigned_location"),
                 )
+
+                print("Employee created:", employee.id)
 
                 SalaryStructure.objects.create(
                     employee=employee,
@@ -197,12 +212,16 @@ def register(request):
                     deductions=form.cleaned_data.get("deductions") or Decimal("0.00"),
                 )
 
+                print("Salary created")
 
                 face_image = request.FILES.get("face_image")
 
                 if not face_image and request.POST.get("captured_image"):
+                    print("Processing webcam image")
+
                     fmt, imgstr = request.POST["captured_image"].split(";base64,")
                     ext = fmt.split("/")[-1]
+
                     face_image = ContentFile(
                         base64.b64decode(imgstr),
                         name=f"face_{employee.employee_id}.{ext}",
@@ -212,34 +231,21 @@ def register(request):
                     employee.face_image = face_image
                     employee.save(update_fields=["face_image"])
 
-                if employee.face_image:
-                    face_sys = get_face_system()
-                    emb = face_sys.get_embedding(employee.face_image.path)
-
-                    if emb is None:
-                        employee.face_encoding = json.dumps({"status": "FACE_PENDING"})
-                        employee.save(update_fields=["face_encoding"])
-                        messages.warning(
-                            request,
-                            "Face not registered. You can add face ID later."
-                        )
-                    else:
-                        employee.face_encoding = json.dumps([emb])
-                        employee.save(update_fields=["face_encoding"])
-                        face_sys.load_from_db()
+                print("Face image saved")
 
                 messages.success(request, "Employee registered successfully")
+
                 return redirect("employee_list")
 
             except Exception as e:
+                print("REGISTRATION ERROR:", str(e))
                 logger.exception("Registration failed")
-                messages.error(request, str(e))
+                messages.error(request, f"Registration failed: {str(e)}")
 
     else:
         form = EmployeeRegistrationForm()
 
     return render(request, "register.html", {"form": form})
-
 
 # --- Real-time AJAX validators ---
 def check_username(request):
@@ -747,7 +753,7 @@ def my_profile_view(request):
     })
 
 @login_required
-@hr_required
+
 def employee_profile(request, pk):
     employee = get_object_or_404(
         Employee.objects.select_related(
@@ -1435,7 +1441,7 @@ def video_feed():
         except Exception:
             logger.exception("Error releasing camera in video_feed")
 
-def can_manage_attendance(user):
+def can_create_attendance(user):
     # 🔑 Superuser always allowed
     if user.is_authenticated and user.is_superuser:
         return True
@@ -1448,7 +1454,7 @@ def can_manage_attendance(user):
     except:
         return False
 
-    return emp.role in ['Admin', 'HR', 'Finance']
+    return emp.role in ['Admin', 'HR', 'Finance','Manager']
 
 @login_required
 def attendance_page(request):
@@ -1781,11 +1787,18 @@ def get_attendance_history(request):
 
     return JsonResponse({'data': data})
 
+
+ALLOWED_ROLES = ["Admin", "Manager"]
+
 def can_manage_attendance(user):
-    return (
-        user.is_superuser or
-        (hasattr(user, "employee") and user.employee.role == "Admin")
-    )
+    if not user.is_authenticated:
+        return False
+
+    if user.is_superuser:
+        return True
+
+    return hasattr(user, "employee") and user.employee.role in ALLOWED_ROLES
+
 @login_required
 def attendance_history_page(request):
     days = int(request.GET.get('days', 30))
@@ -2052,10 +2065,19 @@ def attendance_calendar_data(request, employee_id, year, month):
 @login_required
 @require_POST
 def update_attendance(request, att_id):
-    if not can_manage_attendance(request.user):
+
+    if not can_create_attendance(request.user):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
     attendance = get_object_or_404(Attendance, id=att_id)
+
+    # 🚫 Prevent HR/Manager/Finance editing their own attendance
+    if hasattr(request.user, "employee"):
+        if (
+            attendance.employee.id == request.user.employee.id and
+            request.user.employee.role in ["HR", "Finance", "Manager"]
+        ):
+            return JsonResponse({'error': 'You cannot update your own attendance'}, status=403)
 
     try:
         attendance.attendance_type = request.POST.get('attendance_type')
@@ -2075,10 +2097,20 @@ def update_attendance(request, att_id):
 @login_required
 @require_POST
 def delete_attendance(request, att_id):
-    if not can_manage_attendance(request.user):
+
+    if not can_create_attendance(request.user):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
     attendance = get_object_or_404(Attendance, id=att_id)
+
+    # 🚫 Prevent HR/Manager/Finance deleting their own attendance
+    if hasattr(request.user, "employee"):
+        if (
+            attendance.employee.id == request.user.employee.id and
+            request.user.employee.role in ["HR", "Finance", "Manager"]
+        ):
+            return JsonResponse({'error': 'You cannot delete your own attendance'}, status=403)
+
     attendance.delete()
 
     return JsonResponse({'success': True})
@@ -2086,10 +2118,18 @@ def delete_attendance(request, att_id):
 @login_required
 @require_POST
 def create_attendance(request):
-    if not can_manage_attendance(request.user):
+    if not can_create_attendance(request.user):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
     employee = get_object_or_404(Employee, id=request.POST['employee'])
+
+    # 🚫 HR / Manager / Finance cannot create their own attendance
+    if hasattr(request.user, "employee"):
+        if (
+            employee.id == request.user.employee.id and
+            request.user.employee.role in ["HR", "Finance", "Manager"]
+        ):
+            return JsonResponse({'error': 'You cannot create your own attendance'}, status=403)
 
     Attendance.objects.create(
         employee=employee,
@@ -2099,7 +2139,7 @@ def create_attendance(request):
         ),
         location=request.POST.get('location', ''),
         notes=request.POST.get('notes', ''),
-        confidence_score=None  # manual entry
+        confidence_score=None
     )
 
     return JsonResponse({'success': True})
