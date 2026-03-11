@@ -178,7 +178,43 @@
 
                             <!-- Work Rule -->
                             <td>
-                                <span class="text-secondary text-sm">{{ e.work_rule|default:"Standard" }}</span>
+                                {% if e.work_rule %}
+                                    <div class="d-flex flex-column">
+
+                                        <!-- Work Rule Name -->
+                                        <span class="text-dark fw-semibold text-sm">
+                                            {{ e.work_rule.name }}
+                                        </span>
+
+                                        <!-- Shift Badge -->
+                                        <span class="badge mt-1 
+                                            {% if e.work_rule.shift_type == 'Night' %}
+                                                bg-dark
+                                            {% elif e.work_rule.shift_type == 'Day' %}
+                                                bg-warning text-dark
+                                            {% elif e.work_rule.shift_type == 'Evening' %}
+                                                bg-info
+                                            {% else %}
+                                                bg-secondary
+                                            {% endif %}
+                                            rounded-pill px-2 py-1 text-xs">
+
+                                            {% if e.work_rule.shift_type == 'Night' %}
+                                                🌙 Night Shift
+                                            {% elif e.work_rule.shift_type == 'Day' %}
+                                                ☀ Day Shift
+                                            {% elif e.work_rule.shift_type == 'Evening' %}
+                                                🌆 Evening Shift
+                                            {% else %}
+                                                General
+                                            {% endif %}
+
+                                        </span>
+
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">Standard</span>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if e.salary_structure %}

@@ -946,6 +946,26 @@ class WorkRule(models.Model):
     def __str__(self):
         return self.name
 
+    # ⭐ SHIFT TYPE DETECTOR
+    @property
+    def shift_type(self):
+        start = self.shift_start_time
+        end = self.shift_end_time
+
+        # Night shift (cross midnight)
+        if end <= start:
+            return "Night"
+
+        # Day shift
+        if start >= time(6, 0) and start < time(14, 0):
+            return "Day"
+
+        # Evening shift
+        if start >= time(14, 0) and start < time(20, 0):
+            return "Evening"
+
+        return "General"
+        
 
 # ============================================================
 # 📝 LEAVE MANAGEMENT
