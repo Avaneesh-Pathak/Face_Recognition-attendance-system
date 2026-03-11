@@ -131,13 +131,27 @@
                                 </div>
                             </div>
                             
+                            {% now "Y" as current_year %}
+
                             <!-- Year Field -->
                             <div class="col-md-6">
-                                <label for="year" class="form-label fw-bold text-dark small text-uppercase tracking-wide">Target Year</label>
+                                <label for="year" class="form-label fw-bold text-dark small text-uppercase tracking-wide">
+                                    Target Year
+                                </label>
+
                                 <div class="input-group shadow-sm rounded-3 overflow-hidden">
-                                    <span class="input-group-text"><i class="fas fa-calendar-week"></i></span>
-                                    <input type="number" name="year" id="year" class="form-control fw-bold" 
-                                           min="2020" max="2030" required>
+                                    <span class="input-group-text">
+                                        <i class="fas fa-calendar-week"></i>
+                                    </span>
+
+                                    <input type="number"
+                                        name="year"
+                                        id="year"
+                                        class="form-control fw-bold"
+                                        min="2020"
+                                        max="2030"
+                                        value="{{ current_year }}"
+                                        required>
                                 </div>
                             </div>
                         </div>

@@ -746,13 +746,18 @@ class EnterprisePayrollManager(models.Manager):
                     if work_hours > 0 and (work_rule.count_holiday_overtime or work_rule.count_weekend_overtime):
                         holiday_weekend_ot_hours += work_hours
                 else:
-                    # Normal Working Day
-                    if work_hours >= full_day_req:
+                    # Allow 10% tolerance for shift gaps
+                    full_threshold = full_day_req * Decimal("0.90")
+
+                    if work_hours >= full_threshold:
                         present_days += 1
                         extra = work_hours - full_day_req
-                        if extra > 0: overtime_hours += extra
+                        if extra > 0:
+                            overtime_hours += extra
+
                     elif work_hours >= half_day_req:
                         half_days += 1
+
                     else:
                         absent_days += 1
 
@@ -965,7 +970,7 @@ class WorkRule(models.Model):
             return "Evening"
 
         return "General"
-        
+
 
 # ============================================================
 # 📝 LEAVE MANAGEMENT
