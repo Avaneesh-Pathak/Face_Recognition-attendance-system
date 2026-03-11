@@ -13,10 +13,54 @@
     <!-- 🔹 Header -->
     <div class="card-header bg-white py-3 border-bottom border-light">
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
-        <h4 class="fw-bold text-primary mb-0">
-          <i class="fas fa-calendar-alt me-2"></i>
-          Attendance Calendar – <span class="text-dark">{{ employee.user.get_full_name }}</span>
-        </h4>
+        <div>
+          <h4 class="fw-bold text-primary mb-1">
+            <i class="fas fa-calendar-alt me-2"></i>
+            Attendance Calendar –
+            <span class="text-dark">{{ employee.user.get_full_name }}</span>
+          </h4>
+
+          {% if employee.work_rule %}
+          <div class="d-flex align-items-center gap-2 mt-1">
+
+            <!-- Work Rule -->
+            <span class="text-muted small">
+              <i class="far fa-clock me-1"></i>{{ employee.work_rule.name }}
+            </span>
+
+            <!-- Shift Badge -->
+            <span class="badge 
+              {% if employee.work_rule.shift_type == 'Night' %}
+                bg-dark
+              {% elif employee.work_rule.shift_type == 'Day' %}
+                bg-warning text-dark
+              {% elif employee.work_rule.shift_type == 'Evening' %}
+                bg-info
+              {% else %}
+                bg-secondary
+              {% endif %}
+              rounded-pill px-2 py-1">
+
+              {% if employee.work_rule.shift_type == 'Night' %}
+                🌙 Night Shift
+              {% elif employee.work_rule.shift_type == 'Day' %}
+                ☀ Day Shift
+              {% elif employee.work_rule.shift_type == 'Evening' %}
+                🌆 Evening Shift
+              {% else %}
+                General
+              {% endif %}
+
+            </span>
+
+            <!-- Shift Time -->
+            <span class="text-muted small">
+              {{ employee.work_rule.shift_start_time }} – {{ employee.work_rule.shift_end_time }}
+            </span>
+
+          </div>
+          {% endif %}
+        </div>
         
         <!-- Employee Search / Dropdown -->
         {% if user.is_superuser  or user.employee.role in "Admin" %}

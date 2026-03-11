@@ -159,9 +159,53 @@
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase fw-bold mb-1">Work Shift / Rule</label>
-                            <div class="fs-6 text-dark fw-semibold">
-                                <i class="far fa-clock text-muted me-1"></i>{{ employee.work_rule|default:"Standard Shift" }}
-                            </div>
+
+                            {% if employee.work_rule %}
+                                <div class="fs-6 text-dark fw-semibold d-flex align-items-center gap-2">
+
+                                    <!-- Clock Icon + Rule Name -->
+                                    <span>
+                                        <i class="far fa-clock text-muted me-1"></i>
+                                        {{ employee.work_rule.name }}
+                                    </span>
+
+                                    <!-- Shift Badge -->
+                                    <span class="badge
+                                        {% if employee.work_rule.shift_type == 'Night' %}
+                                            bg-dark
+                                        {% elif employee.work_rule.shift_type == 'Day' %}
+                                            bg-warning text-dark
+                                        {% elif employee.work_rule.shift_type == 'Evening' %}
+                                            bg-info
+                                        {% else %}
+                                            bg-secondary
+                                        {% endif %}
+                                        rounded-pill px-2 py-1">
+
+                                        {% if employee.work_rule.shift_type == 'Night' %}
+                                            🌙 Night
+                                        {% elif employee.work_rule.shift_type == 'Day' %}
+                                            ☀ Day
+                                        {% elif employee.work_rule.shift_type == 'Evening' %}
+                                            🌆 Evening
+                                        {% else %}
+                                            General
+                                        {% endif %}
+
+                                    </span>
+
+                                </div>
+
+                                <!-- Optional: show time -->
+                                <div class="text-muted small mt-1">
+                                    {{ employee.work_rule.shift_start_time }} – {{ employee.work_rule.shift_end_time }}
+                                </div>
+
+                            {% else %}
+                                <div class="fs-6 text-dark fw-semibold">
+                                    <i class="far fa-clock text-muted me-1"></i>Standard Shift
+                                </div>
+                            {% endif %}
                         </div>
                         <div class="col-sm-6 col-md-4">
                             <label class="text-muted small text-uppercase fw-bold mb-1">Date of Joining</label>
