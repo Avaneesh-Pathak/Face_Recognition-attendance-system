@@ -217,35 +217,33 @@ def generate_payslip_pdf(payroll):
     elements.append(Spacer(1, 8 * mm))
 
     # -------------------------------------------------
-    # HR METRICS & ATTENDANCE (Direct from Enterprise Engine)
+    # HR METRICS & ATTENDANCE (Direct from Payroll Record)
     # -------------------------------------------------
 
     total_days = calendar.monthrange(payroll.month.year, payroll.month.month)[1]
 
-    # Calculate exact payable days tracking late penalties and half days
-    exact_paid_days = max(Decimal("0.0"), (
-        payroll.present_days 
-        + payroll.paid_leave_days_count 
-        + (payroll.half_days * Decimal("0.5")) 
-        - payroll.late_penalty_deduction
-    ))
-    
-    exact_lop_days = max(Decimal("0.0"), Decimal(str(total_days)) - exact_paid_days)
-    
+    present_days = payroll.present_days or Decimal("0")
+    half_days = payroll.half_days or Decimal("0")
+    absent_days = payroll.absent_days or Decimal("0")
+    paid_leave_days = payroll.paid_leave_days_count or Decimal("0")
+
+    # Paid days used internally for salary calculation
+    paid_days = present_days + paid_leave_days + (half_days * Decimal("0.5")) - (payroll.late_penalty_deduction or Decimal("0"))
+
     # Calculate Total Overtime (Regular + Holiday Premium)
     total_ot_hours = (payroll.overtime_hours or Decimal("0.0")) + (payroll.holiday_overtime_hours or Decimal("0.0"))
 
     def metric(lbl, val):
         return Table([[Paragraph(lbl, styles["Label"])],
-                      [Paragraph(str(val), styles["Value"])]],
-                     colWidths=40 * mm,
-                     style=[('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
+                    [Paragraph(str(val), styles["Value"])]],
+                    colWidths=40 * mm,
+                    style=[('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
                             ('ALIGN', (0, 0), (-1, -1), 'CENTER')])
 
     elements.append(Table([[
         metric("TOTAL DAYS", clean_number(total_days)),
-        metric("PAID DAYS", clean_number(exact_paid_days)),
-        metric("LOSS OF PAY", clean_number(exact_lop_days)),
+        metric("PRESENT DAYS", clean_number(present_days)),
+        metric("ABSENT DAYS", clean_number(absent_days)),
         metric("OVERTIME (HRS)", clean_number(total_ot_hours))
     ]], colWidths=[47.5 * mm] * 4))
 

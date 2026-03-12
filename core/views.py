@@ -1155,7 +1155,38 @@ def mark_attendance(request):
             # 🟢 FLEXIBLE STAFF (Gardener / Cleaning)
             # =====================================================
             if is_flexible:
-                att_type = "check_out" if open_checkin else "check_in"
+                today = now.date()
+
+                today_records = Attendance.objects.filter(
+                    employee=employee,
+                    timestamp__date=today
+                )
+
+                today_checkin = today_records.filter(attendance_type="check_in").exists()
+                today_checkout = today_records.filter(attendance_type="check_out").exists()
+
+                # If already checked out today → block
+                if today_checkout:
+                    return JsonResponse({
+                        "success": False,
+                        "message": "Attendance already completed for today",
+                        "color": "yellow"
+                    })
+
+                # If checked in but not checked out → allow checkout
+                if today_checkin and open_checkin:
+                    att_type = "check_out"
+
+                # If not checked in → allow checkin
+                elif not today_checkin:
+                    att_type = "check_in"
+
+                else:
+                    return JsonResponse({
+                        "success": False,
+                        "message": "Invalid attendance state",
+                        "color": "red"
+                    })
             # --------------------------------------------
             # 2️⃣ If open shift → CHECK-OUT
             # --------------------------------------------
