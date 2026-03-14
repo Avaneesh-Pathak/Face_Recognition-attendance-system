@@ -70,6 +70,8 @@
       min-height: 100vh;
       overflow-x: hidden;
       position: relative;
+      /* Smooth scrolling for touch */
+      -webkit-overflow-scrolling: touch; 
     }
 
     /* Ambient Animated Background */
@@ -133,18 +135,6 @@
       animation: fadeInDown 0.8s ease;
     }
 
-    .record-time{
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: var(--primary);
-      font-family: var(--font-primary);
-    }
-    .record-time{
-      font-size: 1.6rem;
-      font-weight: 800;
-      color: var(--gray-800);
-      font-family: var(--font-primary);
-    }
     .brand-group {
       display: flex;
       align-items: center;
@@ -191,6 +181,7 @@
       background: #0f172a;
       aspect-ratio: 4/3;
       box-shadow: inset 0 0 0 2px rgba(255,255,255,0.1);
+      width: 100%;
     }
     #camera, #fullscreenCamera {
       width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
@@ -217,8 +208,6 @@
       z-index: 8; pointer-events: none;
     }
     .ai-brackets::before, .ai-brackets::after { content: ''; position: absolute; width: 100%; height: 100%; }
-    
-    /* Creating the 4 corners */
     .ai-brackets::before {
       border-top: 4px solid var(--glass-border); border-bottom: 4px solid var(--glass-border);
       clip-path: polygon(0 0, 15% 0, 15% 100%, 0 100%, 0 0, 100% 0, 100% 100%, 85% 100%, 85% 0, 100% 0);
@@ -235,8 +224,7 @@
       z-index: 20; pointer-events: none;
     }
     .toast-msg {
-      padding: 14px 28px;
-      border-radius: 50px;
+      padding: 14px 28px; border-radius: 50px;
       font-family: var(--font-display); font-weight: 700; font-size: 1.1rem;
       backdrop-filter: blur(16px);
       box-shadow: 0 10px 30px rgba(0,0,0,0.2);
@@ -247,26 +235,21 @@
       0% { opacity: 0; transform: translateY(20px) scale(0.9); }
       100% { opacity: 1; transform: translateY(0) scale(1); }
     }
-    .toast-msg.success { background: rgba(16, 185, 129, 0.9); color: white; }
-    .toast-msg.error { background: rgba(239, 68, 68, 0.9); color: white; }
-    .toast-msg.warning { background: rgba(245, 158, 11, 0.9); color: white; }
-    .toast-msg.info { background: rgba(59, 130, 246, 0.9); color: white; }
+    .toast-msg.success { background: rgba(16, 185, 129, 0.95); color: white; }
+    .toast-msg.error { background: rgba(239, 68, 68, 0.95); color: white; }
+    .toast-msg.warning { background: rgba(245, 158, 11, 0.95); color: white; }
+    .toast-msg.info { background: rgba(59, 130, 246, 0.95); color: white; }
 
     /* Live Status Bar */
     .status-bar {
-      margin-top: 1.5rem;
-      padding: 1rem 1.5rem;
-      background: var(--surface);
-      border-radius: 16px;
+      margin-top: 1.5rem; padding: 1rem 1.5rem;
+      background: var(--surface); border-radius: 16px;
       display: flex; align-items: center; gap: 1rem;
-      border: 1px solid var(--border-color);
-      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);
     }
     .pulse-dot {
-      width: 14px; height: 14px; border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
-      animation: pulse-dot 2s infinite;
+      width: 14px; height: 14px; border-radius: 50%; background: var(--success);
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); animation: pulse-dot 2s infinite;
     }
     @keyframes pulse-dot {
       0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
@@ -284,8 +267,7 @@
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem;
     }
     .stat-box {
-      background: var(--surface);
-      border: 1px solid var(--border-color);
+      background: var(--surface); border: 1px solid var(--border-color);
       border-radius: 16px; padding: 1.25rem;
       text-align: center; transition: all 0.3s ease;
     }
@@ -316,26 +298,22 @@
     
     .record-list {
       max-height: calc(100vh - 300px);
-      overflow-y: auto;
-      padding-right: 8px;
+      overflow-y: auto; padding-right: 8px;
     }
-    /* Custom Scrollbar */
-    .record-list::-webkit-scrollbar { width: 6px; }
+    /* Touch-friendly Scrollbar */
+    .record-list::-webkit-scrollbar { width: 8px; }
     .record-list::-webkit-scrollbar-track { background: transparent; }
     .record-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
     .record-list::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
     .record-card {
-      background: var(--surface);
-      border: 1px solid var(--border-color);
+      background: var(--surface); border: 1px solid var(--border-color);
       border-radius: 16px; padding: 1rem; margin-bottom: 0.8rem;
       display: flex; align-items: center; gap: 1rem;
       transition: all 0.2s ease;
       animation: slideInRight 0.4s ease forwards;
     }
-    .record-card:hover {
-      border-color: var(--primary-light); transform: translateX(4px); box-shadow: var(--shadow-sm);
-    }
+    .record-card:hover { border-color: var(--primary-light); transform: translateX(4px); box-shadow: var(--shadow-sm); }
     @keyframes slideInRight {
       from { opacity: 0; transform: translateX(20px); }
       to { opacity: 1; transform: translateX(0); }
@@ -344,26 +322,25 @@
     .record-avatar {
       width: 48px; height: 48px; border-radius: 14px;
       display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 1.1rem; color: white;
+      font-weight: 800; font-size: 1.1rem; color: white; flex-shrink: 0;
     }
     .avatar-in { background: linear-gradient(135deg, var(--success), #059669); }
     .avatar-out { background: linear-gradient(135deg, var(--warning), #d97706); }
 
-    .record-details { flex: 1; }
-    .record-name { font-weight: 700; color: var(--text-main); margin-bottom: 2px; font-family: var(--font-display); }
+    .record-details { flex: 1; overflow: hidden; }
+    .record-name { font-weight: 700; color: var(--text-main); margin-bottom: 2px; font-family: var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .record-meta { display: flex; align-items: center; gap: 0.8rem; font-size: 0.85rem; color: var(--text-muted); font-weight: 500;}
     
     .status-badge { padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px;}
     .badge-in { background: var(--success-light); color: #065f46; }
     .badge-out { background: var(--warning-light); color: #92400e; }
 
-    .record-score { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-align: right;}
+    .record-time { font-size: 1.4rem; font-weight: 800; color: var(--text-main); font-family: var(--font-display); white-space: nowrap; }
 
     /* Fullscreen Kiosk Mode Overlay */
     #fullscreenMode {
       position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: var(--bg-base); z-index: 9999;
-      display: none; padding: 2rem;
+      background: var(--bg-base); z-index: 9999; display: none; padding: 2rem;
       background-image: radial-gradient(var(--border-color) 1px, transparent 1px);
       background-size: 32px 32px;
     }
@@ -373,12 +350,66 @@
     .fs-camera-wrap { height: 100%; border-radius: var(--radius-xl); overflow: hidden; position: relative; box-shadow: var(--shadow-lg); background:#000;}
     .fs-sidebar { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 1.5rem; box-shadow: var(--shadow-lg); display: flex; flex-direction: column;}
 
-    /* Responsiveness */
-    @media (max-width: 992px) {
-      .fs-layout { grid-template-columns: 1fr; height: auto; }
+
+    /* =========================================================
+       📱 PERFECT RESPONSIVENESS (TABLETS & MOBILE)
+    ========================================================= */
+
+    /* Tablet Landscape (1024px) */
+    @media (max-width: 1199px) {
+      .fs-layout { grid-template-columns: 1fr 320px; gap: 1.5rem; }
+      .brand-title { font-size: 1.8rem; }
+      .time-text { font-size: 1.4rem; }
+      .stat-num { font-size: 1.8rem; }
+      .record-time { font-size: 1.2rem; }
+      .btn-glass { padding: 0.6rem 1.5rem; font-size: 0.95rem; }
+    }
+
+    /* Tablet Portrait (768px - 991px) */
+    @media (max-width: 991px) {
+      .kiosk-wrapper { padding: 1.25rem; }
+      .header-bar { margin-bottom: 1.5rem; }
+      
+      /* Camera Aspect Ratio trick: 
+         Makes it wider & shorter in portrait so the list stays visible! */
+      .camera-container { aspect-ratio: 16/9; }
+      
+      .stats-grid { gap: 0.75rem; margin-top: 1rem; }
+      .stat-box { padding: 1rem; }
+      .stat-num { font-size: 1.6rem; }
+      .stat-label { font-size: 0.75rem; }
+      
+      /* Limit height of list so user doesn't have to scroll body much */
+      .record-list { max-height: 380px; }
+      
+      /* Fullscreen fixes for Portrait Tablet */
+      .fs-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; gap: 1rem; }
+      .fs-camera-wrap { aspect-ratio: 16/9; height: auto; }
+      .fs-sidebar { height: 400px; padding: 1rem; }
+      #fsAttendanceList { max-height: 100%; }
+    }
+
+    /* Mobile (Sub 767px) */
+    @media (max-width: 767px) {
       .kiosk-wrapper { padding: 1rem; }
-      .header-bar { flex-direction: column; gap: 1rem; text-align: center; }
-      .datetime-pill { text-align: center; }
+      .header-bar { flex-direction: column; text-align: center; gap: 1rem; margin-bottom: 1.2rem;}
+      .datetime-pill { text-align: center; width: 100%; }
+      .brand-group { flex-direction: column; gap: 0.5rem; }
+      .brand-title { font-size: 1.5rem; }
+      
+      /* Revert camera back to natural on phones */
+      .camera-container { aspect-ratio: 4/3; }
+      
+      /* Tighten Stats for mobile */
+      .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.8rem;}
+      .stat-box { padding: 0.75rem 0.5rem; border-radius: 12px;}
+      .stat-num { font-size: 1.2rem; }
+      .stat-label { font-size: 0.65rem; }
+      
+      .record-list { max-height: 350px; }
+      .record-time { font-size: 1.1rem; }
+      
+      .fs-camera-wrap { aspect-ratio: 4/3; }
     }
   </style>
 </head>
@@ -411,10 +442,10 @@
       </div>
     </header>
 
-    <div class="row g-4 flex-grow-1">
+    <div class="row g-3 g-lg-4 flex-grow-1">
       <!-- Left Column: Camera & Stats -->
-      <div class="col-lg-7 col-xl-8 d-flex flex-column gap-4">
-        <div class="glass-panel flex-grow-1 d-flex flex-column">
+      <div class="col-12 col-lg-7 col-xl-8 d-flex flex-column gap-3 gap-lg-4">
+        <div class="glass-panel flex-grow-1 d-flex flex-column p-3 p-lg-4">
           
           <!-- Camera Feed -->
           <div class="camera-container flex-grow-1">
@@ -437,7 +468,7 @@
           <!-- Status Bar -->
           <div class="status-bar">
             <div id="statusLed" class="pulse-dot"></div>
-            <div class="status-text" id="statusText">System Online • Ready to Scan</div>
+            <div class="status-text" id="statusText">System Online • Ready</div>
             <div class="ms-auto badge-fps" id="fps"><i class="fas fa-video me-1"></i> 30 FPS</div>
           </div>
 
@@ -458,7 +489,7 @@
           </div>
 
           <!-- Controls -->
-          <div class="mt-4 text-center">
+          <div class="mt-3 mt-lg-4 text-center">
             <button id="fullscreenBtn" class="btn-glass">
               <i class="fas fa-expand"></i> Launch Kiosk Terminal
             </button>
@@ -467,8 +498,8 @@
       </div>
 
       <!-- Right Column: Activity Log -->
-      <div class="col-lg-5 col-xl-4 d-flex">
-        <div class="glass-panel w-100 d-flex flex-column">
+      <div class="col-12 col-lg-5 col-xl-4 d-flex">
+        <div class="glass-panel w-100 d-flex flex-column p-3 p-lg-4">
           <div class="activity-header">
             <h5><i class="fas fa-clipboard-list text-primary me-2"></i> Live Activity</h5>
             <span class="badge bg-primary rounded-pill px-3 py-2">Real-time</span>
@@ -492,8 +523,8 @@
         <div class="logo-box" style="width: 54px; height: 54px; font-size: 1.5rem;"><i class="fas fa-fingerprint"></i></div>
         <div><h2 class="brand-title" style="font-size: 1.8rem;">NovaFace Terminal</h2></div>
       </div>
-      <div class="d-flex align-items-center gap-4">
-        <div class="datetime-pill text-end border-0 bg-transparent shadow-none p-0">
+      <div class="d-flex align-items-center gap-3 gap-lg-4">
+        <div class="datetime-pill text-end border-0 bg-transparent shadow-none p-0 d-none d-sm-block">
           <div id="fsCurrentTime" class="time-text" style="font-size: 1.5rem;">--:--</div>
           <div id="fsCurrentDate" class="date-text" style="color: var(--text-main);">--</div>
         </div>
@@ -571,44 +602,15 @@
     updateClock();
 
     /* =====================================================
-       FULLSCREEN TOGGLE LOGIC
-    ===================================================== */
-    const normalMode = document.getElementById('normalMode');
-    const fullscreenMode = document.getElementById('fullscreenMode');
-    const fsBtn = document.getElementById('fullscreenBtn');
-    const exitFsBtn = document.getElementById('exitFullscreenBtn');
-    const videoNormal = document.getElementById('camera');
-    const videoFs = document.getElementById('fullscreenCamera');
-
-    fsBtn.addEventListener('click', () => {
-      normalMode.style.display = 'none';
-      fullscreenMode.classList.add('active');
-      // Swap video source to fullscreen player
-      if (cameraStream) {
-        videoFs.srcObject = cameraStream;
-        videoFs.play().catch(e => console.error(e));
-      }
-    });
-
-    exitFsBtn.addEventListener('click', () => {
-      fullscreenMode.classList.remove('active');
-      normalMode.style.display = 'flex';
-      // Swap video source back to normal player
-      if (cameraStream) {
-        videoNormal.srcObject = cameraStream;
-        videoNormal.play().catch(e => console.error(e));
-      }
-    });
-
-    /* =====================================================
-       AUDIO
+       AUDIO (iOS Tablet Compatibility Fix)
     ===================================================== */
     const successBeep = document.getElementById("successBeep");
     const errorBeep   = document.getElementById("errorBeep");
     const scanBeep    = document.getElementById("scanBeep");
 
     function unlockAudio() {
-      if (AUDIO_UNLOCKED) return;[successBeep, errorBeep, scanBeep].forEach(a => {
+      if (AUDIO_UNLOCKED) return;
+      [successBeep, errorBeep, scanBeep].forEach(a => {
         if (!a) return;
         a.muted = true;
         a.play().then(() => {
@@ -619,8 +621,12 @@
       });
 
       AUDIO_UNLOCKED = true;
-      console.log("🔓 Audio unlocked");
+      console.log("🔓 Audio unlocked via touch");
     }
+
+    // Force unlock audio heavily on first touch for iOS tablets
+    document.body.addEventListener('click', unlockAudio, { once: true });
+    document.body.addEventListener('touchstart', unlockAudio, { once: true });
 
     function playSound(audio) {
       if (!AUDIO_UNLOCKED || !audio) return;
@@ -630,17 +636,44 @@
     }
 
     /* =====================================================
+       FULLSCREEN TOGGLE LOGIC
+    ===================================================== */
+    const normalMode = document.getElementById('normalMode');
+    const fullscreenMode = document.getElementById('fullscreenMode');
+    const fsBtn = document.getElementById('fullscreenBtn');
+    const exitFsBtn = document.getElementById('exitFullscreenBtn');
+    const videoNormal = document.getElementById('camera');
+    const videoFs = document.getElementById('fullscreenCamera');
+
+    fsBtn.addEventListener('click', () => {
+      unlockAudio(); // Extra guarantee for tablets
+      normalMode.style.display = 'none';
+      fullscreenMode.classList.add('active');
+      if (cameraStream) {
+        videoFs.srcObject = cameraStream;
+        videoFs.play().catch(e => console.error(e));
+      }
+    });
+
+    exitFsBtn.addEventListener('click', () => {
+      fullscreenMode.classList.remove('active');
+      normalMode.style.display = 'flex';
+      if (cameraStream) {
+        videoNormal.srcObject = cameraStream;
+        videoNormal.play().catch(e => console.error(e));
+      }
+    });
+
+    /* =====================================================
        ELEMENTS
     ===================================================== */
     const canvas = document.getElementById("canvas");
 
-    // Standard Messages
+    // Messages
     const successMsg = document.getElementById("successMessage");
     const errorMsg   = document.getElementById("errorMessage");
     const warningMsg = document.getElementById("warningMessage");
     const infoMsg    = document.getElementById("infoMessage");
-
-    // Fullscreen Messages
     const fsSuccessMsg = document.getElementById("fsSuccessMessage");
     const fsErrorMsg   = document.getElementById("fsErrorMessage");
     const fsWarningMsg = document.getElementById("fsWarningMessage");
@@ -662,20 +695,14 @@
       hideMessages();
 
       const isFs = fullscreenMode.classList.contains('active');
-      
       let el;
       if (isFs) {
-        el = type === "success" ? fsSuccessMsg :
-             type === "warning" ? fsWarningMsg :
-             type === "error"   ? fsErrorMsg   : fsInfoMsg;
+        el = type === "success" ? fsSuccessMsg : type === "warning" ? fsWarningMsg : type === "error" ? fsErrorMsg : fsInfoMsg;
       } else {
-        el = type === "success" ? successMsg :
-             type === "warning" ? warningMsg :
-             type === "error"   ? errorMsg   : infoMsg;
+        el = type === "success" ? successMsg : type === "warning" ? warningMsg : type === "error" ? errorMsg : infoMsg;
       }
 
       if (!el) return;
-
       el.textContent = text;
       el.style.display = "block";
 
@@ -695,7 +722,6 @@
           reject("Geolocation not supported");
           return;
         }
-
         navigator.geolocation.getCurrentPosition(
           pos => {
             window.CURRENT_LAT = pos.coords.latitude;
@@ -708,32 +734,22 @@
             showMessage("Location permission required", "error");
             reject(err);
           },
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
-          }
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
       });
     }
 
     /* =====================================================
-       CAMERA (AUDIO UNLOCKS HERE)
+       CAMERA
     ===================================================== */
     async function startCamera() {
       try {
         cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 1280, height: 720, facingMode: "user" }
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }
         });
-
-        // Default attach to normal view
         videoNormal.srcObject = cameraStream;
-
-        // 🔑 Permission click unlocks audio
-        unlockAudio();
-
+        unlockAudio(); // Browser permission might count as gesture
         console.log("📷 Camera started");
-
       } catch (err) {
         console.error("Camera error:", err);
         showMessage("Camera permission required", "error");
@@ -741,11 +757,10 @@
     }
 
     /* =====================================================
-       LOAD TODAY ATTENDANCE (FIXED URL)
+       LOAD TODAY ATTENDANCE
     ===================================================== */
     async function loadTodayAttendance() {
       try {
-        // ✅ FIXED: Using django url tag instead of hardcoded route
         const res = await fetch("{% url 'attendance_log_api' %}");
         const data = await res.json();
 
@@ -770,7 +785,6 @@
             time: record.time || ""
           });
         });
-
       } catch (err) {
         console.error("Attendance load error:", err);
       }
@@ -780,69 +794,51 @@
        ATTENDANCE UI BUILDER
     ===================================================== */
     function addAttendanceRecord(data) {
+      if(historyList.querySelector('.text-center')) historyList.innerHTML = "";
+      if(fsHistoryList.querySelector('.text-center')) fsHistoryList.innerHTML = "";
 
-  // Clear empty states if they exist
-  if(historyList.querySelector('.text-center')) historyList.innerHTML = "";
-  if(fsHistoryList.querySelector('.text-center')) fsHistoryList.innerHTML = "";
+      const isCheckIn = data.attendance_type.toLowerCase().includes("in");
+      const badgeClass = isCheckIn ? "badge-in" : "badge-out";
+      const avatarClass = isCheckIn ? "avatar-in" : "avatar-out";
+      const icon = isCheckIn ? "fa-arrow-right-to-bracket" : "fa-person-walking-arrow-right";
 
-  const isCheckIn = data.attendance_type.toLowerCase().includes("in");
-  const badgeClass = isCheckIn ? "badge-in" : "badge-out";
-  const avatarClass = isCheckIn ? "avatar-in" : "avatar-out";
-  const icon = isCheckIn ? "fa-arrow-right-to-bracket" : "fa-person-walking-arrow-right";
+      const countEl = document.getElementById("todayCount");
+      countEl.innerText = parseInt(countEl.innerText) + 1;
 
-  // Update counters
-  const countEl = document.getElementById("todayCount");
-  countEl.innerText = parseInt(countEl.innerText) + 1;
+      if(isCheckIn){
+        const inEl = document.getElementById("checkIns");
+        inEl.innerText = parseInt(inEl.innerText) + 1;
+      }else{
+        const outEl = document.getElementById("checkOuts");
+        outEl.innerText = parseInt(outEl.innerText) + 1;
+      }
 
-  if(isCheckIn){
-    const inEl = document.getElementById("checkIns");
-    inEl.innerText = parseInt(inEl.innerText) + 1;
-  }else{
-    const outEl = document.getElementById("checkOuts");
-    outEl.innerText = parseInt(outEl.innerText) + 1;
-  }
-
-  const html = `
-    <div class="record-card">
-      
-      <div class="record-avatar ${avatarClass}">
-        <i class="fas ${icon}"></i>
-      </div>
-
-      <div class="record-details">
-        <div class="record-name">${data.name}</div>
-
-        <div class="record-meta">
-          <span class="status-badge ${badgeClass}">
-            ${data.attendance_type.toUpperCase()}
-          </span>
+      const html = `
+        <div class="record-card">
+          <div class="record-avatar ${avatarClass}">
+            <i class="fas ${icon}"></i>
+          </div>
+          <div class="record-details">
+            <div class="record-name">${data.name}</div>
+            <div class="record-meta">
+              <span class="status-badge ${badgeClass}">${data.attendance_type.toUpperCase()}</span>
+            </div>
+          </div>
+          <div class="record-time">${data.time}</div>
         </div>
-      </div>
+      `;
 
-      <div class="record-time">
-        ${data.time}
-      </div>
-
-    </div>
-  `;
-
-  historyList.insertAdjacentHTML("afterbegin", html);
-  fsHistoryList.insertAdjacentHTML("afterbegin", html);
-}
+      historyList.insertAdjacentHTML("afterbegin", html);
+      fsHistoryList.insertAdjacentHTML("afterbegin", html);
+    }
 
     /* =====================================================
        FRAME PROCESS
     ===================================================== */
     async function processFrame() {
-      // Grab active video element
       const activeVideo = fullscreenMode.classList.contains('active') ? videoFs : videoNormal;
 
-      if (
-        isProcessing ||
-        activeVideo.readyState < 2 ||
-        CURRENT_LAT === null ||
-        CURRENT_LNG === null
-      ) return;
+      if (isProcessing || activeVideo.readyState < 2 || CURRENT_LAT === null || CURRENT_LNG === null) return;
 
       isProcessing = true;
 
@@ -866,21 +862,15 @@
         const data = await res.json();
 
         if (data.success) {
-
           if (data.status === "new") {
             addAttendanceRecord(data);
-            playSound(successBeep);   // ✅ FIRST CHECK-IN BEEP
+            playSound(successBeep);
           }
-
           showMessage(data.message, "success");
-
         } else {
-          const type =
-            data.color === "yellow" ? "warning" :
-            data.color === "blue"   ? "info"    : "error";
+          const type = data.color === "yellow" ? "warning" : data.color === "blue" ? "info" : "error";
           showMessage(data.message, type);
         }
-
       } catch (e) {
         console.error("Frame error:", e);
       } finally {
@@ -897,12 +887,12 @@
     }
 
     /* =====================================================
-       START ORDER (IMPORTANT)
+       START ORDER
     ===================================================== */
-    await getLocation();   // 📍 user clicks permission
-    await startCamera();   // 📷 user clicks permission → audio unlocks
+    await getLocation();
+    await startCamera();
     await loadTodayAttendance();  
-    loop();                // ▶ auto scanning
+    loop();
 
   });
   </script>
