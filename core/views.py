@@ -164,46 +164,40 @@ def home(request):
 # =====================================================
 
 def register(request):
-
-    print("===== REGISTER VIEW START =====")
-
     if request.method == "POST":
-        print("POST DATA:", request.POST)
-        print("FILES:", request.FILES)
+        form = EmployeeRegistrationForm(request.POST)
 
-        form = EmployeeRegistrationForm(request.POST, request.FILES)
-
-        if not form.is_valid():
-            print("FORM ERRORS:", form.errors)
-            messages.error(request, f"Form validation failed: {form.errors}")
-        else:
+        if form.is_valid():
             try:
-                print("Creating user...")
-
+                # -----------------------------
+                # Create User
+                # -----------------------------
                 user = User.objects.create_user(
                     username=form.cleaned_data["username"],
                     email=form.cleaned_data["email"],
                     password=form.cleaned_data["password1"],
-                    first_name=form.cleaned_data.get("first_name"),
-                    last_name=form.cleaned_data.get("last_name"),
+                    first_name=form.cleaned_data["first_name"],
+                    last_name=form.cleaned_data["last_name"],
                 )
 
-                print("User created:", user.username)
-
+                # -----------------------------
+                # Create Employee
+                # -----------------------------
                 employee = Employee.objects.create(
                     user=user,
-                    department=form.cleaned_data.get("department"),
-                    position=form.cleaned_data.get("position"),
-                    manager=form.cleaned_data.get("manager"),
-                    phone_number=form.cleaned_data.get("phone_number"),
-                    role=form.cleaned_data.get("role"),
+                    department=form.cleaned_data["department"],
+                    position=form.cleaned_data["position"],
+                    manager=form.cleaned_data["manager"],
+                    phone_number=form.cleaned_data["phone_number"],
+                    role=form.cleaned_data["role"],
                     work_rule=form.cleaned_data.get("work_rule"),
-                    location_type=form.cleaned_data.get("location_type"),
+                    location_type=form.cleaned_data["location_type"],
                     assigned_location=form.cleaned_data.get("assigned_location"),
                 )
 
-                print("Employee created:", employee.id)
-
+                # -----------------------------
+                # Create Salary
+                # -----------------------------
                 SalaryStructure.objects.create(
                     employee=employee,
                     base_salary=form.cleaned_data.get("base_salary") or Decimal("0.00"),
@@ -212,13 +206,12 @@ def register(request):
                     deductions=form.cleaned_data.get("deductions") or Decimal("0.00"),
                 )
 
-                print("Salary created")
-
+                # -----------------------------
+                # Get Face Image
+                # -----------------------------
                 face_image = request.FILES.get("face_image")
 
                 if not face_image and request.POST.get("captured_image"):
-                    print("Processing webcam image")
-
                     fmt, imgstr = request.POST["captured_image"].split(";base64,")
                     ext = fmt.split("/")[-1]
 
@@ -227,20 +220,51 @@ def register(request):
                         name=f"face_{employee.employee_id}.{ext}",
                     )
 
+                # -----------------------------
+                # Save Face Image
+                # -----------------------------
                 if face_image:
                     employee.face_image = face_image
                     employee.save(update_fields=["face_image"])
 
-                print("Face image saved")
+                # -----------------------------
+                # Generate Face Encoding
+                # -----------------------------
+                if employee.face_image:
+                    try:
+                        face_sys = get_face_system()
+
+                        image_path = employee.face_image.path
+                        print("Generating encoding for:", image_path)
+
+                        emb = face_sys.get_embedding(image_path)
+
+                        if emb is None:
+                            employee.face_encoding = json.dumps({"status": "FACE_PENDING"})
+                            employee.save(update_fields=["face_encoding"])
+
+                            messages.warning(
+                                request,
+                                "Face detected failed. You can add face later."
+                            )
+                        else:
+                            employee.face_encoding = json.dumps(emb)
+                            employee.save(update_fields=["face_encoding"])
+
+                            # Reload system memory
+                            face_sys.load_from_db()
+
+                            print("Face encoding generated successfully")
+
+                    except Exception as e:
+                        print("Face encoding error:", str(e))
 
                 messages.success(request, "Employee registered successfully")
-
                 return redirect("employee_list")
 
             except Exception as e:
-                print("REGISTRATION ERROR:", str(e))
                 logger.exception("Registration failed")
-                messages.error(request, f"Registration failed: {str(e)}")
+                messages.error(request, str(e))
 
     else:
         form = EmployeeRegistrationForm()
@@ -1274,20 +1298,22 @@ def mark_attendance(request):
 @login_required
 def attendance_log_api(request):
     today = timezone.now().date()
+
     logs = (
         Attendance.objects.filter(timestamp__date=today)
-        .select_related('employee__user')
-        .order_by('-timestamp')[:10]
+        .select_related("employee__user")
+        .order_by("-timestamp")
     )
+
     data = [
         {
             "name": log.employee.user.get_full_name() or log.employee.user.username,
-            "type": log.attendance_type.replace('_', ' ').title(),
+            "type": log.attendance_type.replace("_", " ").title(),
             "time": log.timestamp.strftime("%I:%M %p"),
-            "confidence": round(log.confidence_score * 100, 2) if log.confidence_score is not None else None,
         }
         for log in logs
     ]
+
     return JsonResponse(data, safe=False)
 
 
