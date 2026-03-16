@@ -1184,12 +1184,12 @@ def mark_attendance(request):
                 today_records = Attendance.objects.filter(
                     employee=employee,
                     timestamp__date=today
-                )
+                ).order_by("timestamp")
 
-                today_checkin = today_records.filter(attendance_type="check_in").exists()
+                today_checkin_record = today_records.filter(attendance_type="check_in").first()
                 today_checkout = today_records.filter(attendance_type="check_out").exists()
 
-                # If already checked out today → block
+                # ⛔ Already completed attendance
                 if today_checkout:
                     return JsonResponse({
                         "success": False,
@@ -1197,20 +1197,28 @@ def mark_attendance(request):
                         "color": "yellow"
                     })
 
-                # If checked in but not checked out → allow checkout
-                if today_checkin and open_checkin:
+                # -----------------------------------------
+                # CHECK OUT LOGIC
+                # -----------------------------------------
+                if today_checkin_record:
+
+                    # Minimum gap to avoid instant checkout (10 minutes)
+                    min_checkout_gap = timedelta(minutes=10)
+
+                    if now - today_checkin_record.timestamp < min_checkout_gap:
+                        return JsonResponse({
+                            "success": False,
+                            "message": "Checkout not allowed yet",
+                            "color": "orange"
+                        })
+
                     att_type = "check_out"
 
-                # If not checked in → allow checkin
-                elif not today_checkin:
-                    att_type = "check_in"
-
+                # -----------------------------------------
+                # CHECK IN LOGIC
+                # -----------------------------------------
                 else:
-                    return JsonResponse({
-                        "success": False,
-                        "message": "Invalid attendance state",
-                        "color": "red"
-                    })
+                    att_type = "check_in"
             # --------------------------------------------
             # 2️⃣ If open shift → CHECK-OUT
             # --------------------------------------------
@@ -1220,10 +1228,18 @@ def mark_attendance(request):
 
                     if worked_hours < min_hours:
                         mins_left = int((min_hours - worked_hours) * 60)
+
+                        hours_left = mins_left // 60
+                        minutes_left = mins_left % 60
                         
+                        if hours_left > 0:
+                            message = f"Wait {hours_left}h {minutes_left}m to checkout"
+                        else:
+                            message = f"Wait {minutes_left} minutes to checkout"
+
                         return JsonResponse({
                             "success": False,
-                            "message": f"Wait {mins_left} minutes to checkout",
+                            "message": message,
                             "color": "yellow"
                         })
 
@@ -1297,7 +1313,7 @@ def mark_attendance(request):
 
 @login_required
 def attendance_log_api(request):
-    today = timezone.now().date()
+    today = timezone.localdate()   # use local date instead of UTC
 
     logs = (
         Attendance.objects.filter(timestamp__date=today)
@@ -1309,7 +1325,7 @@ def attendance_log_api(request):
         {
             "name": log.employee.user.get_full_name() or log.employee.user.username,
             "type": log.attendance_type.replace("_", " ").title(),
-            "time": log.timestamp.strftime("%I:%M %p"),
+            "time": timezone.localtime(log.timestamp).strftime("%I:%M %p"),  # convert to IST
         }
         for log in logs
     ]

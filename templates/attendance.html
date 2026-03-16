@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Nelson | AI Attendance Kiosk</title>
+  <title>Nelson Hospital | Face Attendance</title>
 
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -587,11 +587,22 @@
     ===================================================== */
     function updateClock() {
       const now = new Date();
-      const timeOpts = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
-      const dateOpts = { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' };
-      
-      const timeStr = now.toLocaleTimeString('en-US', timeOpts);
-      const dateStr = now.toLocaleDateString('en-US', dateOpts);
+
+      const timeStr = now.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+
+      const dateStr = now.toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
 
       document.getElementById('currentTime').textContent = timeStr;
       document.getElementById('currentDate').textContent = dateStr;
@@ -760,77 +771,130 @@
        LOAD TODAY ATTENDANCE
     ===================================================== */
     async function loadTodayAttendance() {
-      try {
-        const res = await fetch("{% url 'attendance_log_api' %}");
-        const data = await res.json();
+  try {
 
-        historyList.innerHTML = "";
-        fsHistoryList.innerHTML = "";
+    const res = await fetch("{% url 'attendance_log_api' %}");
+    const data = await res.json();
 
-        if (!data.length) {
-          const emptyHtml = `
-            <div class="text-center py-5 text-muted">
-              <i class="fas fa-clipboard-check fa-3x mb-3 opacity-25"></i>
-              <p class="fw-medium">No attendance recorded today</p>
-            </div>`;
-          historyList.innerHTML = emptyHtml;
-          fsHistoryList.innerHTML = emptyHtml;
-          return;
-        }
+    historyList.innerHTML = "";
+    fsHistoryList.innerHTML = "";
 
-        data.forEach(record => {
-          addAttendanceRecord({
-            name: record.name,
-            attendance_type: record.type,
-            time: record.time || ""
-          });
-        });
-      } catch (err) {
-        console.error("Attendance load error:", err);
-      }
+    if (!data.length) {
+
+      const emptyHtml = `
+        <div class="text-center py-5 text-muted">
+          <i class="fas fa-clipboard-check fa-3x mb-3 opacity-25"></i>
+          <p class="fw-medium">No attendance recorded today</p>
+        </div>`;
+
+      historyList.innerHTML = emptyHtml;
+      fsHistoryList.innerHTML = emptyHtml;
+      return;
     }
 
+    data.forEach(record => {
+
+      renderApiAttendance({
+        name: record.name,
+        attendance_type: record.type,
+        time: record.time || ""
+      });
+
+    });
+
+  } catch (err) {
+    console.error("Attendance load error:", err);
+  }
+}
+
+    function renderApiAttendance(data) {
+
+  const isCheckIn = data.attendance_type.toLowerCase().includes("in");
+  const badgeClass = isCheckIn ? "badge-in" : "badge-out";
+  const avatarClass = isCheckIn ? "avatar-in" : "avatar-out";
+  const icon = isCheckIn
+      ? "fa-arrow-right-to-bracket"
+      : "fa-person-walking-arrow-right";
+
+  const html = `
+    <div class="record-card">
+      <div class="record-avatar ${avatarClass}">
+        <i class="fas ${icon}"></i>
+      </div>
+      <div class="record-details">
+        <div class="record-name">${data.name}</div>
+        <div class="record-meta">
+          <span class="status-badge ${badgeClass}">
+            ${data.attendance_type.toUpperCase()}
+          </span>
+        </div>
+      </div>
+      <div class="record-time">${data.time}</div>
+    </div>
+  `;
+
+  // API history goes to bottom
+  historyList.insertAdjacentHTML("beforeend", html);
+  fsHistoryList.insertAdjacentHTML("beforeend", html);
+}
     /* =====================================================
        ATTENDANCE UI BUILDER
     ===================================================== */
     function addAttendanceRecord(data) {
-      if(historyList.querySelector('.text-center')) historyList.innerHTML = "";
-      if(fsHistoryList.querySelector('.text-center')) fsHistoryList.innerHTML = "";
 
-      const isCheckIn = data.attendance_type.toLowerCase().includes("in");
-      const badgeClass = isCheckIn ? "badge-in" : "badge-out";
-      const avatarClass = isCheckIn ? "avatar-in" : "avatar-out";
-      const icon = isCheckIn ? "fa-arrow-right-to-bracket" : "fa-person-walking-arrow-right";
+  if(historyList.querySelector('.text-center')) historyList.innerHTML = "";
+  if(fsHistoryList.querySelector('.text-center')) fsHistoryList.innerHTML = "";
 
-      const countEl = document.getElementById("todayCount");
-      countEl.innerText = parseInt(countEl.innerText) + 1;
+  const isCheckIn = data.attendance_type.toLowerCase().includes("in");
+  const badgeClass = isCheckIn ? "badge-in" : "badge-out";
+  const avatarClass = isCheckIn ? "avatar-in" : "avatar-out";
+  const icon = isCheckIn
+      ? "fa-arrow-right-to-bracket"
+      : "fa-person-walking-arrow-right";
 
-      if(isCheckIn){
-        const inEl = document.getElementById("checkIns");
-        inEl.innerText = parseInt(inEl.innerText) + 1;
-      }else{
-        const outEl = document.getElementById("checkOuts");
-        outEl.innerText = parseInt(outEl.innerText) + 1;
-      }
+  const countEl = document.getElementById("todayCount");
+  countEl.innerText = parseInt(countEl.innerText) + 1;
 
-      const html = `
-        <div class="record-card">
-          <div class="record-avatar ${avatarClass}">
-            <i class="fas ${icon}"></i>
-          </div>
-          <div class="record-details">
-            <div class="record-name">${data.name}</div>
-            <div class="record-meta">
-              <span class="status-badge ${badgeClass}">${data.attendance_type.toUpperCase()}</span>
-            </div>
-          </div>
-          <div class="record-time">${data.time}</div>
+  if(isCheckIn){
+      const inEl = document.getElementById("checkIns");
+      inEl.innerText = parseInt(inEl.innerText) + 1;
+  } else {
+      const outEl = document.getElementById("checkOuts");
+      outEl.innerText = parseInt(outEl.innerText) + 1;
+  }
+
+  const html = `
+    <div class="record-card">
+      <div class="record-avatar ${avatarClass}">
+        <i class="fas ${icon}"></i>
+      </div>
+      <div class="record-details">
+        <div class="record-name">${data.name}</div>
+        <div class="record-meta">
+          <span class="status-badge ${badgeClass}">
+            ${data.attendance_type.toUpperCase()}
+          </span>
         </div>
-      `;
+      </div>
+      <div class="record-time">${data.time}</div>
+    </div>
+  `;
 
-      historyList.insertAdjacentHTML("afterbegin", html);
-      fsHistoryList.insertAdjacentHTML("afterbegin", html);
-    }
+  // LIVE scans go to TOP
+  historyList.insertAdjacentHTML("afterbegin", html);
+  fsHistoryList.insertAdjacentHTML("afterbegin", html);
+
+  // limit records for performance
+  const maxRecords = 20;
+
+  while(historyList.children.length > maxRecords){
+      historyList.removeChild(historyList.lastChild);
+  }
+
+  while(fsHistoryList.children.length > maxRecords){
+      fsHistoryList.removeChild(fsHistoryList.lastChild);
+  }
+}
 
     /* =====================================================
        FRAME PROCESS
