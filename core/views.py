@@ -1616,6 +1616,22 @@ def attendance_reports(request):
     present_employees_count = present_employees_list.count()
     absent_employees_count = max(0, total_employees_count - present_employees_count)
 
+    for record in attendance_qs:
+        work_rule = getattr(record.employee, "work_rule", None)
+
+        if work_rule:
+            # Shift type from model property
+            record.shift = work_rule.shift_type
+
+            # Format timing
+            record.shift_time = (
+                f"{work_rule.shift_start_time.strftime('%I:%M %p')} - "
+                f"{work_rule.shift_end_time.strftime('%I:%M %p')}"
+            )
+        else:
+            record.shift = "N/A"
+            record.shift_time = "Not Assigned"
+
     # =====================================================
     # 7. PAGINATION
     # =====================================================

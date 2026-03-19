@@ -254,6 +254,7 @@
             <th class="ps-4 py-3 text-uppercase small fw-bold text-muted">Employee</th>
             <th class="py-3 text-uppercase small fw-bold text-muted">Type</th>
             <th class="py-3 text-uppercase small fw-bold text-muted">Date & Time</th>
+            <th class="py-3 text-uppercase small fw-bold text-muted">Shift</th>
             <th class="py-3 text-uppercase small fw-bold text-muted">Confidence</th>
             <th class="py-3 text-uppercase small fw-bold text-muted">Location</th>
             <th class="text-center py-3 text-uppercase small fw-bold text-muted">Status</th>
@@ -299,6 +300,23 @@
                 <span class="fw-bold text-dark">{{ record.timestamp|date:"M d, Y" }}</span>
                 <span class="text-muted small"><i class="far fa-clock me-1"></i>{{ record.timestamp|date:"h:i A" }}</span>
               </div>
+            </td>
+            <td>
+              <span class="badge px-3 py-2
+                {% if record.shift == 'Day' %}
+                  bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25
+                {% else %}
+                  bg-dark bg-opacity-10 text-dark border border-dark border-opacity-25
+                {% endif %}"
+                
+                data-bs-toggle="tooltip"
+                data-bs-placement="top"
+                title="{{ record.shift_time }}"
+              >
+                
+                <i class="fas {% if record.shift == 'Day' %}fa-sun{% else %}fa-moon{% endif %} me-1"></i>
+                {{ record.shift }}
+              </span>
             </td>
             <td>
               {% if record.confidence_score %}
