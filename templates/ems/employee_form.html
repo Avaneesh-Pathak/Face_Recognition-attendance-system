@@ -198,7 +198,6 @@
                         </div>
                     </div>
                 </div>
-                {% if user.is_superuser or user.is_staff or user.employee.role in "Admin HR Finance Manager" %}
                 <!-- 2. Job & Department -->
                 <div class="card modern-card mb-4">
                     <div class="card-header-modern">
@@ -223,7 +222,19 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">System Role</label>
-                                <input type="text" class="form-control" value="{{ employee.role }}" readonly>
+
+                                <select name="role" class="form-select"
+                                    {% if not user.is_superuser and user.employee.role != "Admin" and user.employee.role != "Finance" %}
+                                        disabled
+                                    {% endif %}>
+
+                                    <option value="Admin" {% if employee.role == "Admin" %}selected{% endif %}>Admin</option>
+                                    <option value="HR" {% if employee.role == "HR" %}selected{% endif %}>HR Manager</option>
+                                    <option value="Finance" {% if employee.role == "Finance" %}selected{% endif %}>Accounts / Finance</option>
+                                    <option value="Manager" {% if employee.role == "Manager" %}selected{% endif %}>Manager</option>
+                                    <option value="Employee" {% if employee.role == "Employee" %}selected{% endif %}>Employee</option>
+
+                                </select>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Shift / Work Rule</label>
@@ -232,7 +243,6 @@
                         </div>
                     </div>
                 </div>
-                {% endif %}
 
                 <!-- 3. Salary Structure -->
                 <div class="card modern-card mb-4">
@@ -248,28 +258,28 @@
                                 <label class="form-label fw-semibold">Base Salary</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text fw-bold">₹</span>
-                                    <input type="number" readonly step="0.01" name="base_salary" value="{{ salary.base_salary|default:'' }}" class="form-control">
+                                    <input type="number"  step="0.01" name="base_salary" value="{{ salary.base_salary|default:'' }}" class="form-control">
                                 </div>
                             </div>
                             <div class="col-md-3 col-6">
                                 <label class="form-label fw-semibold">HRA</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text fw-bold">₹</span>
-                                    <input type="number" readonly step="0.01" name="hra" value="{{ salary.hra|default:'' }}" class="form-control">
+                                    <input type="number"  step="0.01" name="hra" value="{{ salary.hra|default:'' }}" class="form-control">
                                 </div>
                             </div>
                             <div class="col-md-3 col-6">
                                 <label class="form-label fw-semibold">Allowances</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text fw-bold">₹</span>
-                                    <input type="number" readonly step="0.01" name="allowances" value="{{ salary.allowances|default:'' }}" class="form-control">
+                                    <input type="number"  step="0.01" name="allowances" value="{{ salary.allowances|default:'' }}" class="form-control">
                                 </div>
                             </div>
                             <div class="col-md-3 col-6">
                                 <label class="form-label fw-semibold">Deductions</label>
                                 <div class="input-group input-group-sm">
                                     <span class="input-group-text fw-bold text-danger">-</span>
-                                    <input type="number" readonly step="0.01" name="deductions" value="{{ salary.deductions|default:'' }}" class="form-control">
+                                    <input type="number"  step="0.01" name="deductions" value="{{ salary.deductions|default:'' }}" class="form-control">
                                 </div>
                             </div>
                         </div>
@@ -575,5 +585,30 @@
             reader.readAsDataURL(input.files[0]);
         }
     }
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    {% if messages %}
+        {% for message in messages %}
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: '{{ message.tags }}',
+                title: '{{ message|escapejs }}',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                background: '#fff',
+                color: '#333',
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer)
+                    toast.addEventListener('mouseleave', Swal.resumeTimer)
+                }
+            });
+        {% endfor %}
+    {% endif %}
+
+});
 </script>
 {% endblock %}

@@ -4,159 +4,299 @@
 {% block page_title %}My Profile{% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- Left Column: Profile Card -->
-    <div class="col-lg-4 mb-4">
-        <div class="card border-0 shadow-sm text-center h-100">
-            <div class="card-body p-4">
-                <div class="mb-4 position-relative d-inline-block">
-                    {% if employee.face_image %}
-                    <img src="{{ employee.face_image.url }}" class="rounded-circle img-thumbnail shadow-sm"
-                        style="width: 160px; height: 160px; object-fit: cover; border-width: 4px;">
-                    {% else %}
-                    <div class="bg-light rounded-circle d-flex align-items-center justify-content-center mx-auto shadow-sm"
-                        style="width: 160px; height: 160px; border: 4px solid white;">
-                        <i class="fas fa-user fa-4x text-secondary"></i>
-                    </div>
-                    {% endif %}
-                    <span class="position-absolute bottom-0 end-0 p-2 bg-success border border-light rounded-circle">
-                        <span class="visually-hidden">Active</span>
-                    </span>
-                </div>
+<!-- Modern Font & CSS Tweak -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-                <h4 class="fw-bold mb-1">{{ employee.user.get_full_name }}</h4>
-                <p class="text-muted mb-3">{{ employee.position }}</p>
-
-                <div class="d-flex justify-content-center gap-2 mb-4">
-                    <span class="badge bg-primary-soft text-primary">{{ employee.department.name }}</span>
-                    <span
-                        class="badge {% if employee.employment_status == 'active' %}bg-success-soft text-success{% else %}bg-warning-soft text-warning{% endif %}">
-                        {{ employee.get_employment_status_display }}
-                    </span>
-                </div>
-
-                <div class="d-grid gap-2">
-                    <button class="btn btn-outline-primary">
-                        <a href="{% url 'employee_update' employee.id %}" class="text-decoration-none text-dark">
-                            <i class="fas fa-camera me-2"></i>Update Data
-                        </a>
-                    </button>
-                </div>
-            </div>
-            <div class="card-footer bg-light p-3">
-                <div class="row text-center">
-                    <div class="col border-end">
-                        <small class="text-muted d-block text-uppercase fw-bold"
-                            style="font-size: 0.7rem;">Joined</small>
-                        <span class="fw-bold">{{ employee.date_of_joining|date:"M Y" }}</span>
-                    </div>
-                    <div class="col">
-                        <small class="text-muted d-block text-uppercase fw-bold" style="font-size: 0.7rem;">ID</small>
-                        <span class="fw-bold">{{ employee.employee_id }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Right Column: Details -->
-    <div class="col-lg-8">
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-header bg-white py-3">
-                <h6 class="mb-0 fw-bold text-dark">
-                    <i class="fas fa-info-circle me-2 text-primary"></i>Personal Information
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="small text-muted text-uppercase fw-bold">Full Name</label>
-                        <p class="fw-medium mb-0">{{ employee.user.get_full_name }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="small text-muted text-uppercase fw-bold">Username</label>
-                        <p class="fw-medium mb-0">{{ employee.user.username }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="small text-muted text-uppercase fw-bold">Email Address</label>
-                        <p class="fw-medium mb-0">{{ employee.user.email }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="small text-muted text-uppercase fw-bold">Phone Number</label>
-                        <p class="fw-medium mb-0">{{ employee.phone_number|default:"-" }}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card border-0 shadow-sm mb-4">
-            <div class="card-header bg-white py-3">
-                <h6 class="mb-0 fw-bold text-dark">
-                    <i class="fas fa-briefcase me-2 text-primary"></i>Employment Details
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="small text-muted text-uppercase fw-bold">Department</label>
-                        <p class="fw-medium mb-0">{{ employee.department.name }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="small text-muted text-uppercase fw-bold">Reporting Manager</label>
-                        {% if employee.manager %}
-                        <div class="d-flex align-items-center mt-1">
-                            <div class="avatar-initials bg-light text-primary rounded-circle me-2 d-flex align-items-center justify-content-center"
-                                style="width: 24px; height: 24px; font-size: 0.7rem;">
-                                {{ employee.manager.user.first_name|first }}
-                            </div>
-                            <span class="fw-medium">{{ employee.manager.user.get_full_name }}</span>
-                        </div>
+<div class="container-fluid py-4 animate-fade-in" style="font-family: 'Plus Jakarta Sans', sans-serif;">
+    <div class="row g-4">
+        
+        <!-- Left Column: Profile Card -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm overflow-hidden position-sticky rounded-4" style="top: 20px;">
+                <!-- Decorative Profile Header -->
+                <div class="profile-header-bg"></div>
+                
+                <div class="card-body text-center pt-0" style="margin-top: -60px;">
+                    <div class="position-relative d-inline-block mb-3">
+                        {% if employee.face_image %}
+                        <img src="{{ employee.face_image.url }}" class="rounded-circle border border-4 border-white shadow-lg"
+                            style="width: 140px; height: 140px; object-fit: cover;">
                         {% else %}
-                        <p class="fw-medium mb-0 text-muted">No Manager (Top Level)</p>
+                        <div class="bg-light rounded-circle border border-4 border-white shadow-lg d-flex align-items-center justify-content-center mx-auto"
+                            style="width: 140px; height: 140px;">
+                            <i class="fas fa-user fa-3x text-muted opacity-50"></i>
+                        </div>
                         {% endif %}
+                        <span class="position-absolute bottom-0 end-0 p-2 bg-success border border-3 border-white rounded-circle pulse-animation" title="Active"></span>
                     </div>
-                    <div class="col-md-6">
-                        <label class="small text-muted text-uppercase fw-bold">Date of Joining</label>
-                        <p class="fw-medium mb-0">{{ employee.date_of_joining }}</p>
+
+                    <h4 class="fw-bold text-dark mb-1">{{ employee.user.get_full_name }}</h4>
+                    <p class="text-muted small fw-medium mb-3">{{ employee.position|default:"Team Member" }}</p>
+
+                    <div class="d-flex justify-content-center gap-2 mb-4">
+                        <span class="badge rounded-pill bg-primary-soft text-primary px-3 py-2">
+                            <i class="fas fa-building me-1"></i> {{ employee.department.name }}
+                        </span>
+                        <span class="badge rounded-pill {% if employee.employment_status == 'active' %}bg-success-soft text-success{% else %}bg-warning-soft text-warning{% endif %} px-3 py-2">
+                            {{ employee.get_employment_status_display }}
+                        </span>
                     </div>
-                    <div class="col-md-6">
-                        <label class="small text-muted text-uppercase fw-bold">Current Status</label>
-                        <p class="fw-medium mb-0">
-                            <span
-                                class="badge {% if employee.employment_status == 'active' %}bg-success-soft text-success{% else %}bg-warning-soft text-warning{% endif %}">
-                                {{ employee.get_employment_status_display }}
-                            </span>
-                        </p>
+
+                    <div class="d-grid gap-2 mb-2">
+                        <a href="{% url 'employee_update' employee.id %}" class="btn btn-primary rounded-3 py-2 shadow-sm hover-lift">
+                            <i class="fas fa-user-edit me-2"></i>Update Profile
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card-footer bg-white border-top-0 p-0 overflow-hidden">
+                    <div class="row g-0 text-center border-top">
+                        <div class="col border-end py-3 bg-light-hover transition">
+                            <small class="text-muted d-block text-uppercase ls-1 fw-bold" style="font-size: 0.65rem;">Joined</small>
+                            <span class="fw-bold text-dark">{{ employee.date_of_joining|date:"M Y" }}</span>
+                        </div>
+                        <div class="col py-3 bg-light-hover transition">
+                            <small class="text-muted d-block text-uppercase ls-1 fw-bold" style="font-size: 0.65rem;">ID Number</small>
+                            <span class="fw-bold text-dark">#{{ employee.employee_id }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white py-3">
-                <h6 class="mb-0 fw-bold text-dark">
-                    <i class="fas fa-shield-alt me-2 text-primary"></i>System Access
-                </h6>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="small text-muted text-uppercase fw-bold">Last Login</label>
-                        <p class="fw-medium mb-0">{{ employee.user.last_login|default:"Never" }}</p>
+        <!-- Right Column: Detailed Info -->
+        <div class="col-lg-8">
+            
+            <!-- Personal Information -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+                <div class="card-header bg-white border-0 py-3 px-4">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-box bg-indigo-soft text-indigo me-3">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <h6 class="mb-0 fw-bold">Personal Information</h6>
                     </div>
-                    <div class="col-md-6">
-                        <label class="small text-muted text-uppercase fw-bold">Account Status</label>
-                        <p class="fw-medium mb-0">
-                            {% if employee.is_active %}
-                            <span class="text-success"><i class="fas fa-check-circle me-1"></i>Active</span>
-                            {% else %}
-                            <span class="text-danger"><i class="fas fa-times-circle me-1"></i>Inactive</span>
-                            {% endif %}
-                        </p>
+                </div>
+                <div class="card-body px-4 pb-4">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="info-group">
+                                <label><i class="far fa-id-badge me-2"></i>Full Name</label>
+                                <p>{{ employee.user.get_full_name }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-group">
+                                <label><i class="far fa-user me-2"></i>Username</label>
+                                <p>{{ employee.user.username }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-group">
+                                <label><i class="far fa-envelope me-2"></i>Email Address</label>
+                                <p class="text-primary fw-semibold">{{ employee.user.email }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-group">
+                                <label><i class="fas fa-phone-alt me-2"></i>Phone Number</label>
+                                <p>{{ employee.phone_number|default:"Not Provided" }}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Employment Details -->
+            <div class="card border-0 shadow-sm rounded-4 mb-4 overflow-hidden">
+                <div class="card-header bg-white border-0 py-3 px-4">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-box bg-emerald-soft text-emerald me-3">
+                            <i class="fas fa-briefcase"></i>
+                        </div>
+                        <h6 class="mb-0 fw-bold">Employment Details</h6>
+                    </div>
+                </div>
+                <div class="card-body px-4 pb-4">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="info-group">
+                                <label>Department</label>
+                                <p>{{ employee.department.name }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-group">
+                                <label>Reporting Manager</label>
+                                <div class="d-flex align-items-center mt-1">
+                                    {% if employee.manager %}
+                                    <div class="avatar-sm bg-primary text-white rounded-circle me-2 d-flex align-items-center justify-content-center fw-bold">
+                                        {{ employee.manager.user.first_name|first }}
+                                    </div>
+                                    <span class="fw-semibold text-dark">{{ employee.manager.user.get_full_name }}</span>
+                                    {% else %}
+                                    <span class="text-muted italic small">No Manager Assigned</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-group">
+                                <label>Date of Joining</label>
+                                <p>{{ employee.date_of_joining|date:"D, d M Y" }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-group">
+                                <label>Employment Status</label>
+                                <div class="mt-1">
+                                    <span class="badge {% if employee.employment_status == 'active' %}bg-success-soft text-success{% else %}bg-warning-soft text-warning{% endif %} rounded-pill">
+                                        ● {{ employee.get_employment_status_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security & System -->
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-white border-0 py-3 px-4">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-box bg-amber-soft text-amber me-3">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h6 class="mb-0 fw-bold">System Access</h6>
+                    </div>
+                </div>
+                <div class="card-body px-4 pb-4 pt-0">
+                    <div class="row align-items-center bg-light rounded-4 p-3 mx-0">
+                        <div class="col-md-6 border-end-md">
+                            <small class="text-muted d-block mb-1">Last Login Session</small>
+                            <span class="fw-medium text-dark">
+                                <i class="far fa-clock me-1 text-muted"></i>
+                                {{ employee.user.last_login|date:"M d, Y H:i"|default:"First time login" }}
+                            </span>
+                        </div>
+                        <div class="col-md-6 ps-md-4 mt-3 mt-md-0">
+                            <small class="text-muted d-block mb-1">Account Status</small>
+                            {% if employee.is_active %}
+                            <span class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i> Verified & Active</span>
+                            {% else %}
+                            <span class="text-danger fw-bold"><i class="fas fa-times-circle me-1"></i> Account Suspended</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
+
+<style>
+    :root {
+        --primary-color: #4e73df;
+        --indigo-soft: rgba(78, 115, 223, 0.1);
+        --emerald-soft: rgba(16, 185, 129, 0.1);
+        --amber-soft: rgba(245, 158, 11, 0.1);
+    }
+
+    body { background-color: #f8f9fc; }
+
+    /* Custom Header Background */
+    .profile-header-bg {
+        height: 100px;
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+    }
+
+    /* Soft Badges */
+    .bg-primary-soft { background: var(--indigo-soft); color: #4e73df; }
+    .bg-success-soft { background: var(--emerald-soft); color: #10b981; }
+    .bg-warning-soft { background: var(--amber-soft); color: #f59e0b; }
+
+    /* Info Grouping */
+    .info-group label {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #94a3b8;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+    .info-group p {
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 0;
+        font-size: 0.95rem;
+    }
+
+    /* Icon Shapes */
+    .icon-box {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+    }
+    .bg-indigo-soft { background: #eef2ff; color: #6366f1; }
+    .bg-emerald-soft { background: #ecfdf5; color: #10b981; }
+    .bg-amber-soft { background: #fffbeb; color: #f59e0b; }
+
+    .avatar-sm { width: 32px; height: 32px; font-size: 0.8rem; }
+
+    /* Utilities */
+    .ls-1 { letter-spacing: 1px; }
+    .hover-lift { transition: all 0.2s ease; }
+    .hover-lift:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important; }
+    .bg-light-hover:hover { background-color: #f1f5f9 !important; cursor: default; }
+    .transition { transition: 0.3s ease; }
+
+    /* Animations */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in { animation: fadeInUp 0.5s ease-out; }
+
+    .pulse-animation {
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7);
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+        70% { box-shadow: 0 0 0 10px rgba(25, 135, 84, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(25, 135, 84, 0); }
+    }
+
+    @media (min-width: 768px) {
+        .border-end-md { border-right: 1px solid #e2e8f0; }
+    }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    {% if messages %}
+        {% for message in messages %}
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: "{% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %}",
+                title: "{{ message|escapejs }}",
+                showConfirmButton: false,
+                timer: 3500,
+                timerProgressBar: true,
+                background: "#fff",
+                color: "#333"
+            });
+        {% endfor %}
+    {% endif %}
+
+});
+</script>
 {% endblock %}

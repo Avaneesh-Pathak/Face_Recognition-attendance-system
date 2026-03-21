@@ -407,15 +407,23 @@ def employee_update(request, pk):
     salary = getattr(employee, "salary_structure", None)
 
     if request.method == "POST":
+        print("POST DATA:", request.POST)
+
         form = EmployeeUpdateForm(
             request.POST,
             request.FILES,
             instance=employee
         )
 
+        # =====================
+        # ROLE CHECK
+        # =====================
+        is_self = request.user == employee.user
+        user_role = getattr(request.user.employee, "role", "").lower()
+        is_admin_or_finance = user_role in ["admin", "finance"] or request.user.is_superuser
+
         if form.is_valid():
 
-            # 🔐 ONE TRANSACTION = SAFE SYSTEM
             with transaction.atomic():
 
                 # =====================
@@ -423,9 +431,7 @@ def employee_update(request, pk):
                 # =====================
                 new_username = request.POST.get("username", "").strip()
                 new_password = request.POST.get("password", "")
-                print("USERNAME:", new_username)
-                print("PASSWORD PROVIDED:", bool(new_password))
-                # 🔐 Username update (safe)
+
                 if new_username and new_username != user.username:
                     if User.objects.exclude(pk=user.pk).filter(username=new_username).exists():
                         messages.error(request, "Username already exists.")
@@ -436,20 +442,42 @@ def employee_update(request, pk):
                 user.last_name = request.POST.get("last_name", user.last_name)
                 user.email = request.POST.get("email", user.email)
 
-                # 🔐 Password update (secure)
                 if new_password:
                     user.set_password(new_password)
-                    update_session_auth_hash(request, user)  # 🔥 THIS IS REQUIRED
+                    update_session_auth_hash(request, user)
 
                 user.save()
 
                 # =====================
                 # UPDATE EMPLOYEE
                 # =====================
+                old_employee = Employee.objects.get(pk=employee.pk)
                 employee = form.save(commit=False)
 
+
+                # ✅ ADD THIS BLOCK HERE
+                if is_admin_or_finance:
+                    employee.role = request.POST.get("role", employee.role)
                 # =====================
-                # FACE IMAGE HANDLING
+                # PERMISSION CONTROL
+                # =====================
+                if not is_admin_or_finance:
+
+                    if not is_self:
+                        messages.error(request, "❌ You are not authorized to update other employee details.")
+                        return redirect("employee_list")
+
+                    # Only personal allowed
+                    messages.warning(request, "⚠️ Only personal details updated. Official data is locked.")
+
+                    employee.department = old_employee.department
+                    employee.position = old_employee.position
+                    employee.manager = old_employee.manager
+                    employee.work_rule = old_employee.work_rule
+                    employee.role = old_employee.role
+
+                # =====================
+                # FACE IMAGE
                 # =====================
                 if form.cleaned_data.get("remove_face"):
                     if employee.face_image:
@@ -472,13 +500,13 @@ def employee_update(request, pk):
                     else:
                         employee.face_encoding = json.dumps([emb])
                         face_sys.load_from_db()
-                    
+
                     employee.save(update_fields=["face_encoding"])
 
                 employee.save()
 
                 # =====================
-                # SALARY UPDATE
+                # SALARY
                 # =====================
                 salary, _ = SalaryStructure.objects.get_or_create(
                     employee=employee,
@@ -490,35 +518,28 @@ def employee_update(request, pk):
                     }
                 )
 
-                salary.base_salary = safe_decimal(
-                    request.POST.get("base_salary"),
-                    salary.base_salary
-                )
-                salary.hra = safe_decimal(request.POST.get("hra"))
-                salary.allowances = safe_decimal(request.POST.get("allowances"))
-                salary.deductions = safe_decimal(request.POST.get("deductions"))
-                salary.save()
+                if is_admin_or_finance:
+                    salary.base_salary = safe_decimal(
+                        request.POST.get("base_salary"),
+                        salary.base_salary
+                    )
+                    salary.hra = safe_decimal(request.POST.get("hra"))
+                    salary.allowances = safe_decimal(request.POST.get("allowances"))
+                    salary.deductions = safe_decimal(request.POST.get("deductions"))
+                    salary.save()
+                else:
+                    if is_self:
+                        messages.warning(request, "⚠️ Salary changes are not allowed.")
 
                 # =====================
-                # JOINING DETAIL
+                # JOINING
                 # =====================
-                joining, _ = JoiningDetail.objects.get_or_create(
-                    employee=employee
-                )
+                joining, _ = JoiningDetail.objects.get_or_create(employee=employee)
 
-                # =====================
-                # MULTIPLE DOCUMENT UPLOAD
-                # =====================
                 files = request.FILES.getlist("documents")
                 for file in files:
-                    JoiningDocument.objects.create(
-                        joining=joining,
-                        file=file
-                    )
+                    JoiningDocument.objects.create(joining=joining, file=file)
 
-                # =====================
-                # DOCUMENT DELETE
-                # =====================
                 delete_ids = request.POST.getlist("delete_docs")
                 if delete_ids:
                     JoiningDocument.objects.filter(
@@ -526,13 +547,18 @@ def employee_update(request, pk):
                         joining=joining
                     ).delete()
 
-            messages.success(request, "Employee updated successfully.")
-            if request.user == employee.user:
-                # Employee updating his own profile
+            messages.success(request, "✅ Employee updated successfully.")
+
+            if is_self:
                 return redirect("my_profile")
-            else:
-                # HR / Admin / Manager updating others
-                return redirect("employee_list")
+            return redirect("employee_list")
+
+        else:
+            # =====================
+            # FORM ERROR HANDLING (IMPORTANT)
+            # =====================
+            print("FORM ERRORS:", form.errors)
+            messages.error(request, f"❌ Form error: {form.errors}")
 
     else:
         form = EmployeeUpdateForm(instance=employee)
@@ -546,9 +572,8 @@ def employee_update(request, pk):
         "joining": joining,
         "documents": documents,
         "salary": salary,
+        "role_choices": Employee.ROLE_CHOICES,
     })
-
-
 
 @login_required
 @admin_required
