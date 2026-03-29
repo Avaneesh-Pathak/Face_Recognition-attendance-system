@@ -156,10 +156,44 @@
               {% if item.holiday %}
                 <div class="status-badge text-warning mt-1"><i class="fas fa-umbrella-beach mb-1"></i><br>Holiday</div>
               {% elif item.present %}
-                <div class="status-badge text-success mt-1"><i class="fas fa-check-circle mb-1"></i><br>Present</div>
-                {% if item.daily_hours %}
-                  <div class="small text-dark mt-1 fw-bold bg-white px-2 py-1 rounded-pill shadow-sm"><i class="far fa-clock text-primary"></i> {{ item.daily_hours }}</div>
-                {% endif %}
+
+<div class="status-badge text-success mt-1">
+  <i class="fas fa-check-circle mb-1"></i><br>Present
+</div>
+
+<!-- ⏱ Hours -->
+{% if item.daily_hours %}
+<div class="small text-dark mt-1 fw-bold bg-white px-2 py-1 rounded-pill shadow-sm">
+  <i class="far fa-clock text-primary"></i> {{ item.daily_hours }}
+</div>
+{% endif %}
+
+<!-- 🌙 SHIFT BADGE -->
+<div class="mt-1">
+  {% if item.shift_type == "Night" %}
+    <span class="badge bg-dark">🌙 Night</span>
+  {% elif item.shift_type == "Day" %}
+    <span class="badge bg-warning text-dark">☀ Day</span>
+  {% elif item.shift_type == "Evening" %}
+    <span class="badge bg-info">🌆 Evening</span>
+  {% else %}
+    <span class="badge bg-secondary">General</span>
+  {% endif %}
+</div>
+
+<!-- 🔥 OVERTIME -->
+{% if item.overtime > 0 %}
+<div class="badge bg-primary mt-1">
+  ⏱ OT {{ item.overtime }}h
+</div>
+{% endif %}
+
+<!-- 🚨 EXTRA SHIFT -->
+{% if item.extra_shift > 0 %}
+<div class="badge bg-danger mt-1">
+  🔥 Extra Shift
+</div>
+{% endif %}
               {% elif item.is_future %}
                 <div class="status-badge text-secondary mt-1 opacity-50">—</div>
               {% else %}
@@ -279,9 +313,34 @@
   .fs-5 { font-size: 1.1rem !important; }
   .status-badge { font-size: 0.65rem; }
 }
+/* 🔥 Overtime highlight */
+.badge.bg-primary {
+  background: linear-gradient(45deg, #3b82f6, #60a5fa);
+}
+
+/* 🚨 Extra shift highlight */
+.badge.bg-danger {
+  background: linear-gradient(45deg, #ef4444, #f87171);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+/* 🌙 Night shift glow */
+.badge.bg-dark {
+  box-shadow: 0 0 8px rgba(0,0,0,0.5);
+}
+
+/* ☀ Day shift glow */
+.badge.bg-warning {
+  box-shadow: 0 0 8px rgba(255,193,7,0.6);
+}
 </style>
 
-<!-- 🔹 Scripts -->
+<!-- 🔹 Scripts --> 
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 
 <script>
@@ -321,6 +380,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 let html = `<div class="d-flex justify-content-between align-items-center mb-3">
                                 <h6 class="mb-0 text-secondary">Attendance Logs</h6>`;
+                
+                let summary = `
+                <div class="alert alert-info text-start shadow-sm">
+                  <div><strong>Total Hours:</strong> ${data.total_hours || 0}h</div>
+                  <div><strong>Overtime:</strong> ${data.overtime || 0}h</div>
+                  <div><strong>Extra Shift:</strong> ${data.extra || 0}h</div>
+                </div>
+                `;
 
                 if(CAN_EDIT_ATTENDANCE) {
                     html += `<button class="btn btn-success btn-sm shadow-sm" onclick="openAddModal('${date}')">
@@ -379,7 +446,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
 
                 html += `</tbody></table></div>`;
-                body.innerHTML = html;
+                body.innerHTML = summary + html;
 
                 // Bind Edit Buttons Dynamically (Safe from string quoting errors)
                 document.querySelectorAll('.edit-log-btn').forEach(btn => {

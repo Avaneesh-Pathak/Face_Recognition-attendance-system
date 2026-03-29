@@ -543,19 +543,99 @@ def get_employee_rule_from_rule(rule):
 
 #         print("\n[END] Payroll generation complete\n")        
 
+# ============================================================
+# 🔥 ADVANCED ATTENDANCE ENGINE (FINAL)
+# ============================================================
+
+def build_sessions(logs):
+    sessions = []
+    open_in = None
+
+    for log in sorted(logs, key=lambda x: x.timestamp):
+        if log.attendance_type == "check_in":
+            open_in = log.timestamp
+
+        elif log.attendance_type == "check_out" and open_in:
+            if log.timestamp > open_in:
+                sessions.append((open_in, log.timestamp))
+            open_in = None
+
+    return sessions
+
+
+def split_session_by_day(start, end):
+    from datetime import datetime, time, timedelta
+
+    result = {}
+    current = start
+
+    while current.date() <= end.date():
+        day_start = datetime.combine(current.date(), time.min, tzinfo=start.tzinfo)
+        day_end = datetime.combine(current.date(), time.max, tzinfo=start.tzinfo)
+
+        s = max(start, day_start)
+        e = min(end, day_end)
+
+        if s < e:
+            hours = (e - s).total_seconds() / 3600
+            result[current.date()] = result.get(current.date(), 0) + hours
+
+        current += timedelta(days=1)
+
+    return result
+
+
+def calculate_shift_blocks(work_hours, full_day_hours, max_ot_hours):
+    work_hours = float(work_hours)
+    fsh = float(full_day_hours)
+    max_ot = float(max_ot_hours)
+
+    normal = 0
+    overtime = 0
+    extra = 0
+
+    if work_hours <= fsh:
+        normal = work_hours
+
+    elif work_hours <= fsh + max_ot:
+        normal = fsh
+        overtime = work_hours - fsh
+
+    else:
+        normal = fsh
+        overtime = max_ot
+        extra = work_hours - (fsh + max_ot)
+
+    return normal, overtime, extra
+
+
+def split_extra_shifts(extra_hours, full_day_hours):
+    fsh = float(full_day_hours)
+
+    full_shifts = int(extra_hours // fsh)
+    remaining = extra_hours % fsh
+
+    return full_shifts, remaining
+
+
+def get_attendance_status(worked_hours, rule):
+    worked_hours = float(worked_hours)
+
+    if worked_hours == 0:
+        return "Absent"
+
+    if worked_hours < float(rule.half_day_hours):
+        return "Partial"
+
+    if worked_hours <= float(rule.full_day_hours):
+        return "Present"
+
+    if worked_hours <= float(rule.full_day_hours + rule.max_overtime_hours):
+        return "Present + OT"
+
+    return "Extra Shift"
 
 class EnterprisePayrollManager(models.Manager):
-    """
-    10x Faster, Production-Grade Payroll Engine.
-    Features: 
-    - Bulk fetching (O(1) DB Queries inside loops)
-    - Late-coming deductions (e.g., 3 lates = 1 absent / half-day)
-    - Missing punch recovery
-    - Weekend / Holiday Overtime Multipliers
-    - Automatic Pro-Rata for new joiners
-    - Smart Shift Parsing (Auto Day/Night shift detection)
-    - Automatic Paid Weekends for Salaried Employees
-    """
 
     def generate_salary(self, year, month, employee=None):
         print(f"\n🚀 [START] Enterprise Payroll Engine → {month}/{year}")
@@ -564,15 +644,17 @@ class EnterprisePayrollManager(models.Manager):
         last_day = date(year, month, calendar.monthrange(year, month)[1])
         days_in_month = Decimal(str((last_day - first_day).days + 1))
 
-        # 1. FETCH ALL EMPLOYEES
+        # -------------------------------
+        # FETCH EMPLOYEES
+        # -------------------------------
         employees_qs = Employee.objects.filter(
             is_active=True,
             employment_status="active"
-        ).select_related("salary_structure", "work_rule", "joiningdetail")
+        ).select_related("salary_structure", "work_rule")
 
         if employee:
             employees_qs = employees_qs.filter(id=employee.id)
-            
+
         employees = list(employees_qs)
         employee_ids = [emp.id for emp in employees]
 
@@ -580,207 +662,195 @@ class EnterprisePayrollManager(models.Manager):
             print("❌ No active employees found.")
             return
 
-        # ==========================================================
-        # ⚡ MASSIVE OPTIMIZATION: PRE-FETCH EVERYTHING INTO MEMORY
-        # ==========================================================
-
-        # A. Attendance Settings (Grace periods, limits)
-        att_settings = AttendanceSettings.objects.first()
-        late_grace_mins = 15  # default
-        if att_settings and att_settings.late_threshold:
-            late_grace_mins = (att_settings.late_threshold.hour * 60) + att_settings.late_threshold.minute - (att_settings.check_in_start.hour * 60) - att_settings.check_in_start.minute
-            if late_grace_mins < 0: late_grace_mins = 15
-
-        # B. Attendance Logs (Expanded by 1 day for night shifts crossing midnight)
+        # -------------------------------
+        # PREFETCH ATTENDANCE
+        # -------------------------------
         logs_qs = Attendance.objects.filter(
             employee_id__in=employee_ids,
             timestamp__date__range=(first_day - timedelta(days=1), last_day + timedelta(days=1))
         ).order_by("timestamp")
-        
+
         attendance_map = defaultdict(list)
         for log in logs_qs:
             attendance_map[log.employee_id].append(log)
 
-        # C. Approved Leaves
+        # -------------------------------
+        # LEAVES
+        # -------------------------------
         leaves_qs = LeaveApplication.objects.filter(
             employee_id__in=employee_ids,
             status="approved",
             start_date__lte=last_day,
             end_date__gte=first_day
         ).select_related("leave_type")
-        
+
         leave_map = {}
         for leave in leaves_qs:
             for d in daterange(max(leave.start_date, first_day), min(leave.end_date, last_day)):
                 leave_map[(leave.employee_id, d)] = getattr(leave.leave_type, "is_paid", True)
 
-        # D. Holidays
-        holidays_set = set(Holiday.objects.filter(
-            date__range=(first_day, last_day)
-        ).values_list('date', flat=True))
+        # -------------------------------
+        # HOLIDAYS
+        # -------------------------------
+        holidays_set = set(
+            Holiday.objects.filter(date__range=(first_day, last_day))
+            .values_list('date', flat=True)
+        )
 
-        # E. Shift Assignments (Overrides base work_rule)
+        # -------------------------------
+        # SHIFT MAP
+        # -------------------------------
         shifts_qs = EmployeeShiftAssignment.objects.filter(
             employee_id__in=employee_ids,
             start_date__lte=last_day,
-        ).filter(Q(end_date__gte=first_day) | Q(end_date__isnull=True)).select_related("work_rule")
-        
+        ).filter(
+            Q(end_date__gte=first_day) | Q(end_date__isnull=True)
+        ).select_related("work_rule")
+
         shift_map = defaultdict(dict)
         for shift in shifts_qs:
             for d in daterange(max(shift.start_date, first_day), min(shift.end_date or last_day, last_day)):
                 shift_map[shift.employee_id][d] = shift.work_rule
 
-        # ==========================================================
-        # ⚙️ PROCESS EACH EMPLOYEE
-        # ==========================================================
+        # =====================================================
+        # PROCESS EMPLOYEES
+        # =====================================================
         payroll_objects = []
 
         for emp in employees:
-            if not getattr(emp, 'salary_structure', None) or not getattr(emp, 'work_rule', None):
+
+            if not emp.salary_structure or not emp.work_rule:
                 continue
 
             structure = emp.salary_structure
             monthly_salary = structure.base_salary
             daily_salary = monthly_salary / days_in_month
 
-            # Counters
             present_days = Decimal("0")
             half_days = Decimal("0")
             absent_days = Decimal("0")
             paid_leave_days = Decimal("0")
-            late_days = 0
             overtime_hours = Decimal("0")
             holiday_weekend_ot_hours = Decimal("0")
 
             logs = attendance_map.get(emp.id, [])
 
+            # -------------------------------
+            # BUILD SESSIONS (ONCE)
+            # -------------------------------
+            sessions = []
+            open_in = None
+
+            for log in logs:
+                if log.attendance_type == "check_in":
+                    open_in = log.timestamp
+
+                elif log.attendance_type == "check_out" and open_in:
+                    if log.timestamp > open_in:
+                        sessions.append((open_in, log.timestamp))
+                    open_in = None
+
+            # -------------------------------
+            # SPLIT INTO DAYS
+            # -------------------------------
+            daily_hours_map = {}
+
+            for start, end in sessions:
+                current = start
+
+                while current.date() <= end.date():
+                    day_start = datetime.combine(current.date(), time.min, tzinfo=start.tzinfo)
+                    day_end = datetime.combine(current.date(), time.max, tzinfo=start.tzinfo)
+
+                    s = max(start, day_start)
+                    e = min(end, day_end)
+
+                    if s < e:
+                        hours = (e - s).total_seconds() / 3600
+                        daily_hours_map[current.date()] = daily_hours_map.get(current.date(), 0) + hours
+
+                    current += timedelta(days=1)
+
+            # -------------------------------
+            # DAILY LOOP (ONLY ONE LOOP)
+            # -------------------------------
             for day in daterange(first_day, last_day):
-                # 1. Joining / Resignation Check (Pro-Rata)
+
                 if day < emp.date_of_joining:
                     continue
                 if emp.date_of_resignation and day > emp.date_of_resignation:
                     continue
 
-                # 2. Daily Rules & Shift
                 work_rule = shift_map.get(emp.id, {}).get(day, emp.work_rule)
                 is_work_day = is_working_day(day, get_employee_rule_from_rule(work_rule))
                 is_holiday = day in holidays_set
 
-                # 3. Leave Check (Approved Leaves override normal attendance)
+                # LEAVE
                 leave_key = (emp.id, day)
                 if leave_key in leave_map:
-                    if leave_map[leave_key]:  # is_paid
+                    if leave_map[leave_key]:
                         paid_leave_days += 1
                     else:
                         absent_days += 1
                     continue
 
-                # ---------------------------------------------------------
-                # 4. SMART ATTENDANCE PARSING (Handles Day/Night Auto)
-                # ---------------------------------------------------------
-                check_in = None
-                check_out = None
-                
-                # Get the first Check-In that happened on this specific calendar day
-                daily_check_ins = [l for l in logs if timezone.localtime(l.timestamp).date() == day and l.attendance_type == "check_in"]
-                
-                if daily_check_ins:
-                    # Sort just in case, and pick the earliest check-in for this day
-                    daily_check_ins = sorted(daily_check_ins, key=lambda x: x.timestamp)
-                    check_in = daily_check_ins[0].timestamp
-                    
-                    # Find the very next Check-Out AFTER this Check-In 
-                    # (This flawlessly handles night shifts that cross over midnight into the next day)
-                    subsequent_check_outs = [l for l in logs if l.timestamp > check_in and l.attendance_type == "check_out"]
-                    
-                    if subsequent_check_outs:
-                        subsequent_check_outs = sorted(subsequent_check_outs, key=lambda x: x.timestamp)
-                        check_out = subsequent_check_outs[0].timestamp
+                worked_hours = Decimal(str(daily_hours_map.get(day, 0)))
 
-                # No punches found at all today
-                if not check_in and not check_out:
+                # NO WORK
+                if worked_hours == 0:
                     if is_work_day and not is_holiday:
                         absent_days += 1
-                    elif not is_work_day or is_holiday:
-                        # ✅ FIXED: Give them a paid day for Weekend/Holiday if they didn't work
+                    else:
                         paid_leave_days += 1
                     continue
 
-                # 🛑 Missing Punch Recovery Logic
-                if check_in and not check_out:
-                    in_time_local = timezone.localtime(check_in)
-                    expected_half_day_end = in_time_local + timedelta(hours=work_rule.half_day_hours)
-                    if timezone.now() > expected_half_day_end: 
-                        check_out = expected_half_day_end # Auto-recover to half-day
-                    else:
-                        if is_work_day: absent_days += 1
-                        continue
+                fsh = float(work_rule.full_day_hours)
+                max_ot = float(getattr(work_rule, "max_overtime_hours", 4))
+                wh = float(worked_hours)
 
-                # Invalid Punches (Checkout before Check-in)
-                if not check_in or not check_out or check_out <= check_in:
-                    if is_work_day and not is_holiday: absent_days += 1
-                    continue
+                normal = min(wh, fsh)
+                overtime = min(max(0, wh - fsh), max_ot)
+                extra = max(0, wh - (fsh + max_ot))
 
-                # 📉 Late Coming Deduction Logic
-                shift_start_dt = timezone.make_aware(datetime.combine(day, work_rule.shift_start_time))
-                actual_in_dt = timezone.localtime(check_in)
-                
-                # Only penalize late coming if it's their scheduled working day
-                if is_work_day and actual_in_dt.date() == shift_start_dt.date() and actual_in_dt > shift_start_dt + timedelta(minutes=late_grace_mins):
-                    late_days += 1
-
-                # ⏱️ Work Hours Calculation
-                work_hours = Decimal((check_out - check_in).total_seconds() / 3600).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-                max_realistic_hours = Decimal(str(work_rule.full_day_hours + 6))
-                work_hours = min(work_hours, max_realistic_hours)
-
-                # 💵 Day Status Allocation
                 full_day_req = Decimal(str(work_rule.full_day_hours))
                 half_day_req = Decimal(str(work_rule.half_day_hours))
 
+                # HOLIDAY / WEEKEND
                 if not is_work_day or is_holiday:
-                    # ✅ FIXED: Give them their standard paid day for Weekend/Holiday
                     paid_leave_days += 1
-                    
-                    # ✅ FIXED: If they actually came to work on this off-day, count ALL hours as Premium Overtime
-                    if work_hours > 0 and (work_rule.count_holiday_overtime or work_rule.count_weekend_overtime):
-                        holiday_weekend_ot_hours += work_hours
+
+                    if work_rule.count_holiday_overtime or work_rule.count_weekend_overtime:
+                        holiday_weekend_ot_hours += worked_hours
+
+                    continue
+
+                # DAY CLASSIFICATION
+                if Decimal(str(normal)) >= full_day_req * Decimal("0.90"):
+                    present_days += 1
+                elif Decimal(str(normal)) >= half_day_req:
+                    half_days += 1
                 else:
-                    # Allow 10% tolerance for shift gaps
-                    full_threshold = full_day_req * Decimal("0.90")
+                    absent_days += 1
 
-                    if work_hours >= full_threshold:
-                        present_days += 1
-                        extra = work_hours - full_day_req
-                        if extra > 0:
-                            overtime_hours += extra
+                overtime_hours += Decimal(str(overtime))
 
-                    elif work_hours >= half_day_req:
-                        half_days += 1
+                # EXTRA SHIFT
+                if extra > 0:
+                    extra_shifts = int(extra // fsh)
+                    present_days += extra_shifts
 
-                    else:
-                        absent_days += 1
+                    remaining = extra % fsh
+                    overtime_hours += Decimal(str(remaining))
 
-            # =================================================
-            # 💰 FINAL SALARY COMPUTATION
-            # =================================================
+            # -------------------------------
+            # FINAL SALARY
+            # -------------------------------
+            payable_days = present_days + paid_leave_days + (half_days * Decimal("0.5"))
 
-            # Late Penalty: Every 3 late days = 1 Half Day deduction
-            late_penalty_days = Decimal(late_days // 3) * Decimal("0.5")
+            earned_basic = (daily_salary * payable_days).quantize(Decimal("0.01"))
 
-            # Total Payable Days
-            payable_days = present_days + paid_leave_days + (half_days * Decimal("0.5")) - late_penalty_days
-            payable_days = max(payable_days, Decimal("0")) # Prevent negative days
-
-            earned_basic = (daily_salary * payable_days).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-            # Standard Overtime (1.0x or custom rate)
             ot_rate = Decimal(str(work_rule.overtime_rate))
-            regular_ot_pay = (overtime_hours * ot_rate).quantize(Decimal("0.01"))
-
-            # Weekend/Holiday Overtime (Usually 1.5x or 2.0x base OT rate in Enterprise)
-            holiday_ot_pay = (holiday_weekend_ot_hours * ot_rate * Decimal("1.5")).quantize(Decimal("0.01"))
-            total_ot_pay = regular_ot_pay + holiday_ot_pay
+            total_ot_pay = (overtime_hours * ot_rate).quantize(Decimal("0.01"))
 
             final_net_salary = (
                 earned_basic
@@ -790,12 +860,11 @@ class EnterprisePayrollManager(models.Manager):
                 - structure.deductions
             ).quantize(Decimal("0.01"))
 
-            # Append to Bulk Creation List
             payroll_objects.append(
                 Payroll(
                     employee=emp,
                     month=first_day,
-                    basic_pay=earned_basic, # Store actual earned basic
+                    basic_pay=earned_basic,
                     allowances=structure.hra + structure.allowances,
                     deductions=structure.deductions,
                     calculated_salary=final_net_salary,
@@ -804,8 +873,6 @@ class EnterprisePayrollManager(models.Manager):
                     half_days=half_days,
                     absent_days=absent_days,
                     paid_leave_days_count=paid_leave_days,
-                    late_days_count=late_days,
-                    late_penalty_deduction=late_penalty_days,
                     overtime_hours=overtime_hours,
                     holiday_overtime_hours=holiday_weekend_ot_hours,
                     status="processed",
@@ -813,17 +880,14 @@ class EnterprisePayrollManager(models.Manager):
                 )
             )
 
-        # ==========================================================
-        # 💾 BULK SAVE (1 DB Query to Save 1000s of Records)
-        # ==========================================================
+        # -------------------------------
+        # SAVE
+        # -------------------------------
         with transaction.atomic():
-            print(f"🧹 Clearing previous payroll records for {month}/{year}...")
             Payroll.objects.filter(month=first_day).delete()
-            
-            print(f"💾 Bulk creating {len(payroll_objects)} payroll records...")
             Payroll.objects.bulk_create(payroll_objects, batch_size=500)
-            
-        print("✅ [END] Payroll Generation Complete. 10x Speed Achieved.\n")
+
+        print("✅ Payroll Generated Successfully\n")
 
 
 
@@ -935,7 +999,12 @@ class WorkRule(models.Model):
 
     full_day_hours = models.FloatField(default=8.0)
     half_day_hours = models.FloatField(default=4.0)
-
+    max_overtime_hours = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=4,
+        help_text="Max overtime allowed before counting extra shift"
+    )
     overtime_rate = models.DecimalField(
         max_digits=10,
         decimal_places=2,

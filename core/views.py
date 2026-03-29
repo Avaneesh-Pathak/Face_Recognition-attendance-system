@@ -62,7 +62,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.utils import ProgrammingError, OperationalError
 from .models import (Employee, Attendance, AttendanceSettings, DailyReport,Department, SalaryStructure, Payroll, LeaveType, 
     LeaveApplication, LeaveWorkflowStage, LeaveApproval,
-    JoiningDetail, Resignation, Notification,JoiningDocument,WorkRule,OfficeLocation)
+    JoiningDetail, Resignation, Notification,JoiningDocument,WorkRule,OfficeLocation,Holiday)
 
 from .forms import ( UserRegistrationForm, EmployeeRegistrationForm, AttendanceSettingsForm,DepartmentForm, SalaryStructureForm, PayrollFilterForm,
     LeaveTypeForm, LeaveApplicationForm, LeaveApprovalForm, LeaveWorkflowStageForm,
@@ -93,7 +93,7 @@ from core.face_system import get_face_system
 
 from datetime import date
 import calendar
-
+from collections import defaultdict
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -933,7 +933,7 @@ _LIVE_TTL = 60     # Cleanup after 60 seconds of inactivity
 
 def _get_liveness(session_key):
     """Fetch cached LivenessDetector OR create new if expired/missing."""
-    import time
+    
     now = time.time()
 
     det, last_time = _LIVE_CACHE.get(session_key, (None, 0))
@@ -996,7 +996,7 @@ def _recognize_employee(frame_bgr):
 
     return None, 0.0, None, "none"
 
-import time
+
 
 def attendance_heartbeat(request):
     return JsonResponse({
@@ -1934,193 +1934,328 @@ def attendance_history_page(request):
     return render(request, 'attendance_history.html', context)
 
 
-def get_work_date(attendance, rule):
+def get_work_date(attendance, rule=None):
     ts = timezone.localtime(attendance.timestamp)
 
-    if not rule:
-        return ts.date()
-
-    start = rule.shift_start_time
-    end = rule.shift_end_time
-
-    # Night shift (crosses midnight)
-    if end <= start and ts.time() < end:
+    # 🔥 Everything before 12 PM belongs to previous day
+    if ts.hour < 12:
         return ts.date() - timedelta(days=1)
 
     return ts.date()
 
-@login_required
-def attendance_calendar(request, employee_id, year, month):
-    employee = get_object_or_404(Employee, id=employee_id)
-    rule = employee.work_rule
 
+# ==========================================================
+# 🔥 SESSION ENGINE (SAME AS PAYROLL)
+# ==========================================================
+
+
+
+# ==========================================================
+# 🔥 SESSION ENGINE (SAFE + FIXED)
+# ==========================================================
+def build_sessions(logs):
+    sessions = []
+    open_in = None
+
+    for log in sorted(logs, key=lambda x: x.timestamp):
+        if log.attendance_type == "check_in":
+            open_in = log.timestamp
+
+        elif log.attendance_type == "check_out" and open_in:
+            if log.timestamp > open_in:
+                sessions.append({
+                    "start": open_in,
+                    "end": log.timestamp
+                })
+            open_in = None
+
+    return sessions
+
+
+def split_sessions_to_days(sessions):
+    daily_hours = defaultdict(float)
+
+    for session in sessions:
+        start = session["start"]
+        end = session["end"]
+
+        current = start
+
+        while current.date() <= end.date():
+
+            day_start = datetime.combine(
+                current.date(), time(0, 0, 0), tzinfo=start.tzinfo
+            )
+            day_end = datetime.combine(
+                current.date(), time(23, 59, 59), tzinfo=start.tzinfo
+            )
+
+            s = max(start, day_start)
+            e = min(end, day_end)
+
+            if s < e:
+                hours = (e - s).total_seconds() / 3600
+                daily_hours[current.date()] += hours
+
+            current += timedelta(days=1)
+
+    return daily_hours
+
+def get_shift_from_time(dt):
+    hour = dt.hour
+
+    if 6 <= hour < 14:
+        return "Day"
+    elif 14 <= hour < 22:
+        return "Night"
+    else:
+        return "Evening"
+
+# ✔ Morning shift (before 11 AM)
+# ✔ Day shift (11 AM – 4 PM)
+# ✔ Evening shift (4–7 PM)
+# ✔ Night shift (after 7 PM)
+# ==========================================================
+# 📅 ATTENDANCE CALENDAR VIEW (FINAL)
+# ==========================================================
+def attendance_calendar(request, employee_id, year, month):
+
+    employee = get_object_or_404(Employee, id=employee_id)
+    can_edit_attendance = can_manage_attendance(request.user)
     year = int(year)
     month = int(month)
 
-    # Use Calendar to get a perfect grid (Lists of weeks containing date objects)
-    # firstweekday=0 means Monday is the first day of the week
-    cal = calendar.Calendar(firstweekday=0) 
-    month_days = cal.monthdatescalendar(year, month) 
+    first_day = date(year, month, 1)
+    last_day = date(year, month, calendar.monthrange(year, month)[1])
 
-    # Determine exact query range (From the first visible grid day to the last)
-    start_date = month_days[0][0]
-    end_date = month_days[-1][-1]
-
-    records = Attendance.objects.filter(
-        employee=employee,
-        timestamp__gte=start_date - timedelta(days=1),
-        timestamp__lte=end_date + timedelta(days=1),
-    ).order_by("timestamp")
-
-    # ------------------------------------
-    # SEQUENTIAL PAIRING (PERMANENT FIX)
-    # ------------------------------------
-    daily_attendance = {}
-    open_checkin = None
-    open_work_date = None
-
-    for rec in records:
-        ts = timezone.localtime(rec.timestamp)
-        work_date = get_work_date(rec, rule)
-
-        if rec.attendance_type == "check_in":
-            open_checkin = ts
-            open_work_date = work_date
-
-            daily_attendance.setdefault(work_date, {
-                "check_in": None,
-                "check_out": None,
-            })
-
-            # earliest check-in wins
-            if not daily_attendance[work_date]["check_in"] or ts < daily_attendance[work_date]["check_in"]:
-                daily_attendance[work_date]["check_in"] = ts
-
-        elif rec.attendance_type == "check_out" and open_checkin:
-            daily_attendance.setdefault(open_work_date, {
-                "check_in": open_checkin,
-                "check_out": None,
-            })
-
-            # latest checkout wins
-            if not daily_attendance[open_work_date]["check_out"] or ts > daily_attendance[open_work_date]["check_out"]:
-                daily_attendance[open_work_date]["check_out"] = ts
-
-            open_checkin = None
-            open_work_date = None
-
-    # ------------------------------------
-    # BUILD PERFECT CALENDAR DATA
-    # ------------------------------------
-    month_data = []
-    total_present = total_absent = total_holiday = 0
-    total_work_seconds = 0
     today = timezone.localdate()
 
+    # -------------------------------
+    # FETCH ATTENDANCE (BUFFER)
+    # -------------------------------
+    logs = Attendance.objects.filter(
+        employee=employee,
+        timestamp__date__range=(first_day - timedelta(days=1), last_day + timedelta(days=1))
+    ).order_by("timestamp")
+
+    # -------------------------------
+    # BUILD SESSION DATA
+    # -------------------------------
+    sessions = build_sessions(logs)
+    daily_hours_map = split_sessions_to_days(sessions)
+
+    # -------------------------------
+    # HOLIDAYS
+    # -------------------------------
+    holidays_set = set(
+        Holiday.objects.filter(date__range=(first_day, last_day))
+        .values_list("date", flat=True)
+    )
+
+    # -------------------------------
+    # CALENDAR GRID
+    # -------------------------------
+    cal = calendar.Calendar()
+    month_days = cal.monthdatescalendar(year, month)
+
+    data = []
+
+    total_present = 0
+    total_absent = 0
+    total_holiday = 0
+    total_working_hours = 0
+
     for week in month_days:
-        for day_date in week:
-            is_current_month = day_date.month == month
-            is_future = day_date > today
-            is_sunday = day_date.weekday() == 6 # 6 is Sunday
-            is_today = day_date == today
+        for day in week:
 
-            record = daily_attendance.get(day_date)
-            check_in = record["check_in"] if record else None
-            check_out = record["check_out"] if record else None
+            worked_hours = round(daily_hours_map.get(day, 0), 2)
 
-            present = False
-            daily_hours = None
+            is_current_month = (day.month == month)
+            is_future = day > today
+            is_today = day == today
+            is_holiday = day in holidays_set
 
-            if check_in:
+            # -------------------------------
+            # SHIFT + RULE
+            # -------------------------------
+            work_rule = employee.work_rule
+            fsh = float(work_rule.full_day_hours) if work_rule else 8
+            max_ot = float(getattr(work_rule, "max_overtime_hours", 4))
+            # 🔥 Get logs for logical work day AND sort properly
+            day_logs = sorted(
+                [
+                    log for log in logs
+                    if get_work_date(log, employee.work_rule) == day
+                ],
+                key=lambda x: x.timestamp
+            )
+
+            shift_type = None
+
+            # ✅ PRIMARY: use check-in
+            for log in day_logs:
+                if log.attendance_type == "check_in":
+                    shift_type = get_shift_from_time(log.timestamp)
+                    break
+
+            # ✅ FALLBACK: use session start
+            if not shift_type:
+                for session in sessions:
+                    start_date = get_work_date(
+                        type("obj", (), {"timestamp": session["start"]})(),
+                        employee.work_rule
+                    )
+
+                    if start_date == day:
+                        shift_type = get_shift_from_time(session["start"])
+                        break
+
+            # ✅ FINAL fallback
+            if not shift_type:
+                shift_type = "Day"  # default instead of General
+
+            # -------------------------------
+            # OT + EXTRA SHIFT
+            # -------------------------------
+            overtime = 0
+            extra = 0
+
+            if worked_hours > fsh:
+                overtime = min(worked_hours - fsh, max_ot)
+
+            if worked_hours > fsh + max_ot:
+                extra = worked_hours - (fsh + max_ot)
+
+            # -------------------------------
+            # STATUS
+            # -------------------------------
+            if is_holiday:
+                total_holiday += 1
+                present = False
+
+            elif worked_hours > 0:
+                total_present += 1
                 present = True
-                if is_current_month:
-                    total_present += 1
+                total_working_hours += worked_hours
 
-                if check_out and check_out > check_in:
-                    delta = check_out - check_in
-                    if is_current_month:
-                        total_work_seconds += delta.total_seconds()
-                    
-                    # Format as Xh Ym
-                    hours, remainder = divmod(delta.seconds, 3600)
-                    minutes, _ = divmod(remainder, 60)
-                    daily_hours = f"{int(hours)}h {int(minutes)}m"
+            elif not is_future and is_current_month:
+                total_absent += 1
+                present = False
+
             else:
-                # Don't count future dates as absent
-                if is_current_month and not is_future:
-                    if is_sunday:
-                        total_holiday += 1
-                    else:
-                        total_absent += 1
+                present = False
 
-            month_data.append({
-                "date_str": day_date.strftime("%Y-%m-%d"),
-                "day": day_date.day,
-                "day_name": calendar.day_name[day_date.weekday()][:3],
-                "is_current_month": is_current_month,
+            data.append({
+                "day": day.day,
+                "date": day,
+                "date_str": day.strftime("%Y-%m-%d"),
+                "present": present,
+                "daily_hours": f"{worked_hours}h" if worked_hours else "",
+                "holiday": is_holiday,
                 "is_future": is_future,
                 "is_today": is_today,
-                "present": present,
-                "holiday": is_sunday and not present,
-                "daily_hours": daily_hours,
+                "is_current_month": is_current_month,
+
+                # 🔥 UI FIELDS
+                "shift_type": shift_type,
+                "overtime": round(overtime, 2),
+                "extra_shift": round(extra, 2),
             })
 
-    total_working_hours = round(total_work_seconds / 3600, 2)
-    settings = AttendanceSettings.objects.first()
-    expected_hours = total_present * (settings.max_daily_hours if settings else 8)
-    can_edit_attendance = can_manage_attendance(request.user)
-    context = {
+    # -------------------------------
+    # NAVIGATION
+    # -------------------------------
+    prev_month = (month - 1) or 12
+    prev_year = year - 1 if month == 1 else year
+
+    next_month = (month + 1) if month < 12 else 1
+    next_year = year + 1 if month == 12 else year
+
+    # -------------------------------
+    # EXPECTED HOURS
+    # -------------------------------
+    total_expected_hours = 0
+    if employee.work_rule:
+        total_expected_hours = calendar.monthrange(year, month)[1] * float(employee.work_rule.full_day_hours)
+
+    return render(request, "attendance_calendar.html", {
         "employee": employee,
+        "data": data,
         "year": year,
         "month": month,
         "month_name": calendar.month_name[month],
-        "data": month_data,
+
+        "previous_month": prev_month,
+        "previous_year": prev_year,
+        "next_month": next_month,
+        "next_year": next_year,
+
         "total_present": total_present,
         "total_absent": total_absent,
         "total_holiday": total_holiday,
-        "total_working_hours": total_working_hours,
-        "total_expected_hours": round(expected_hours, 2),
-        "next_month": month + 1 if month < 12 else 1,
-        "next_year": year if month < 12 else year + 1,
-        "previous_month": month - 1 if month > 1 else 12,
-        "previous_year": year if month > 1 else year - 1,
+        "total_working_hours": round(total_working_hours, 2),
+        "total_expected_hours": total_expected_hours,
+
         "day_names": list(calendar.day_name),
-        "all_employees": Employee.objects.all().order_by("user__first_name"),
         "can_edit_attendance": can_edit_attendance,
-    }
-
-    return render(request, "attendance_calendar.html", context)
+    })
 
 
+# ==========================================================
+# 📊 DAY DETAIL (MODAL DATA)
+# ==========================================================
 def attendance_day_detail(request, emp_id, date):
+
     try:
         date_obj = datetime.strptime(date, "%Y-%m-%d").date()
     except ValueError:
         return JsonResponse({"error": "Invalid date"}, status=400)
 
     emp = get_object_or_404(Employee, id=emp_id)
-    rule = emp.work_rule
 
     logs = Attendance.objects.filter(employee=emp).order_by("timestamp")
 
+    sessions = build_sessions(logs)
+    daily_map = split_sessions_to_days(sessions)
+
+    total_hours = round(daily_map.get(date_obj, 0), 2)
+
+    rule = emp.work_rule
+    fsh = float(rule.full_day_hours) if rule else 8
+    max_ot = float(getattr(rule, "max_overtime_hours", 4))
+
+    overtime = 0
+    extra = 0
+
+    if total_hours > fsh:
+        overtime = min(total_hours - fsh, max_ot)
+
+    if total_hours > fsh + max_ot:
+        extra = total_hours - (fsh + max_ot)
+
     day_logs = [
         log for log in logs
-        if get_work_date(log, rule) == date_obj
+        if get_work_date(log, emp.work_rule) == date_obj
     ]
 
     return JsonResponse({
         "date": date_obj.strftime("%d %B %Y"),
+        "total_hours": total_hours,
+        "overtime": round(overtime, 2),
+        "extra": round(extra, 2),
+
         "logs": [
-            {   "id": log.id,
+            {
+                "id": log.id,
                 "type": log.get_attendance_type_display(),
                 "timestamp": timezone.localtime(log.timestamp).strftime("%I:%M %p"),
                 "date": timezone.localtime(log.timestamp).strftime("%d-%m-%Y"),
                 "location": log.location or "—",
-                "confidence": f"{log.confidence_score * 100:.1f}%" if log.confidence_score else "—",
             }
             for log in day_logs
         ]
     })
+
 
 @login_required
 @require_GET
