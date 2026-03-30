@@ -1957,15 +1957,16 @@ def build_sessions(logs):
     sessions = []
     open_in = None
 
-    for log in sorted(logs, key=lambda x: x.timestamp):
+    for log in sorted(logs, key=lambda x: timezone.localtime(x.timestamp)):
         if log.attendance_type == "check_in":
-            open_in = log.timestamp
+            open_in = timezone.localtime(log.timestamp)
 
         elif log.attendance_type == "check_out" and open_in:
-            if log.timestamp > open_in:
+            current_time = timezone.localtime(log.timestamp)
+            if current_time > open_in:
                 sessions.append({
                     "start": open_in,
-                    "end": log.timestamp
+                    "end": current_time
                 })
             open_in = None
 
@@ -2009,7 +2010,7 @@ def get_shift_from_time(dt):
     elif 14 <= hour < 22:
         return "Night"
     else:
-        return "Evening"
+        return "Night"
 
 # ✔ Morning shift (before 11 AM)
 # ✔ Day shift (11 AM – 4 PM)
@@ -2033,10 +2034,12 @@ def attendance_calendar(request, employee_id, year, month):
     # -------------------------------
     # FETCH ATTENDANCE (BUFFER)
     # -------------------------------
-    logs = Attendance.objects.filter(
-        employee=employee,
-        timestamp__date__range=(first_day - timedelta(days=1), last_day + timedelta(days=1))
-    ).order_by("timestamp")
+    logs = list(
+        Attendance.objects.filter(
+            employee=employee,
+            timestamp__date__range=(first_day - timedelta(days=1), last_day + timedelta(days=1))
+        ).order_by("timestamp")
+    )
 
     # -------------------------------
     # BUILD SESSION DATA
@@ -2095,8 +2098,8 @@ def attendance_calendar(request, employee_id, year, month):
             # ✅ PRIMARY: use check-in
             for log in day_logs:
                 if log.attendance_type == "check_in":
-                    shift_type = get_shift_from_time(log.timestamp)
-                    break
+                    local_time = timezone.localtime(log.timestamp)
+                    shift_type = get_shift_from_time(local_time)
 
             # ✅ FALLBACK: use session start
             if not shift_type:
