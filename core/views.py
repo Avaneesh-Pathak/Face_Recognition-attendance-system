@@ -1957,60 +1957,83 @@ def build_sessions(logs):
     sessions = []
     open_in = None
 
-    for log in sorted(logs, key=lambda x: timezone.localtime(x.timestamp)):
+    for log in sorted(logs, key=lambda x: x.timestamp):
+
         if log.attendance_type == "check_in":
             open_in = timezone.localtime(log.timestamp)
 
         elif log.attendance_type == "check_out" and open_in:
-            current_time = timezone.localtime(log.timestamp)
-            if current_time > open_in:
+            out_time = timezone.localtime(log.timestamp)
+
+            if out_time > open_in:
                 sessions.append({
                     "start": open_in,
-                    "end": current_time
+                    "end": out_time
                 })
+
             open_in = None
 
     return sessions
 
+def split_sessions_by_shift(sessions, rule):
 
-def split_sessions_to_days(sessions):
-    daily_hours = defaultdict(float)
+    daily = defaultdict(lambda: {
+        "hours": 0,
+        "segments": []
+    })
 
-    for session in sessions:
-        start = session["start"]
-        end = session["end"]
+    boundary_time = rule.shift_start_time if rule else time(8, 0)
 
-        current = start
+    for s in sessions:
+        current = s["start"]
+        end = s["end"]
 
-        while current.date() <= end.date():
+        while current < end:
 
-            day_start = datetime.combine(
-                current.date(), time(0, 0, 0), tzinfo=start.tzinfo
+            boundary_today = datetime.combine(
+                current.date(),
+                boundary_time,
+                tzinfo=current.tzinfo
             )
-            day_end = datetime.combine(
-                current.date(), time(23, 59, 59), tzinfo=start.tzinfo
-            )
 
-            s = max(start, day_start)
-            e = min(end, day_end)
+            if current < boundary_today:
+                boundary = boundary_today
+                work_day = current.date() - timedelta(days=1)
+            else:
+                boundary = datetime.combine(
+                    current.date() + timedelta(days=1),
+                    boundary_time,
+                    tzinfo=current.tzinfo
+                )
+                work_day = current.date()
 
-            if s < e:
-                hours = (e - s).total_seconds() / 3600
-                daily_hours[current.date()] += hours
+            segment_end = min(boundary, end)
 
-            current += timedelta(days=1)
+            duration = (segment_end - current).total_seconds() / 3600
 
-    return daily_hours
+            daily[work_day]["hours"] += duration
+            daily[work_day]["segments"].append({
+                "start": current,
+                "end": segment_end
+            })
+
+            current = segment_end
+
+    return daily
 
 def get_shift_from_time(dt):
     hour = dt.hour
 
+    # 🌙 Night Shift (7 PM → 6 AM)
+    if hour >= 19 or hour < 6:
+        return "Night"
+
+    # ☀ Day Shift (6 AM → 2 PM)
     if 6 <= hour < 14:
         return "Day"
-    elif 14 <= hour < 22:
-        return "Night"
-    else:
-        return "Night"
+
+    # 🔁 Transition (2 PM → 7 PM)
+    return "Shift Change"
 
 # ✔ Morning shift (before 11 AM)
 # ✔ Day shift (11 AM – 4 PM)
@@ -2019,33 +2042,38 @@ def get_shift_from_time(dt):
 # ==========================================================
 # 📅 ATTENDANCE CALENDAR VIEW (FINAL)
 # ==========================================================
+@login_required
 def attendance_calendar(request, employee_id, year, month):
 
     employee = get_object_or_404(Employee, id=employee_id)
     can_edit_attendance = can_manage_attendance(request.user)
+
     year = int(year)
     month = int(month)
 
     first_day = date(year, month, 1)
     last_day = date(year, month, calendar.monthrange(year, month)[1])
-
     today = timezone.localdate()
 
     # -------------------------------
-    # FETCH ATTENDANCE (BUFFER)
+    # FETCH LOGS (BUFFER)
     # -------------------------------
     logs = list(
         Attendance.objects.filter(
             employee=employee,
-            timestamp__date__range=(first_day - timedelta(days=1), last_day + timedelta(days=1))
+            timestamp__date__range=(first_day - timedelta(days=2), last_day + timedelta(days=2))
         ).order_by("timestamp")
     )
 
     # -------------------------------
-    # BUILD SESSION DATA
+    # BUILD SESSIONS
     # -------------------------------
     sessions = build_sessions(logs)
-    daily_hours_map = split_sessions_to_days(sessions)
+
+    # -------------------------------
+    # 🔥 SHIFT-BASED SPLIT ENGINE
+    # -------------------------------
+    daily_map = split_sessions_by_shift(sessions, employee.work_rule)
 
     # -------------------------------
     # HOLIDAYS
@@ -2071,7 +2099,11 @@ def attendance_calendar(request, employee_id, year, month):
     for week in month_days:
         for day in week:
 
-            worked_hours = round(daily_hours_map.get(day, 0), 2)
+            # -------------------------------
+            # HOURS FROM SHIFT ENGINE
+            # -------------------------------
+            day_data = daily_map.get(day, {"hours": 0, "segments": []})
+            worked_hours = round(day_data["hours"], 2)
 
             is_current_month = (day.month == month)
             is_future = day > today
@@ -2079,47 +2111,79 @@ def attendance_calendar(request, employee_id, year, month):
             is_holiday = day in holidays_set
 
             # -------------------------------
-            # SHIFT + RULE
+            # LOGS FOR UI (REAL DATE)
             # -------------------------------
-            work_rule = employee.work_rule
-            fsh = float(work_rule.full_day_hours) if work_rule else 8
-            max_ot = float(getattr(work_rule, "max_overtime_hours", 4))
-            # 🔥 Get logs for logical work day AND sort properly
             day_logs = sorted(
                 [
                     log for log in logs
-                    if get_work_date(log, employee.work_rule) == day
+                    if timezone.localtime(log.timestamp).date() == day
                 ],
                 key=lambda x: x.timestamp
             )
 
+            # -------------------------------
+            # CHECK-IN / CHECK-OUT
+            # -------------------------------
+            first_in = next(
+                (l for l in day_logs if l.attendance_type == "check_in"), None
+            )
+
+            last_out = next(
+                (l for l in reversed(day_logs) if l.attendance_type == "check_out"), None
+            )
+
+            cin = timezone.localtime(first_in.timestamp).strftime("%I:%M %p") if first_in else "—"
+            cout = timezone.localtime(last_out.timestamp).strftime("%I:%M %p") if last_out else "—"
+
+            # -------------------------------
+            # SHIFT DETECTION
+            # -------------------------------
             shift_type = None
 
-            # ✅ PRIMARY: use check-in
-            for log in day_logs:
-                if log.attendance_type == "check_in":
-                    local_time = timezone.localtime(log.timestamp)
-                    shift_type = get_shift_from_time(local_time)
+            # -------------------------------
+            # 1. BASE SHIFT FROM CHECK-IN
+            # -------------------------------
+            if first_in:
+                shift_type = get_shift_from_time(timezone.localtime(first_in.timestamp))
 
-            # ✅ FALLBACK: use session start
+            elif day_data["segments"]:
+                shift_type = get_shift_from_time(day_data["segments"][0]["start"])
+
+            # -------------------------------
+            # 2. 🔥 SHIFT CHANGE BY CHECK-OUT (NEW FIX)
+            # -------------------------------
+            if last_out:
+                out_hour = timezone.localtime(last_out.timestamp).hour
+
+                # 🎯 2 PM condition
+                if 13 <= out_hour <= 15:
+                    shift_type = "Shift Change"
+
+            # -------------------------------
+            # 3. 🔥 SHIFT CHANGE BY MIXED SEGMENTS
+            # -------------------------------
+            segment_shifts = set()
+
+            for seg in day_data["segments"]:
+                seg_shift = get_shift_from_time(seg["start"])
+                segment_shifts.add(seg_shift)
+
+            if len(segment_shifts) > 1:
+                shift_type = "Shift Change"
+
+            # -------------------------------
+            # 4. FALLBACK
+            # -------------------------------
             if not shift_type:
-                for session in sessions:
-                    start_date = get_work_date(
-                        type("obj", (), {"timestamp": session["start"]})(),
-                        employee.work_rule
-                    )
-
-                    if start_date == day:
-                        shift_type = get_shift_from_time(session["start"])
-                        break
-
-            # ✅ FINAL fallback
-            if not shift_type:
-                shift_type = "Day"  # default instead of General
+                shift_type = "—"
 
             # -------------------------------
             # OT + EXTRA SHIFT
             # -------------------------------
+            rule = employee.work_rule
+            fsh = float(rule.full_day_hours) if rule else 8
+            max_ot = float(getattr(rule, "max_overtime_hours", 4))
+
             overtime = 0
             extra = 0
 
@@ -2130,28 +2194,35 @@ def attendance_calendar(request, employee_id, year, month):
                 extra = worked_hours - (fsh + max_ot)
 
             # -------------------------------
-            # STATUS
+            # STATUS (FINAL FIXED LOGIC)
             # -------------------------------
-            if is_holiday:
-                total_holiday += 1
+            if is_future:
                 present = False
 
+            elif is_holiday:
+                present = False
+                total_holiday += 1
+
             elif worked_hours > 0:
-                total_present += 1
                 present = True
+                total_present += 1
                 total_working_hours += worked_hours
 
             elif not is_future and is_current_month:
-                total_absent += 1
                 present = False
+                total_absent += 1
 
             else:
                 present = False
 
+            # -------------------------------
+            # APPEND DATA
+            # -------------------------------
             data.append({
                 "day": day.day,
                 "date": day,
                 "date_str": day.strftime("%Y-%m-%d"),
+
                 "present": present,
                 "daily_hours": f"{worked_hours}h" if worked_hours else "",
                 "holiday": is_holiday,
@@ -2159,7 +2230,17 @@ def attendance_calendar(request, employee_id, year, month):
                 "is_today": is_today,
                 "is_current_month": is_current_month,
 
-                # 🔥 UI FIELDS
+                # 🔥 NEW UI FIELDS
+                "check_in": cin,
+                "check_out": cout,
+                "timeline": [
+                    {
+                        "start": seg["start"].strftime("%I:%M %p"),
+                        "end": seg["end"].strftime("%I:%M %p"),
+                    }
+                    for seg in day_data["segments"]
+                ],
+
                 "shift_type": shift_type,
                 "overtime": round(overtime, 2),
                 "extra_shift": round(extra, 2),
@@ -2168,10 +2249,10 @@ def attendance_calendar(request, employee_id, year, month):
     # -------------------------------
     # NAVIGATION
     # -------------------------------
-    prev_month = (month - 1) or 12
+    prev_month = 12 if month == 1 else month - 1
     prev_year = year - 1 if month == 1 else year
 
-    next_month = (month + 1) if month < 12 else 1
+    next_month = 1 if month == 12 else month + 1
     next_year = year + 1 if month == 12 else year
 
     # -------------------------------
@@ -2203,7 +2284,6 @@ def attendance_calendar(request, employee_id, year, month):
         "can_edit_attendance": can_edit_attendance,
     })
 
-
 # ==========================================================
 # 📊 DAY DETAIL (MODAL DATA)
 # ==========================================================
@@ -2216,13 +2296,36 @@ def attendance_day_detail(request, emp_id, date):
 
     emp = get_object_or_404(Employee, id=emp_id)
 
-    logs = Attendance.objects.filter(employee=emp).order_by("timestamp")
+    # -------------------------------
+    # FETCH LOGS (BUFFER)
+    # -------------------------------
+    logs = list(
+        Attendance.objects.filter(
+            employee=emp,
+            timestamp__date__range=(
+                date_obj - timedelta(days=2),
+                date_obj + timedelta(days=2)
+            )
+        ).order_by("timestamp")
+    )
 
+    # -------------------------------
+    # BUILD SESSIONS
+    # -------------------------------
     sessions = build_sessions(logs)
-    daily_map = split_sessions_to_days(sessions)
 
-    total_hours = round(daily_map.get(date_obj, 0), 2)
+    # 🔥 SHIFT ENGINE
+    daily_map = split_sessions_by_shift(sessions, emp.work_rule)
 
+    # -------------------------------
+    # HOURS
+    # -------------------------------
+    day_data = daily_map.get(date_obj, {"hours": 0, "segments": []})
+    total_hours = round(day_data["hours"], 2)
+
+    # -------------------------------
+    # RULES
+    # -------------------------------
     rule = emp.work_rule
     fsh = float(rule.full_day_hours) if rule else 8
     max_ot = float(getattr(rule, "max_overtime_hours", 4))
@@ -2236,16 +2339,83 @@ def attendance_day_detail(request, emp_id, date):
     if total_hours > fsh + max_ot:
         extra = total_hours - (fsh + max_ot)
 
+    # -------------------------------
+    # LOGS (REAL DATE)
+    # -------------------------------
     day_logs = [
         log for log in logs
-        if get_work_date(log, emp.work_rule) == date_obj
+        if timezone.localtime(log.timestamp).date() == date_obj
     ]
 
+    # -------------------------------
+    # CHECK-IN / CHECK-OUT
+    # -------------------------------
+    first_in = next(
+        (l for l in day_logs if l.attendance_type == "check_in"),
+        None
+    )
+
+    last_out = next(
+        (l for l in reversed(day_logs) if l.attendance_type == "check_out"),
+        None
+    )
+
+    # -------------------------------
+    # 🔥 SHIFT DETECTION (FINAL)
+    # -------------------------------
+    shift_type = None
+
+    # 1. Base from check-in
+    if first_in:
+        shift_type = get_shift_from_time(timezone.localtime(first_in.timestamp))
+
+    elif day_data["segments"]:
+        shift_type = get_shift_from_time(day_data["segments"][0]["start"])
+
+    # 2. 🔁 CHECK-OUT AT 2 PM (YOUR RULE)
+    if last_out:
+        out_hour = timezone.localtime(last_out.timestamp).hour
+        if 13 <= out_hour <= 15:
+            shift_type = "Shift Change"
+
+    # 3. 🔁 MIXED SEGMENTS (SHIFT CHANGE)
+    segment_shifts = set()
+    for seg in day_data["segments"]:
+        seg_shift = get_shift_from_time(seg["start"])
+        segment_shifts.add(seg_shift)
+
+    if len(segment_shifts) > 1:
+        shift_type = "Shift Change"
+
+    # fallback
+    if not shift_type:
+        shift_type = "—"
+
+    # -------------------------------
+    # TIMELINE
+    # -------------------------------
+    timeline = [
+        {
+            "start": seg["start"].strftime("%I:%M %p"),
+            "end": seg["end"].strftime("%I:%M %p"),
+            "hours": round((seg["end"] - seg["start"]).total_seconds() / 3600, 2)
+        }
+        for seg in day_data["segments"]
+    ]
+
+    # -------------------------------
+    # RESPONSE
+    # -------------------------------
     return JsonResponse({
         "date": date_obj.strftime("%d %B %Y"),
         "total_hours": total_hours,
         "overtime": round(overtime, 2),
         "extra": round(extra, 2),
+
+        # 🔥 NEW FIELD
+        "shift_type": shift_type,
+
+        "timeline": timeline,
 
         "logs": [
             {
@@ -2258,7 +2428,6 @@ def attendance_day_detail(request, emp_id, date):
             for log in day_logs
         ]
     })
-
 
 @login_required
 @require_GET

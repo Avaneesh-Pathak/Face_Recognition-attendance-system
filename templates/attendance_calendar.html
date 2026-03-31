@@ -157,43 +157,58 @@
                 <div class="status-badge text-warning mt-1"><i class="fas fa-umbrella-beach mb-1"></i><br>Holiday</div>
               {% elif item.present %}
 
-<div class="status-badge text-success mt-1">
-  <i class="fas fa-check-circle mb-1"></i><br>Present
-</div>
+              <div class="status-badge text-success mt-1">
+                <i class="fas fa-check-circle mb-1"></i><br>Present
+              </div>
 
-<!-- ⏱ Hours -->
-{% if item.daily_hours %}
-<div class="small text-dark mt-1 fw-bold bg-white px-2 py-1 rounded-pill shadow-sm">
-  <i class="far fa-clock text-primary"></i> {{ item.daily_hours }}
-</div>
-{% endif %}
+              <!-- ⏱ Hours -->
+              {% if item.daily_hours %}
+              <div class="small text-dark mt-1 fw-bold bg-white px-2 py-1 rounded-pill shadow-sm">
+                <i class="far fa-clock text-primary"></i> {{ item.daily_hours }}
+              </div>
+              {% endif %}
 
-<!-- 🌙 SHIFT BADGE -->
-<div class="mt-1">
-  {% if item.shift_type == "Night" %}
-    <span class="badge bg-dark">🌙 Night</span>
-  {% elif item.shift_type == "Day" %}
-    <span class="badge bg-warning text-dark">☀ Day</span>
-  {% elif item.shift_type == "Evening" %}
-    <span class="badge bg-info">🌆 Evening</span>
-  {% else %}
-    <span class="badge bg-secondary">General</span>
-  {% endif %}
-</div>
+              <!-- 🌙 SHIFT BADGE (UPDATED) -->
+              <div class="mt-1">
 
-<!-- 🔥 OVERTIME -->
-{% if item.overtime > 0 %}
-<div class="badge bg-primary mt-1">
-  ⏱ OT {{ item.overtime }}h
-</div>
-{% endif %}
+                {% if item.shift_type == "Night" %}
+                  <span class="badge bg-dark">
+                    🌙 Night
+                  </span>
 
-<!-- 🚨 EXTRA SHIFT -->
-{% if item.extra_shift > 0 %}
-<div class="badge bg-danger mt-1">
-  🔥 Extra Shift
-</div>
-{% endif %}
+                {% elif item.shift_type == "Day" %}
+                  <span class="badge bg-warning text-dark">
+                    ☀ Day
+                  </span>
+
+                {% elif item.shift_type == "Shift Change" %}
+                  <span class="badge bg-danger">
+                    🔁 Shift Change
+                  </span>
+
+                {% else %}
+                  <!-- fallback (should rarely happen) -->
+                  <span class="badge bg-light text-dark border">
+                    —
+                  </span>
+
+                {% endif %}
+
+              </div>
+
+              <!-- 🔥 OVERTIME -->
+              {% if item.overtime > 0 %}
+              <div class="badge bg-primary mt-1">
+                ⏱ OT {{ item.overtime }}h
+              </div>
+              {% endif %}
+
+              <!-- 🚨 EXTRA SHIFT -->
+              {% if item.extra_shift > 0 %}
+              <div class="badge bg-danger mt-1">
+                🔥 Extra Shift
+              </div>
+              {% endif %}
               {% elif item.is_future %}
                 <div class="status-badge text-secondary mt-1 opacity-50">—</div>
               {% else %}
