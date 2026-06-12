@@ -49,6 +49,7 @@ class Employee(models.Model):
     phone_number = models.CharField(max_length=15)
     date_of_joining = models.DateField(default=timezone.now)
     date_of_resignation = models.DateField(blank=True, null=True)
+    
     employment_status = models.CharField(
         max_length=20,
         choices=[

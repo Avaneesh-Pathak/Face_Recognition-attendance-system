@@ -599,14 +599,44 @@ def employee_delete(request, pk):
     })
 
 @login_required
+def inactive_employee_list(request):
+    user_role = getattr(request.user.employee, "role", "").lower()
+
+    # ✅ Only allowed roles
+    if user_role in ["admin", "hr", "finance"] or request.user.is_superuser:
+        employees = Employee.objects.exclude(
+            employment_status__iexact="active"
+        ).select_related("user", "department")
+    else:
+        # ❌ others should not see inactive employees
+        employees = Employee.objects.none()
+
+    return render(request, "ems/inactive_employee_list.html", {
+        "employees": employees
+    })
+
+@login_required
+def reactivate_employee(request, pk):
+    employee = get_object_or_404(Employee, pk=pk)
+
+    employee.employment_status = "Active"
+    employee.is_active = True
+    employee.save()
+
+    messages.success(request, f"{employee.user.get_full_name()} reactivated successfully ✅")
+    return redirect("inactive_employee_list")
+
+
+@login_required
 def dashboard(request):
     user = request.user
     today = timezone.localdate()
 
-    # ----------------------------------
     # 🔐 ROLE-BASED EMPLOYEE VISIBILITY
-    # ----------------------------------
-    visible_employees = get_visible_employees(user)
+    visible_employees = get_visible_employees(user).filter(
+        is_active=True,
+        employment_status="active"
+    )
 
     is_admin = user.is_superuser or (
         hasattr(user, "employee") and user.employee.role in ["Admin", "HR", "Finance"]
@@ -620,81 +650,151 @@ def dashboard(request):
     if emp_id:
         if not visible_employees.filter(id=emp_id).exists():
             return HttpResponseForbidden("Not allowed to view this employee")
-
         ems_emp = visible_employees.get(id=emp_id)
     else:
         ems_emp = user.employee if hasattr(user, "employee") else None
 
-    # ----------------------------------
-    # ATTENDANCE SCOPE
-    # ----------------------------------
-    attendance_qs = Attendance.objects.filter(
-        employee__in=[ems_emp] if ems_emp else visible_employees
+    # Base attendance queryset for today
+    today_records = Attendance.objects.filter(
+        employee__in=visible_employees,
+        timestamp__date=today
+    ).select_related('employee__user', 'employee__department').order_by("-timestamp")
+
+    # Initialize tracking structures for today
+    total_staff_count = visible_employees.count()
+    present_today_ids = set()
+    checked_in_now_ids = set()
+    late_today_ids = set()
+
+    # Sort and group logs by employee in memory to optimize database hits
+    emp_today_logs = defaultdict(list)
+    for log in today_records:
+        emp_today_logs[log.employee_id].append(log)
+
+    # Late threshold buffer (default 15 minutes grace period)
+    grace_minutes = 15
+
+    for emp_id_key, logs in emp_today_logs.items():
+        logs_sorted = sorted(logs, key=lambda x: x.timestamp)
+        first_in = next((l for l in logs_sorted if l.attendance_type == 'check_in'), None)
+        last_out = next((l for l in reversed(logs_sorted) if l.attendance_type == 'check_out'), None)
+
+        if first_in:
+            present_today_ids.add(emp_id_key)
+
+            # Determine if currently checked in (the last log was check_in or is after checkout)
+            last_log = logs_sorted[-1]
+
+            if last_log.attendance_type == "check_in":
+                checked_in_now_ids.add(emp_id_key)
+
+            # Detect late arrivals based on Assigned Shift Rule
+            emp = first_in.employee
+            rule = emp.work_rule
+            if rule:
+                shift_start = rule.shift_start_time
+                local_in_time = timezone.localtime(first_in.timestamp).time()
+
+                # Generate target cutoff datetime
+                shift_start_dt = datetime.combine(today, shift_start)
+                late_cutoff_dt = shift_start_dt + timedelta(minutes=grace_minutes)
+                late_cutoff = late_cutoff_dt.time()
+
+                if local_in_time > late_cutoff:
+                    late_today_ids.add(emp_id_key)
+
+    # Process Leaves Active Today
+    leaves_today_qs = LeaveApplication.objects.filter(
+        employee__in=visible_employees,
+        status='approved',
+        start_date__lte=today,
+        end_date__gte=today
+    ).select_related('employee__user', 'employee__department')
+    leave_today_ids = set(leaves_today_qs.values_list('employee_id', flat=True))
+
+    # staff who have not checked in and are not on approved leave today
+    not_marked_qs = visible_employees.exclude(
+        id__in=present_today_ids | leave_today_ids
+    ).select_related('user', 'department')
+
+    # Fetch complete relational detail sets for administrative modal reviews
+    on_duty_details = visible_employees.filter(id__in=checked_in_now_ids).select_related('user', 'department')
+    late_details = visible_employees.filter(id__in=late_today_ids).select_related('user', 'department')
+
+    # Departmental staffing rates
+    department_stats = []
+
+    dept_employee_map = defaultdict(set)
+
+    for emp in visible_employees.only("id", "department_id"):
+        if emp.department_id:
+            dept_employee_map[emp.department_id].add(emp.id)
+
+    departments = (
+        visible_employees
+        .values(
+            "department__id",
+            "department__name"
+        )
+        .annotate(total_count=Count("id"))
     )
 
-    # ----------------------------------
-    # DATE RANGES
-    # ----------------------------------
-    start_week = today - timedelta(days=today.weekday())
-    start_month = today.replace(day=1)
+    for dept in departments:
+        dept_id = dept["department__id"]
 
-    today_records = attendance_qs.filter(timestamp__date=today)
-    week_records = attendance_qs.filter(timestamp__date__gte=start_week)
-    month_records = attendance_qs.filter(timestamp__date__gte=start_month)
+        dept_present = len(
+            dept_employee_map.get(dept_id, set()) & present_today_ids
+        )
 
-    # ----------------------------------
-    # BASIC METRICS
-    # ----------------------------------
-    avg_confidence = attendance_qs.aggregate(
-        avg=Avg("confidence_score")
-    )["avg"] or 0
+        department_stats.append({
+            "department_name": dept["department__name"] or "Unassigned",
+            "total_count": dept["total_count"],
+            "present_count": dept_present,
+            "presence_rate": round(
+                (dept_present / dept["total_count"]) * 100
+            ) if dept["total_count"] else 0,
+        })
 
-    total_employees = visible_employees.count()
-
-    # ----------------------------------
-    # SINGLE EMPLOYEE INSIGHTS
-    # ----------------------------------
+    # Individual Employee Analytics Dashboard Indicators
     current_status = None
     total_hours_today = 0
     total_hours_week = 0
     total_hours_month = 0
-    last_checkin = None
-    late_days = 0
-    attendance_days = 0
+    last_checkin_record = None
+    attendance_percentage = 0
+    leave_stats = None
+    recent_payroll = None
 
     if ems_emp:
-        rule = ems_emp.work_rule
-
         emp_attendance = Attendance.objects.filter(employee=ems_emp)
-
-        # ---- Today status
         today_logs = emp_attendance.filter(timestamp__date=today).order_by("timestamp")
-        last_checkin = today_logs.filter(attendance_type="check_in").last()
-        last_checkout = today_logs.filter(attendance_type="check_out").last()
+        last_checkin_record = today_logs.filter(attendance_type="check_in").last()
+        last_checkout_record = today_logs.filter(attendance_type="check_out").last()
 
-        if last_checkin and (not last_checkout or last_checkout.timestamp < last_checkin.timestamp):
+        if last_checkin_record and (not last_checkout_record or last_checkout_record.timestamp < last_checkin_record.timestamp):
             current_status = "Checked In"
-        elif last_checkout:
+        elif last_checkout_record:
             current_status = "Checked Out"
         else:
             current_status = "Not Checked In"
 
-        # ---- Hours calculation helper
         def calc_hours(qs):
             seconds = 0
-            checkins = qs.filter(attendance_type="check_in")
-            checkouts = qs.filter(attendance_type="check_out")
+            checkins = qs.filter(attendance_type="check_in").order_by('timestamp')
+            checkouts = qs.filter(attendance_type="check_out").order_by('timestamp')
             for ci in checkins:
                 co = checkouts.filter(timestamp__gt=ci.timestamp).first()
                 if co:
                     seconds += (co.timestamp - ci.timestamp).total_seconds()
             return round(seconds / 3600, 2)
 
+        start_week = today - timedelta(days=today.weekday())
+        start_month = today.replace(day=1)
+
         total_hours_today = calc_hours(today_logs)
         total_hours_week = calc_hours(emp_attendance.filter(timestamp__date__gte=start_week))
         total_hours_month = calc_hours(emp_attendance.filter(timestamp__date__gte=start_month))
 
-        # ---- Attendance percentage (month)
         days_passed = today.day
         attendance_days = (
             emp_attendance
@@ -703,85 +803,87 @@ def dashboard(request):
             .distinct()
             .count()
         )
+        attendance_percentage = round((attendance_days / days_passed) * 100, 1) if days_passed else 0
 
-        attendance_percentage = round(
-            (attendance_days / days_passed) * 100, 1
-        ) if days_passed else 0
-
-        # ---- Leave stats
-        leave_stats = (
-            LeaveApplication.objects
-            .filter(employee=ems_emp, start_date__year=today.year)
-            .values("status")
-            .annotate(count=Count("id"))
+        leave_qs = LeaveApplication.objects.filter(
+            employee=ems_emp,
+            start_date__year=today.year
         )
 
-        # ---- Payroll snapshot
-        recent_payroll = (
-            Payroll.objects
-            .filter(employee=ems_emp)
-            .order_by("-month")[:6]
-        )
+        leave_stats = {
+            "total": leave_qs.count(),
+            "approved": leave_qs.filter(status="approved").count(),
+            "pending": leave_qs.filter(status="pending").count(),
+            "rejected": leave_qs.filter(status="rejected").count(),
+        }
+        recent_payroll = Payroll.objects.filter(employee=ems_emp).order_by("-month")[:6]
 
-    else:
-        attendance_percentage = 0
-        leave_stats = None
-        recent_payroll = None
+    # Global Average trust score calculation
+    avg_confidence = Attendance.objects.filter(
+        employee__in=visible_employees,
+        timestamp__date=today
+    ).aggregate(avg=Avg("confidence_score"))["avg"] or 0
 
-    # ----------------------------------
-    # 30-DAY ATTENDANCE CHART
-    # ----------------------------------
+    # Verification counts for the rolling 30-day analytics chart
     start_30 = today - timedelta(days=29)
     att_30 = (
-        attendance_qs
-        .filter(timestamp__date__gte=start_30, attendance_type="check_in")
+        Attendance.objects.filter(
+            employee__in=visible_employees,
+            timestamp__date__gte=start_30,
+            attendance_type="check_in"
+        )
         .annotate(day=TruncDate("timestamp"))
         .values("day")
-        .annotate(count=Count("id"))
+        .annotate(count=Count("employee", distinct=True))
     )
-
     att_map = {a["day"]: a["count"] for a in att_30}
     chart_labels = [(start_30 + timedelta(days=i)).strftime("%d %b") for i in range(30)]
     chart_values = [att_map.get(start_30 + timedelta(days=i), 0) for i in range(30)]
 
-    # ----------------------------------
-    # CONTEXT
-    # ----------------------------------
     context = {
         "is_admin": is_admin,
         "employees": visible_employees.order_by("user__first_name"),
         "employee": ems_emp,
         "selected_emp_id": ems_emp.id if ems_emp else None,
-
-        # attendance
+        
+        # Biometric Streams & Today's Headcounts
         "today_attendance": today_records,
-        "week_attendance": week_records,
-        "month_attendance": month_records,
-
-        # metrics
-        "avg_confidence": round(avg_confidence, 2),
+        "present_count": len(present_today_ids),
+        "on_duty_count": len(checked_in_now_ids),
+        "absent_count": not_marked_qs.count(),
+        "late_count": len(late_today_ids),
+        
+        # Details sets for management lists
+        "on_duty_employees": on_duty_details,
+        "not_marked_employees": not_marked_qs,
+        "late_employees": late_details,
+        "leaves_today": leaves_today_qs,
+        
+        # Department metrics
+        "department_stats": department_stats,
+        
+        # Personal Context Info
+        "avg_confidence": round(avg_confidence * 100, 1) if avg_confidence else 0.0,
+        "total_employees": total_staff_count,
         "current_status": current_status,
-        "last_checkin": last_checkin,
+        "last_checkin": last_checkin_record,
         "total_hours": total_hours_today,
         "total_hours_week": total_hours_week,
         "total_hours_month": total_hours_month,
         "attendance_percentage": attendance_percentage,
-        "total_employees": total_employees,
-
-        # employee panels
         "leave_stats": leave_stats,
         "recent_payroll": recent_payroll,
-
-        # charts
+        
+        # Line Chart Metrics
         "attendance_labels_json": json.dumps(chart_labels),
         "attendance_values_json": json.dumps(chart_values),
-
+        
         "year": today.year,
         "month": today.month,
-        "title": "Dashboard",
+        "title": "Hospital Command Center",
     }
-
     return render(request, "dashboard.html", context)
+
 
 @login_required
 def my_profile_view(request):
@@ -802,7 +904,6 @@ def my_profile_view(request):
     })
 
 @login_required
-
 def employee_profile(request, pk):
     employee = get_object_or_404(
         Employee.objects.select_related(

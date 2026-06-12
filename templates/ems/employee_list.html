@@ -7,65 +7,563 @@
 {% block content %}
 {% now "Y" as year %}
 {% now "m" as month %}
-<div class="container-fluid px-4 fade-in-up">
+
+<style>
+    /* ============ MODERN EMPLOYEE DIRECTORY STYLES ============ */
+    :root {
+        --card-gradient: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+        --hover-gradient: linear-gradient(135deg, rgba(102,126,234,0.05), rgba(118,75,162,0.05));
+    }
+
+    .employee-directory {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 1.5rem;
+    }
+
+    /* Header Section */
+    .directory-header {
+        background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(255,255,255,0.5);
+        box-shadow: 0 10px 30px rgba(102,126,234,0.1);
+    }
+
+    .header-icon-wrapper {
+        width: 50px;
+        height: 50px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+        box-shadow: 0 8px 20px rgba(102,126,234,0.3);
+    }
+
+    .btn-gradient-primary {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        padding: 0.7rem 1.8rem;
+        border-radius: 12px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102,126,234,0.3);
+    }
+
+    .btn-gradient-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102,126,234,0.4);
+        color: white;
+    }
+
+    .btn-gradient-danger {
+        background: linear-gradient(135deg, #fa709a, #fee140);
+        color: #2b2d42;
+        border: none;
+        padding: 0.7rem 1.8rem;
+        border-radius: 12px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(250,112,154,0.3);
+    }
+
+    .btn-gradient-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(250,112,154,0.4);
+        color: #2b2d42;
+    }
+
+    /* KPI Cards */
+    .kpi-card-modern {
+        background: var(--card-gradient);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 1.5rem;
+        border: 1px solid rgba(255,255,255,0.5);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .kpi-card-modern::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+
+    .kpi-card-modern:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(102,126,234,0.15);
+    }
+
+    .kpi-icon-circle {
+        width: 45px;
+        height: 45px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+    }
+
+    .kpi-icon-total {
+        background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));
+        color: #667eea;
+    }
+
+    .kpi-icon-active {
+        background: linear-gradient(135deg, rgba(17,153,142,0.15), rgba(56,239,125,0.15));
+        color: #11998e;
+    }
+
+    .kpi-icon-inactive {
+        background: linear-gradient(135deg, rgba(250,112,154,0.15), rgba(254,225,64,0.15));
+        color: #fa709a;
+    }
+
+    /* Search & Filter */
+    .filter-card {
+        background: var(--card-gradient);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.5);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.04);
+        margin-bottom: 1.5rem;
+    }
+
+    .filter-input {
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 10px;
+        padding: 0.6rem 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .filter-input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+
+    .filter-select {
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 10px;
+        padding: 0.6rem 1rem;
+        background: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .filter-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+
+    /* Table Card */
+    .table-card {
+        background: var(--card-gradient);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.5);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+
+    /* Table Styles */
+    .modern-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .modern-table thead th {
+        background: linear-gradient(135deg, rgba(102,126,234,0.08), rgba(118,75,162,0.08));
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        padding: 1rem 1.2rem;
+        border-bottom: 2px solid rgba(102,126,234,0.15);
+        white-space: nowrap;
+    }
+
+    .modern-table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid rgba(0,0,0,0.04);
+        cursor: pointer;
+    }
+
+    .modern-table tbody tr:hover {
+        background: var(--hover-gradient);
+        transform: scale(1.005);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+
+    .modern-table td {
+        padding: 1rem 1.2rem;
+        vertical-align: middle;
+    }
+
+    /* Avatar */
+    .avatar-modern {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        object-fit: cover;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .avatar-fallback {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 10px rgba(102,126,234,0.3);
+    }
+
+    /* Badges */
+    .badge-modern {
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        letter-spacing: 0.3px;
+    }
+
+    .badge-active {
+        background: linear-gradient(135deg, rgba(17,153,142,0.15), rgba(56,239,125,0.15));
+        color: #11998e;
+        border: 1px solid rgba(17,153,142,0.3);
+    }
+
+    .badge-inactive {
+        background: linear-gradient(135deg, rgba(250,112,154,0.15), rgba(254,225,64,0.15));
+        color: #dc3545;
+        border: 1px solid rgba(220,53,69,0.3);
+    }
+
+    .badge-warning-status {
+        background: linear-gradient(135deg, rgba(255,193,7,0.15), rgba(255,153,0,0.15));
+        color: #b88a00;
+        border: 1px solid rgba(255,193,7,0.3);
+    }
+
+    .shift-badge {
+        padding: 0.3rem 0.7rem;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+    }
+
+    .shift-day {
+        background: linear-gradient(135deg, rgba(255,193,7,0.2), rgba(255,153,0,0.2));
+        color: #b88a00;
+    }
+
+    .shift-night {
+        background: linear-gradient(135deg, rgba(43,45,66,0.2), rgba(141,153,174,0.2));
+        color: #2b2d42;
+    }
+
+    .shift-evening {
+        background: linear-gradient(135deg, rgba(79,172,254,0.2), rgba(0,242,254,0.2));
+        color: #4facfe;
+    }
+
+    /* Action Buttons */
+    .action-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        border: none;
+        background: transparent;
+        color: #64748b;
+    }
+
+    .action-btn:hover {
+        transform: scale(1.1);
+    }
+
+    .action-btn-edit:hover {
+        background: rgba(102,126,234,0.1);
+        color: #667eea;
+    }
+
+    .action-btn-calendar:hover {
+        background: rgba(17,153,142,0.1);
+        color: #11998e;
+    }
+
+    .action-btn-delete:hover {
+        background: rgba(220,53,69,0.1);
+        color: #dc3545;
+    }
+
+    /* Mobile Action Dropdown */
+    .mobile-actions-dropdown .dropdown-menu {
+        border: 1px solid rgba(0,0,0,0.06);
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        padding: 0.5rem;
+        min-width: 180px;
+    }
+
+    .mobile-actions-dropdown .dropdown-item {
+        padding: 0.6rem 1rem;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        font-weight: 500;
+    }
+
+    .mobile-actions-dropdown .dropdown-item:hover {
+        background: rgba(102,126,234,0.08);
+    }
+
+    .mobile-actions-dropdown .dropdown-item.text-danger:hover {
+        background: rgba(220,53,69,0.08);
+    }
+
+    /* Empty State */
+    .empty-state-modern {
+        padding: 3rem 1rem;
+        text-align: center;
+    }
+
+    .empty-state-modern i {
+        font-size: 4rem;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        opacity: 0.3;
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .fade-in-up {
+        animation: fadeInUp 0.5s ease-out;
+    }
+
+    /* Responsive */
+    @media (max-width: 992px) {
+        .employee-directory {
+            padding: 1rem;
+        }
+
+        .directory-header {
+            padding: 1.5rem;
+        }
+
+        .btn-gradient-primary,
+        .btn-gradient-danger {
+            padding: 0.5rem 1.2rem;
+            font-size: 0.85rem;
+        }
+
+        .modern-table thead {
+            display: none;
+        }
+
+        .modern-table tbody tr {
+            display: block;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 12px;
+            padding: 0;
+            background: white;
+        }
+
+        .modern-table td {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(0,0,0,0.04);
+        }
+
+        .modern-table td::before {
+            content: attr(data-label);
+            font-weight: 700;
+            color: #64748b;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-right: 1rem;
+        }
+
+        .modern-table td:last-child {
+            border-bottom: none;
+        }
+
+        .action-buttons-desktop {
+            display: none !important;
+        }
+
+        .action-buttons-mobile {
+            display: flex !important;
+        }
+    }
+
+    @media (min-width: 993px) {
+        .action-buttons-mobile {
+            display: none !important;
+        }
+
+        .action-buttons-desktop {
+            display: flex !important;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .directory-header {
+            flex-direction: column;
+            gap: 1rem;
+            text-align: center;
+        }
+
+        .directory-header .d-flex {
+            flex-direction: column;
+        }
+
+        .header-buttons {
+            flex-direction: column;
+            width: 100%;
+            gap: 0.5rem;
+        }
+
+        .header-buttons .btn {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="employee-directory fade-in-up">
     
-    <!-- Header Section -->
-    <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
-        <div>
-            <h2 class="fw-bold text-dark mb-1">
-                <i class="fas fa-users text-primary me-2"></i>Employee Directory
-            </h2>
-            <p class="text-muted mb-0">Manage your workforce, roles, and statuses.</p>
+    <!-- ==================== HEADER SECTION ==================== -->
+    <div class="directory-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="header-icon-wrapper">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div>
+                    <h2 class="fw-bold mb-1" style="background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                        Employee Directory
+                    </h2>
+                    <p class="text-muted mb-0 small">
+                        <i class="fas fa-sitemap me-1"></i>Manage your workforce, roles, and statuses
+                    </p>
+                </div>
+            </div>
+            <div class="d-flex gap-2 header-buttons">
+                <a href="{% url 'register' %}" class="btn btn-gradient-primary">
+                    <i class="fas fa-plus me-2"></i>Add Employee
+                </a>
+                <a href="{% url 'inactive_employee_list' %}" class="btn btn-gradient-danger">
+                    <i class="fas fa-user-slash me-2"></i>Inactive
+                </a>
+            </div>
         </div>
-        <a href="{% url 'register' %}" class="btn btn-primary btn-lg shadow-sm rounded-pill">
-            <i class="fas fa-plus me-2"></i>Add Employee
-        </a>
     </div>
-    <!-- KPI CARDS -->
+
+    <!-- ==================== KPI CARDS ==================== -->
     <div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm rounded-4">
-        <div class="card-body">
-            <h6 class="text-muted">Total Employees</h6>
-            <h3 class="fw-bold">{{ kpi.total }}</h3>
+        <div class="col-md-4 col-sm-6">
+            <div class="kpi-card-modern">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="kpi-icon-circle kpi-icon-total">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted small mb-1">Total Employees</h6>
+                        <h3 class="fw-bold mb-0" style="color: #667eea;">{{ kpi.total }}</h3>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <div class="col-md-4 col-sm-6">
+            <div class="kpi-card-modern">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="kpi-icon-circle kpi-icon-active">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted small mb-1">Active Employees</h6>
+                        <h3 class="fw-bold mb-0" style="color: #11998e;">{{ kpi.active }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 col-sm-12">
+            <div class="kpi-card-modern">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="kpi-icon-circle kpi-icon-inactive">
+                        <i class="fas fa-user-slash"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-muted small mb-1">Inactive</h6>
+                        <h3 class="fw-bold mb-0" style="color: #fa709a;">{{ kpi.inactive }}</h3>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm rounded-4">
-        <div class="card-body">
-            <h6 class="text-muted">Active Employees</h6>
-            <h3 class="fw-bold text-success">{{ kpi.active }}</h3>
-        </div>
-        </div>
-    </div>
-
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm rounded-4">
-        <div class="card-body">
-            <h6 class="text-muted">Inactive</h6>
-            <h3 class="fw-bold text-danger">{{ kpi.inactive }}</h3>
-        </div>
-        </div>
-    </div>
-    </div>
-    <!-- Search & Filter Bar -->
-    <div class="card border-0 shadow-sm mb-4 search-card">
+    <!-- ==================== SEARCH & FILTER BAR ==================== -->
+    <div class="filter-card">
         <div class="card-body p-3">
             <form method="GET" class="row g-2 align-items-center">
-                <!-- Text Search (Client-side JS) -->
-                <div class="col-md-3">
+                <!-- Text Search -->
+                <div class="col-lg-3 col-md-6">
                     <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
-                        <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Search in results...">
+                        <span class="input-group-text bg-transparent border-end-0 text-muted" style="border-radius: 10px 0 0 10px;">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" 
+                               id="searchInput" 
+                               class="filter-input border-start-0" 
+                               placeholder="Search employees..."
+                               style="border-radius: 0 10px 10px 0; width: 100%;">
                     </div>
                 </div>
 
                 <!-- Department Filter -->
-                <div class="col-md-2">
-                    <select name="department" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
-                        <option value="">All Departments</option>
+                <div class="col-lg-2 col-md-6">
+                    <select name="department" class="filter-select w-100" onchange="this.form.submit()">
+                        <option value="">🏢 All Departments</option>
                         {% for dept in departments %}
                             <option value="{{ dept.id }}" {% if selected_dept == dept.id|stringformat:"s" %}selected{% endif %}>
                                 {{ dept.get_name_display }}
@@ -75,265 +573,209 @@
                 </div>
 
                 <!-- Salary Sort -->
-                <div class="col-md-2">
-                    <select name="sort_salary" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
-                        <option value="">Sort by Salary</option>
-                        <option value="highest" {% if selected_sort == 'highest' %}selected{% endif %}>Highest to Lowest</option>
-                        <option value="lowest" {% if selected_sort == 'lowest' %}selected{% endif %}>Lowest to Highest</option>
+                <div class="col-lg-2 col-md-6">
+                    <select name="sort_salary" class="filter-select w-100" onchange="this.form.submit()">
+                        <option value="">💰 Sort by Salary</option>
+                        <option value="highest" {% if selected_sort == 'highest' %}selected{% endif %}>Highest → Lowest</option>
+                        <option value="lowest" {% if selected_sort == 'lowest' %}selected{% endif %}>Lowest → Highest</option>
                     </select>
                 </div>
 
-                <!-- Gender Filter -->
-                <!-- <div class="col-md-2">
-                    <select name="gender" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
-                        <option value="">All Genders</option>
-                        {% for code, name in genders %}
-                            <option value="{{ code }}" {% if selected_gender == code %}selected{% endif %}>{{ name }}</option>
-                        {% endfor %}
-                    </select>
-                </div> -->
-
                 <!-- Role Filter -->
-                <div class="col-md-2">
-                    <select name="role" class="form-select border-0 shadow-sm" onchange="this.form.submit()">
-                        <option value="">All Roles</option>
+                <div class="col-lg-2 col-md-6">
+                    <select name="role" class="filter-select w-100" onchange="this.form.submit()">
+                        <option value="">👔 All Roles</option>
                         {% for code, name in roles %}
                             <option value="{{ code }}" {% if selected_role == code %}selected{% endif %}>{{ name }}</option>
                         {% endfor %}
                     </select>
                 </div>
 
-                <!-- Clear Filters Button -->
-                <div class="col-md-1">
-                    <a href="{% url 'employee_list' %}" class="btn btn-light shadow-sm w-100 text-muted" data-bs-toggle="tooltip" title="Clear all filters">
-                        <i class="fas fa-undo"></i>
-                    </a>
+                <!-- Clear Filters -->
+                <div class="col-lg-3 col-md-12">
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'employee_list' %}" class="btn btn-light w-100" style="border-radius: 10px;">
+                            <i class="fas fa-undo me-2"></i>Clear Filters
+                        </a>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Main Table Card -->
-    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="employeeTable">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Employee</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Department</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Role</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Work Rule</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Base Salary</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Status</th>
-                            <th class="text-end pe-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for e in employees %}
-                        <tr class="employee-row"
-                            data-href="{% url 'employee_profile' e.id %}"
-                            style="cursor:pointer;">
-                            <!-- Name & ID Column -->
-                            <td class="ps-4">
-                                <div class="d-flex px-2 py-1 align-items-center">
-
-                                    <!-- PROFILE IMAGE / FALLBACK -->
-                                    <div class="me-3">
-                                    {% if e.face_image %}
-                                        <img
-                                        src="{{ e.face_image.url }}"
-                                        alt="{{ e.user.get_full_name }}"
-                                        class="rounded-circle"
-                                        style="width:42px; height:42px; object-fit:cover;"
-                                        >
-                                    {% else %}
-                                        <div class="avatar-circle">
+    <!-- ==================== EMPLOYEE TABLE ==================== -->
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="modern-table" id="employeeTable">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department</th>
+                        <th>Role</th>
+                        <th>Work Rule</th>
+                        <th>Base Salary</th>
+                        <th>Status</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in employees %}
+                    <tr class="employee-row" data-href="{% url 'employee_profile' e.id %}">
+                        <!-- Employee Info -->
+                        <td data-label="Employee">
+                            <div class="d-flex align-items-center gap-3">
+                                {% if e.face_image %}
+                                    <img src="{{ e.face_image.url }}" 
+                                         alt="{{ e.user.get_full_name }}" 
+                                         class="avatar-modern">
+                                {% else %}
+                                    <div class="avatar-fallback">
                                         {{ e.user.first_name|slice:":1" }}{{ e.user.last_name|slice:":1" }}
-                                        </div>
-                                    {% endif %}
                                     </div>
-
-                                    <!-- NAME + EMPLOYEE ID -->
-                                    <div class="d-flex flex-column justify-content-center">
-                                    <h6 class="mb-0 text-sm fw-bold text-dark">
-                                        {{ e.user.get_full_name }}
-                                    </h6>
-                                    <p class="text-xs text-secondary mb-0">
+                                {% endif %}
+                                <div>
+                                    <h6 class="mb-0 fw-bold">{{ e.user.get_full_name }}</h6>
+                                    <small class="text-muted">
                                         <i class="fas fa-id-badge me-1"></i>{{ e.employee_id }}
-                                    </p>
-                                    </div>
-
+                                    </small>
                                 </div>
-                            </td>                                               
-                            <!-- Department -->
-                            <td>
-                                <p class="text-sm font-weight-bold mb-0 text-dark">{{ e.department|default:"-" }}</p>
-                            </td>
-
-                            <!-- Role -->
-                            <td>
-                                <span class="badge bg-light text-dark border">{{ e.role }}</span>
-                            </td>
-
-                            <!-- Work Rule -->
-                            <td>
-                                {% if e.work_rule %}
-                                    <div class="d-flex flex-column">
-
-                                        <!-- Work Rule Name -->
-                                        <span class="text-dark fw-semibold text-sm">
-                                            {{ e.work_rule.name }}
-                                        </span>
-
-                                        <!-- Shift Badge -->
-                                        <span class="badge mt-1 
-                                            {% if e.work_rule.shift_type == 'Night' %}
-                                                bg-dark
-                                            {% elif e.work_rule.shift_type == 'Day' %}
-                                                bg-warning text-dark
-                                            {% elif e.work_rule.shift_type == 'Evening' %}
-                                                bg-info
-                                            {% else %}
-                                                bg-secondary
-                                            {% endif %}
-                                            rounded-pill px-2 py-1 text-xs">
-
-                                            {% if e.work_rule.shift_type == 'Night' %}
-                                                🌙 Night Shift
-                                            {% elif e.work_rule.shift_type == 'Day' %}
-                                                ☀ Day Shift
-                                            {% elif e.work_rule.shift_type == 'Evening' %}
-                                                🌆 Evening Shift
-                                            {% else %}
-                                                General
-                                            {% endif %}
-
-                                        </span>
-
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">Standard</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if e.salary_structure %}
-                                    ₹{{ e.salary_structure.base_salary|floatformat:0 }}
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <!-- Status (Dynamic Badges) -->
-                            <td>
-                                {% if e.employment_status == 'Active' %}
-                                    <span class="badge badge-sm bg-success-soft text-success">Active</span>
-                                {% elif e.employment_status == 'Resigned' or e.employment_status == 'Terminated' %}
-                                    <span class="badge badge-sm bg-danger-soft text-danger">{{ e.employment_status }}</span>
-                                {% else %}
-                                    <span class="badge badge-sm bg-warning-soft text-warning">{{ e.employment_status }}</span>
-                                {% endif %}
-                            </td>
-
-                            <!-- Actions -->
-                            <td class="text-end pe-4">
-                            <div class="d-inline-flex align-items-center gap-2">
-
-                                <!-- Edit -->
-                                <a href="{% url 'employee_update' e.id %}"
-                                class="btn btn-sm btn-outline-primary rounded-circle"
-                                data-bs-toggle="tooltip"
-                                title="Edit Employee">
-                                <i class="fas fa-pen"></i>
-                                </a>
-
-                                <!-- Attendance -->
-                                <a href="{% url 'attendance_calendar' e.id year month %}"
-                                class="btn btn-sm btn-outline-success rounded-circle"
-                                data-bs-toggle="tooltip"
-                                title="Attendance Calendar">
-                                <i class="fas fa-calendar-check"></i>
-                                </a>
-
-                                <!-- Delete -->
-                                <button type="button"
-                                        onclick="confirmDelete('{% url 'employee_delete' e.id %}', '{{ e.user.get_full_name|escapejs }}')"
-                                        class="btn btn-sm btn-outline-danger rounded-circle"
-                                        data-bs-toggle="tooltip"
-                                        title="Delete Employee">
-                                <i class="fas fa-trash"></i>
-                                </button>
-
                             </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="6" class="text-center py-5">
-                                <div class="empty-state">
-                                    <i class="fas fa-users-slash fa-3x text-muted mb-3 opacity-50"></i>
-                                    <h5 class="text-muted">No employees found</h5>
-                                    <p class="text-secondary small">Get started by adding a new employee to the system.</p>
-                                    <a href="{% url 'register' %}" class="btn btn-sm btn-outline-primary mt-2">Add First Employee</a>
+                        </td>
+
+                        <!-- Department -->
+                        <td data-label="Department">
+                            <span class="fw-medium">{{ e.department|default:"—" }}</span>
+                        </td>
+
+                        <!-- Role -->
+                        <td data-label="Role">
+                            <span class="badge-modern" style="background: rgba(102,126,234,0.1); color: #667eea; border: 1px solid rgba(102,126,234,0.2);">
+                                {{ e.role }}
+                            </span>
+                        </td>
+
+                        <!-- Work Rule -->
+                        <td data-label="Work Rule">
+                            {% if e.work_rule %}
+                                <div>
+                                    <span class="fw-medium">{{ e.work_rule.name }}</span>
+                                    <br>
+                                    <span class="shift-badge 
+                                        {% if e.work_rule.shift_type == 'Night' %}shift-night
+                                        {% elif e.work_rule.shift_type == 'Day' %}shift-day
+                                        {% elif e.work_rule.shift_type == 'Evening' %}shift-evening
+                                        {% endif %}">
+                                        {% if e.work_rule.shift_type == 'Night' %}
+                                            🌙 Night
+                                        {% elif e.work_rule.shift_type == 'Day' %}
+                                            ☀ Day
+                                        {% elif e.work_rule.shift_type == 'Evening' %}
+                                            🌆 Evening
+                                        {% else %}
+                                            General
+                                        {% endif %}
+                                    </span>
                                 </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                            {% else %}
+                                <span class="text-muted">Standard</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Salary -->
+                        <td data-label="Salary">
+                            {% if e.salary_structure %}
+                                <span class="fw-bold" style="color: #11998e;">₹{{ e.salary_structure.base_salary|floatformat:0 }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Status -->
+                        <td data-label="Status">
+                            {% if e.employment_status == 'Active' %}
+                                <span class="badge-modern badge-active">Active</span>
+                            {% elif e.employment_status == 'Resigned' or e.employment_status == 'Terminated' %}
+                                <span class="badge-modern badge-inactive">{{ e.employment_status }}</span>
+                            {% else %}
+                                <span class="badge-modern badge-warning-status">{{ e.employment_status }}</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Actions - Desktop -->
+                        <td data-label="Actions" class="text-center">
+                            <div class="action-buttons-desktop d-inline-flex gap-1">
+                                <a href="{% url 'employee_update' e.id %}" 
+                                   class="action-btn action-btn-edit" 
+                                   data-bs-toggle="tooltip" 
+                                   title="Edit">
+                                    <i class="fas fa-pen"></i>
+                                </a>
+                                <a href="{% url 'attendance_calendar' e.id year month %}" 
+                                   class="action-btn action-btn-calendar" 
+                                   data-bs-toggle="tooltip" 
+                                   title="Attendance">
+                                    <i class="fas fa-calendar-check"></i>
+                                </a>
+                                <button onclick="confirmDelete('{% url 'employee_delete' e.id %}', '{{ e.user.get_full_name|escapejs }}')"
+                                        class="action-btn action-btn-delete" 
+                                        data-bs-toggle="tooltip" 
+                                        title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+
+                            <!-- Actions - Mobile Dropdown -->
+                            <div class="action-buttons-mobile mobile-actions-dropdown dropdown">
+                                <button class="btn btn-sm" 
+                                        style="background: rgba(102,126,234,0.1); color: #667eea; border-radius: 8px;"
+                                        data-bs-toggle="dropdown" 
+                                        aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v"></i> Actions
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'employee_update' e.id %}">
+                                            <i class="fas fa-pen me-2 text-primary"></i>Edit
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'attendance_calendar' e.id year month %}">
+                                            <i class="fas fa-calendar-check me-2 text-success"></i>Attendance
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item text-danger" 
+                                           href="#" 
+                                           onclick="confirmDelete('{% url 'employee_delete' e.id %}', '{{ e.user.get_full_name|escapejs }}')">
+                                            <i class="fas fa-trash me-2"></i>Delete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="empty-state-modern">
+                                <i class="fas fa-users-slash mb-3"></i>
+                                <h5 class="text-muted">No employees found</h5>
+                                <p class="text-secondary small">Get started by adding a new employee to the system.</p>
+                                <a href="{% url 'register' %}" class="btn btn-gradient-primary mt-2">
+                                    <i class="fas fa-plus me-2"></i>Add First Employee
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<!-- STYLES -->
-<style>
-    /* Table & Avatar Styles */
-    .avatar-circle {
-        width: 40px;
-        height: 40px;
-        background: linear-gradient(135deg, #4361ee, #3f37c9);
-        color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 0.9rem;
-        box-shadow: 0 4px 6px rgba(67, 97, 238, 0.3);
-    }
-
-    .table thead th {
-        border-bottom-width: 1px;
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        background-color: #f8f9fa;
-    }
-
-    .table tbody tr {
-        transition: background-color 0.2s ease;
-    }
-    .table tbody tr:hover {
-        background-color: #f8faff;
-    }
-
-    /* Soft Badges */
-    .badge-sm { font-size: 0.75rem; padding: 0.45em 0.8em; border-radius: 6px; }
-    .bg-success-soft { background-color: rgba(25, 135, 84, 0.1); color: #198754 !important; }
-    .bg-danger-soft { background-color: rgba(220, 53, 69, 0.1); color: #dc3545 !important; }
-    .bg-warning-soft { background-color: rgba(255, 193, 7, 0.15); color: #b88a00 !important; }
-
-    /* Animations */
-    .fade-in-up { animation: fadeInUp 0.5s ease-out; }
-    @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(15px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    /* Search Input */
-    .search-card .form-control:focus { box-shadow: none; border-color: #e2e8f0; }
-</style>
-
-<!-- SCRIPTS -->
+<!-- ==================== SCRIPTS ==================== -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     // 1. Search Functionality
@@ -343,20 +785,31 @@
         
         rows.forEach(row => {
             const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(value) ? '' : 'none';
+            if (text.includes(value)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
         });
     });
 
     // 2. SweetAlert Delete Confirmation
     function confirmDelete(deleteUrl, name) {
         Swal.fire({
-            title: 'Are you sure?',
-            html: `You are about to delete <b>${name}</b>.<br>This action cannot be undone.`,
+            title: 'Delete Employee?',
+            html: `<p>You are about to delete <b style="color: #dc3545;">${name}</b>.</p><p class="text-muted small">This action cannot be undone.</p>`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc3545',
             cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Yes, delete it!'
+            confirmButtonText: '<i class="fas fa-trash me-2"></i>Yes, delete!',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true,
+            customClass: {
+                popup: 'rounded-4',
+                confirmButton: 'rounded-3',
+                cancelButton: 'rounded-3'
+            }
         }).then((result) => {
             if (result.isConfirmed) {
                 window.location.href = deleteUrl;
@@ -365,22 +818,23 @@
     }
 
     // 3. Initialize Tooltips
-    document.addEventListener("DOMContentLoaded", function(){
+    document.addEventListener("DOMContentLoaded", function() {
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
+        var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl, {
+                placement: 'top',
+                delay: { show: 300, hide: 100 }
+            });
         });
     });
-</script>
 
-<!-- profile script -->
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
+    // 4. Row Click Navigation
+    document.addEventListener("DOMContentLoaded", function() {
         document.querySelectorAll(".employee-row").forEach(row => {
-            row.addEventListener("click", function (e) {
-                // prevent clicking buttons/icons inside row
-                if (e.target.closest("a, button, i")) return;
-
+            row.addEventListener("click", function(e) {
+                // Prevent navigation when clicking buttons, links, or dropdowns
+                if (e.target.closest("a, button, .dropdown-menu, .dropdown-item")) return;
+                
                 window.location.href = this.dataset.href;
             });
         });

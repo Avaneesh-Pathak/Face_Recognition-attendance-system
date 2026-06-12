@@ -7,446 +7,959 @@
 {% block page_subtitle %}Comprehensive overview of employee attendance patterns{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-  <!-- Summary Cards -->
-  <div class="row mb-4">
-    <!-- Total Employees -->
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card dashboard-card border-start border-primary border-4">
-        <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 fw-bold">Total Employees</p>
-              <h4 class="mb-0 fw-bolder">{{ total_employees }}</h4>
+
+<style>
+    /* ============ MODERN REPORTS STYLES ============ */
+    :root {
+        --card-bg: rgba(255, 255, 255, 0.85);
+        --glass-border: rgba(255, 255, 255, 0.5);
+        --gradient-blue: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --gradient-green: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        --gradient-red: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        --gradient-orange: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .reports-container {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 1.5rem;
+    }
+
+    /* Summary Cards */
+    .summary-card {
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 1.5rem;
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        cursor: default;
+    }
+
+    .summary-card.clickable {
+        cursor: pointer;
+    }
+
+    .summary-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+    }
+
+    .summary-card.total::before { background: var(--gradient-blue); }
+    .summary-card.present::before { background: var(--gradient-green); }
+    .summary-card.absent::before { background: var(--gradient-red); }
+    .summary-card.rate::before { background: var(--gradient-orange); }
+
+    .summary-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    }
+
+    .summary-card.clickable:hover {
+        border-color: #667eea;
+        box-shadow: 0 15px 35px rgba(102, 126, 234, 0.2);
+    }
+
+    .icon-circle {
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        transition: all 0.3s ease;
+    }
+
+    .summary-card.clickable:hover .icon-circle {
+        transform: scale(1.1) rotate(-5deg);
+    }
+
+    .icon-total {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+        color: #667eea;
+    }
+
+    .icon-present {
+        background: linear-gradient(135deg, rgba(17, 153, 142, 0.15), rgba(56, 239, 125, 0.15));
+        color: #11998e;
+    }
+
+    .icon-absent {
+        background: linear-gradient(135deg, rgba(250, 112, 154, 0.15), rgba(254, 225, 64, 0.15));
+        color: #fa709a;
+    }
+
+    .icon-rate {
+        background: linear-gradient(135deg, rgba(240, 147, 251, 0.15), rgba(245, 87, 108, 0.15));
+        color: #f093fb;
+    }
+
+    /* Filter Card */
+    .filter-card {
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.04);
+    }
+
+    .filter-input {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 10px;
+        padding: 0.65rem 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .filter-input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .btn-gradient {
+        background: var(--gradient-blue);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.7rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .btn-gradient-success {
+        background: var(--gradient-green);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.7rem 1.5rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(17, 153, 142, 0.3);
+    }
+
+    .btn-gradient-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(17, 153, 142, 0.4);
+        color: white;
+    }
+
+    .btn-outline-light-modern {
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        padding: 0.5rem 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .btn-outline-light-modern:hover {
+        background: rgba(102, 126, 234, 0.05);
+        border-color: #667eea;
+    }
+
+    /* Chart Card */
+    .chart-card {
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+    }
+
+    /* Donut Chart */
+    .donut-chart-wrapper {
+        position: relative;
+        width: 200px;
+        height: 200px;
+        margin: 0 auto;
+    }
+
+    .donut-center {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 150px;
+        height: 150px;
+        background: white;
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Distribution Badges */
+    .dist-badge {
+        padding: 1rem;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .dist-badge:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .dist-badge.present-badge {
+        background: linear-gradient(135deg, rgba(17, 153, 142, 0.1), rgba(56, 239, 125, 0.1));
+        border: 1px solid rgba(17, 153, 142, 0.25);
+    }
+
+    .dist-badge.absent-badge {
+        background: linear-gradient(135deg, rgba(250, 112, 154, 0.1), rgba(254, 225, 64, 0.1));
+        border: 1px solid rgba(250, 112, 154, 0.25);
+    }
+
+    /* Table Card */
+    .table-card {
+        background: var(--card-bg);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+    }
+
+    .modern-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .modern-table thead th {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.06), rgba(118, 75, 162, 0.06));
+        font-weight: 700;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #64748b;
+        padding: 1rem;
+        border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+        white-space: nowrap;
+    }
+
+    .modern-table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    }
+
+    .modern-table tbody tr:hover {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.03), rgba(118, 75, 162, 0.03));
+    }
+
+    .modern-table td {
+        padding: 0.9rem 1rem;
+        vertical-align: middle;
+    }
+
+    /* Avatar */
+    .avatar-circle-modern {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: var(--gradient-blue);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+        box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+    }
+
+    .avatar-img-modern {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        object-fit: cover;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Badges */
+    .badge-status {
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
+
+    .badge-checkin {
+        background: linear-gradient(135deg, rgba(17, 153, 142, 0.12), rgba(56, 239, 125, 0.12));
+        color: #11998e;
+        border: 1px solid rgba(17, 153, 142, 0.3);
+    }
+
+    .badge-checkout {
+        background: linear-gradient(135deg, rgba(79, 172, 254, 0.12), rgba(0, 242, 254, 0.12));
+        color: #4facfe;
+        border: 1px solid rgba(79, 172, 254, 0.3);
+    }
+
+    .badge-shift-day {
+        background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 153, 0, 0.15));
+        color: #b88a00;
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+
+    .badge-shift-night {
+        background: linear-gradient(135deg, rgba(43, 45, 66, 0.15), rgba(141, 153, 174, 0.15));
+        color: #2b2d42;
+        border: 1px solid rgba(43, 45, 66, 0.3);
+    }
+
+    /* Action Buttons */
+    .action-btn-modern {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        border: none;
+        background: transparent;
+        color: #64748b;
+    }
+
+    .action-btn-modern:hover {
+        transform: scale(1.1);
+    }
+
+    .action-btn-edit:hover {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+    }
+
+    .action-btn-delete:hover {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+
+    /* Mobile Action Dropdown */
+    .mobile-actions .dropdown-menu {
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        padding: 0.5rem;
+    }
+
+    .mobile-actions .dropdown-item {
+        padding: 0.6rem 1rem;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+
+    /* Progress Bar */
+    .progress-modern {
+        height: 8px;
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    /* Status Icon */
+    .status-icon {
+        font-size: 1.3rem;
+    }
+
+    .status-icon-success { color: #11998e; }
+    .status-icon-info { color: #4facfe; }
+
+    /* Empty State */
+    .empty-state-modern {
+        padding: 3rem 1rem;
+        text-align: center;
+    }
+
+    .empty-state-modern i {
+        font-size: 4rem;
+        background: var(--gradient-blue);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        opacity: 0.3;
+    }
+
+    /* Pagination */
+    .pagination-modern .page-link {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 8px;
+        margin: 0 3px;
+        transition: all 0.3s ease;
+    }
+
+    .pagination-modern .page-item.active .page-link {
+        background: var(--gradient-blue);
+        border-color: transparent;
+        color: white;
+    }
+
+    /* Modal Styles */
+    .modal-modern .modal-content {
+        border-radius: 16px;
+        border: none;
+        overflow: hidden;
+    }
+
+    .modal-modern .modal-header {
+        border-bottom: none;
+    }
+
+    .modal-modern .modal-header.bg-success { background: var(--gradient-green) !important; }
+    .modal-modern .modal-header.bg-danger { background: var(--gradient-red) !important; }
+
+    /* Responsive Table */
+    @media (max-width: 992px) {
+        .reports-container {
+            padding: 1rem;
+        }
+
+        .modern-table thead {
+            display: none;
+        }
+
+        .modern-table tbody tr {
+            display: block;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            border-radius: 12px;
+            padding: 0;
+            background: white;
+        }
+
+        .modern-table td {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.7rem 1rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        }
+
+        .modern-table td::before {
+            content: attr(data-label);
+            font-weight: 700;
+            color: #64748b;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-right: 1rem;
+            min-width: 80px;
+        }
+
+        .modern-table td:last-child {
+            border-bottom: none;
+        }
+
+        .desktop-actions {
+            display: none !important;
+        }
+
+        .mobile-actions {
+            display: flex !important;
+            justify-content: flex-end;
+        }
+
+        .filter-row {
+            flex-direction: column;
+        }
+
+        .filter-row .col-md-3,
+        .filter-row .col-md-4,
+        .filter-row .col-md-2 {
+            width: 100%;
+        }
+    }
+
+    @media (min-width: 993px) {
+        .mobile-actions {
+            display: none !important;
+        }
+
+        .desktop-actions {
+            display: flex !important;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .summary-card {
+            padding: 1rem;
+        }
+
+        .btn-gradient,
+        .btn-gradient-success {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .header-actions {
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .header-actions .btn {
+            width: 100%;
+        }
+
+        .donut-chart-wrapper {
+            width: 160px;
+            height: 160px;
+        }
+
+        .donut-center {
+            width: 120px;
+            height: 120px;
+        }
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-in-up {
+        animation: fadeInUp 0.5s ease-out;
+    }
+</style>
+
+<div class="reports-container fade-in-up">
+
+    <!-- ==================== SUMMARY CARDS ==================== -->
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="summary-card total">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="icon-circle icon-total">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div>
+                        <p class="text-muted small mb-1 fw-semibold">Total Employees</p>
+                        <h3 class="mb-0 fw-bold" style="color: #667eea;">{{ total_employees }}</h3>
+                    </div>
+                </div>
             </div>
-            <div class="flex-shrink-0">
-              <div class="icon-shape bg-primary text-white rounded-circle p-3">
-                <i class="fas fa-users fs-4"></i>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
-    </div>
-    
-    <!-- Present Employees (CLICKABLE) -->
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card dashboard-card border-start border-success border-4 clickable-card" onclick="showEmployeeList('present')">
-        <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 fw-bold">Present (Range)</p>
-              <h4 class="mb-0 fw-bolder text-success">{{ present_employees }} <i class="fas fa-hand-pointer ms-1 fs-6 text-muted opacity-50"></i></h4>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="summary-card present clickable" onclick="showEmployeeList('present')">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="icon-circle icon-present">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div>
+                        <p class="text-muted small mb-1 fw-semibold">Present (Range)</p>
+                        <h3 class="mb-0 fw-bold" style="color: #11998e;">
+                            {{ present_employees }}
+                            <i class="fas fa-hand-pointer ms-1 fs-6 text-muted opacity-50"></i>
+                        </h3>
+                    </div>
+                </div>
             </div>
-            <div class="flex-shrink-0">
-              <div class="icon-shape bg-success text-white rounded-circle p-3 shadow-sm">
-                <i class="fas fa-user-check fs-4"></i>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
-    </div>
-    
-    <!-- Absent Employees (CLICKABLE) -->
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card dashboard-card border-start border-danger border-4 clickable-card" onclick="showEmployeeList('absent')">
-        <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 fw-bold">Absent (Range)</p>
-              <h4 class="mb-0 fw-bolder text-danger">{{ absent_employees }} <i class="fas fa-hand-pointer ms-1 fs-6 text-muted opacity-50"></i></h4>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="summary-card absent clickable" onclick="showEmployeeList('absent')">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="icon-circle icon-absent">
+                        <i class="fas fa-user-times"></i>
+                    </div>
+                    <div>
+                        <p class="text-muted small mb-1 fw-semibold">Absent (Range)</p>
+                        <h3 class="mb-0 fw-bold" style="color: #fa709a;">
+                            {{ absent_employees }}
+                            <i class="fas fa-hand-pointer ms-1 fs-6 text-muted opacity-50"></i>
+                        </h3>
+                    </div>
+                </div>
             </div>
-            <div class="flex-shrink-0">
-              <div class="icon-shape bg-danger text-white rounded-circle p-3 shadow-sm">
-                <i class="fas fa-user-times fs-4"></i>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="summary-card rate">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="icon-circle icon-rate">
+                        <i class="fas fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <p class="text-muted small mb-1 fw-semibold">Attendance Rate</p>
+                        <h3 class="mb-0 fw-bold" style="color: #f093fb;">
+                            {% if total_employees > 0 %}
+                                {% widthratio present_employees total_employees 100 %}%
+                            {% else %}
+                                0%
+                            {% endif %}
+                        </h3>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    
-    <!-- Attendance Rate -->
-    <div class="col-xl-3 col-md-6 mb-4">
-      <div class="card dashboard-card border-start border-warning border-4">
-        <div class="card-body">
-          <div class="d-flex align-items-center">
-            <div class="flex-grow-1">
-              <p class="text-muted mb-1 fw-bold">Attendance Rate</p>
-              <h4 class="mb-0 fw-bolder">
-                {% if total_employees > 0 %}
-                  {% widthratio present_employees total_employees 100 %}%
-                {% else %}
-                  0%
+
+    <!-- ==================== FILTERS ==================== -->
+    <div class="filter-card mb-4">
+        <div class="card-header bg-transparent border-bottom py-3">
+            <h5 class="mb-0 fw-bold">
+                <i class="fas fa-filter me-2" style="color: #667eea;"></i>Report Filters
+            </h5>
+        </div>
+        <div class="card-body py-4">
+            <form method="get">
+                <div class="row g-3 filter-row">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">Start Date</label>
+                        <input type="date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="filter-input w-100">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">End Date</label>
+                        <input type="date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="filter-input w-100">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted text-uppercase">Employee</label>
+                        <select name="employee" class="filter-input w-100">
+                            <option value="">All Employees</option>
+                            {% for emp in employees %}
+                            <option value="{{ emp.id }}" {% if emp.id == selected_employee %}selected{% endif %}>
+                                {{ emp.user.get_full_name|default:emp.user.username }} ({{ emp.employee_id }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-gradient w-100">
+                            <i class="fas fa-search me-1"></i> Filter
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-3 border-top mt-3">
+                <span class="badge px-3 py-2" style="background: rgba(102,126,234,0.08); color: #667eea; border: 1px solid rgba(102,126,234,0.2); border-radius: 8px;">
+                    <i class="fas fa-calendar-alt me-1"></i>
+                    {% if start_date and end_date %}
+                        {% if start_date == end_date %}
+                            <strong>{{ start_date|date:"M d, Y" }}</strong>
+                        {% else %}
+                            <strong>{{ start_date|date:"M d, Y" }}</strong> — <strong>{{ end_date|date:"M d, Y" }}</strong>
+                        {% endif %}
+                    {% else %}
+                        All recent data
+                    {% endif %}
+                </span>
+
+                <a href="?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}&download=excel" 
+                   class="btn btn-gradient-success">
+                    <i class="fas fa-file-excel me-1"></i> Export Excel
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== CHARTS & DISTRIBUTION ==================== -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-8">
+            <div class="chart-card h-100">
+                <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">Attendance Overview</h5>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-light-modern btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-clock me-1"></i> Period
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-3">
+                            <li><a class="dropdown-item" href="?range=week">This Week</a></li>
+                            <li><a class="dropdown-item" href="?range=month">This Month</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="attendanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="chart-card h-100">
+                <div class="card-header bg-transparent border-bottom py-3">
+                    <h5 class="mb-0 fw-bold">Attendance Distribution</h5>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <div class="donut-chart-wrapper mb-4">
+                        <div style="width: 100%; height: 100%; border-radius: 50%; background: conic-gradient(#11998e 0% {% widthratio present_employees total_employees 100 %}%, #fa709a 0% 100%); box-shadow: 0 0 20px rgba(0,0,0,0.08);"></div>
+                        <div class="donut-center">
+                            <h2 class="mb-0 fw-bold">
+                                {% if total_employees > 0 %}
+                                    {% widthratio present_employees total_employees 100 %}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </h2>
+                            <span class="badge px-2 py-1 mt-1" style="background: rgba(0,0,0,0.05); color: #64748b; font-size: 0.7rem;">Present Rate</span>
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="dist-badge present-badge text-center" onclick="showEmployeeList('present')">
+                                <i class="fas fa-user-check mb-2" style="color: #11998e; font-size: 1.5rem;"></i>
+                                <h5 class="mb-0 fw-bold" style="color: #11998e;">{{ present_employees }}</h5>
+                                <small class="fw-semibold" style="color: rgba(17,153,142,0.7);">Present</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="dist-badge absent-badge text-center" onclick="showEmployeeList('absent')">
+                                <i class="fas fa-user-times mb-2" style="color: #fa709a; font-size: 1.5rem;"></i>
+                                <h5 class="mb-0 fw-bold" style="color: #fa709a;">{{ absent_employees }}</h5>
+                                <small class="fw-semibold" style="color: rgba(250,112,154,0.7);">Absent</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== ATTENDANCE TABLE ==================== -->
+    <div class="table-card">
+        <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="mb-0 fw-bold">
+                <i class="fas fa-list-alt me-2" style="color: #667eea;"></i>Attendance Logs
+            </h5>
+
+            <div class="d-flex align-items-center gap-2 header-actions">
+                {% if user.is_superuser or user.employee.role in "Admin Manager" %}
+                <button type="button" class="btn btn-gradient" onclick="openModal('create')">
+                    <i class="fas fa-plus me-1"></i> Add Record
+                </button>
                 {% endif %}
-              </h4>
-            </div>
-            <div class="flex-shrink-0">
-              <div class="icon-shape bg-warning text-white rounded-circle p-3">
-                <i class="fas fa-chart-pie fs-4"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Filters and Controls -->
-  <div class="card dashboard-card mb-4 border-0 shadow-sm">
-    <div class="card-header bg-white border-bottom py-3">
-      <h5 class="card-title mb-0 fw-bold">
-        <i class="fas fa-filter me-2 text-primary"></i>Report Filters
-      </h5>
-    </div>
-    <div class="card-body py-4">
-        <form method="get" class="mb-4">
-            <div class="row align-items-end g-3">
-                <div class="col-md-3">
-                    <label for="start_date" class="form-label text-muted fw-bold small text-uppercase">Start Date</label>
-                    <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control form-control-lg bg-light border-0">
-                </div>
-                <div class="col-md-3">
-                    <label for="end_date" class="form-label text-muted fw-bold small text-uppercase">End Date</label>
-                    <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control form-control-lg bg-light border-0">
-                </div>
-                <div class="col-md-4">
-                    <label for="employee" class="form-label text-muted fw-bold small text-uppercase">Employee</label>
-                    <select name="employee" id="employee" class="form-select form-select-lg bg-light border-0">
-                        <option value="">All Employees</option>
-                        {% for emp in employees %}
-                        <option value="{{ emp.id }}" {% if emp.id == selected_employee %}selected{% endif %}>
-                            {{ emp.user.get_full_name|default:emp.user.username }} ({{ emp.employee_id }})
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary btn-lg w-100">
-                        <i class="fas fa-search me-1"></i> Filter
-                    </button>
-                </div>
-            </div>
-        </form>
-      
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-3 border-top">
-        <div>
-          <span class="badge bg-light text-dark border px-3 py-2">
-            <i class="fas fa-calendar-alt me-1 text-muted"></i>
-            {% if start_date and end_date %}
-                {% if start_date == end_date %}
-                    <strong>{{ start_date|date:"M d, Y" }}</strong>
-                {% else %}
-                    <strong>{{ start_date|date:"M d, Y" }}</strong> — <strong>{{ end_date|date:"M d, Y" }}</strong>
-                {% endif %}
-            {% else %}
-              All recent data
-            {% endif %}
-          </span>
-        </div>
-        
-        <div class="d-flex gap-2">
-            <a href="?start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}&download=excel" class="btn btn-success rounded-pill px-4 shadow-sm">
-              <i class="fas fa-file-excel me-1"></i> Export Excel
-            </a>
-            
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Charts & Dist Row -->
-  <div class="row mb-4">
-    <div class="col-lg-8 mb-4 mb-lg-0">
-      <div class="card dashboard-card h-100 border-0 shadow-sm">
-        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-          <h5 class="card-title mb-0 fw-bold">Attendance Overview</h5>
-          <div class="dropdown">
-            <button class="btn btn-sm btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown">
-              <i class="fas fa-clock me-1"></i> Period
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end shadow">
-              <li><a class="dropdown-item" href="?range=week">This Week</a></li>
-              <li><a class="dropdown-item" href="?range=month">This Month</a></li>
-            </ul>
-          </div>
-        </div>
-        <div class="card-body">
-            <div style="position: relative; height: 300px; width: 100%;">
-                <canvas id="attendanceChart"></canvas>
+                <span class="badge px-3 py-2" style="background: rgba(102,126,234,0.08); color: #667eea; border: 1px solid rgba(102,126,234,0.2); border-radius: 20px;">
+                    {{ attendance_data.paginator.count }} Records
+                </span>
             </div>
         </div>
-      </div>
-    </div>
-    
-    <div class="col-lg-4">
-      <div class="card dashboard-card h-100 border-0 shadow-sm">
-        <div class="card-header bg-white border-bottom py-3">
-          <h5 class="card-title mb-0 fw-bold">Attendance Distribution</h5>
+
+        <div class="table-responsive">
+            <table class="modern-table" id="attendanceTable">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Type</th>
+                        <th>Date & Time</th>
+                        <th>Shift</th>
+                        <th>Confidence</th>
+                        <th>Location</th>
+                        <th class="text-center">Status</th>
+                        {% if request.user.is_superuser or request.user.employee.role != 'Employee' %}
+                        <th class="text-center">Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in attendance_data %}
+                    <tr>
+                        <td data-label="Employee">
+                            <div class="d-flex align-items-center gap-3">
+                                {% if record.employee.face_image %}
+                                    <img src="{{ record.employee.face_image.url }}" class="avatar-img-modern">
+                                {% else %}
+                                    <div class="avatar-circle-modern">
+                                        {{ record.employee.user.first_name|first|upper }}{{ record.employee.user.last_name|first|upper }}
+                                    </div>
+                                {% endif %}
+                                <div>
+                                    <h6 class="mb-0 fw-bold">{{ record.employee.user.get_full_name|default:record.employee }}</h6>
+                                    <small class="text-muted">ID: {{ record.employee.employee_id|default:"N/A" }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td data-label="Type">
+                            <span class="badge-status {% if record.attendance_type == 'check_in' %}badge-checkin{% else %}badge-checkout{% endif %}">
+                                <i class="fas {% if record.attendance_type == 'check_in' %}fa-sign-in-alt{% else %}fa-sign-out-alt{% endif %} me-1"></i>
+                                {{ record.get_attendance_type_display }}
+                            </span>
+                        </td>
+                        <td data-label="Date & Time">
+                            <div>
+                                <span class="fw-bold">{{ record.timestamp|date:"M d, Y" }}</span>
+                                <br>
+                                <small class="text-muted"><i class="far fa-clock me-1"></i>{{ record.timestamp|date:"h:i A" }}</small>
+                            </div>
+                        </td>
+                        <td data-label="Shift">
+                            <span class="badge-status {% if record.shift == 'Day' %}badge-shift-day{% else %}badge-shift-night{% endif %}">
+                                <i class="fas {% if record.shift == 'Day' %}fa-sun{% else %}fa-moon{% endif %} me-1"></i>
+                                {{ record.shift }}
+                            </span>
+                        </td>
+                        <td data-label="Confidence">
+                            {% if record.confidence_score %}
+                                <div class="d-flex align-items-center gap-2" style="min-width: 120px;">
+                                    <div class="progress progress-modern flex-grow-1">
+                                        <div class="progress-bar {% if record.confidence_score >= 0.90 %}bg-success{% elif record.confidence_score >= 0.70 %}bg-warning{% else %}bg-danger{% endif %}" 
+                                             style="width: {% widthratio record.confidence_score 1 100 %}%"></div>
+                                    </div>
+                                    <span class="small fw-bold">{% widthratio record.confidence_score 1 100 %}%</span>
+                                </div>
+                            {% else %}
+                                <span class="badge-status" style="background: rgba(108,117,125,0.1); color: #6c757d; border: 1px solid rgba(108,117,125,0.2);">
+                                    <i class="fas fa-keyboard me-1"></i> Manual
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Location">
+                            {% if record.location %}
+                                <small class="text-muted">
+                                    <i class="fas fa-map-marker-alt me-1 text-danger"></i> {{ record.location|truncatechars:25 }}
+                                </small>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Status" class="text-center">
+                            {% if record.attendance_type == 'check_in' %}
+                                <i class="fas fa-check-circle status-icon status-icon-success"></i>
+                            {% else %}
+                                <i class="fas fa-sign-out-alt status-icon status-icon-info"></i>
+                            {% endif %}
+                        </td>
+
+                        {% if user.is_superuser or user.employee.role in "Admin HR Manager" %}
+                        <td data-label="Actions" class="text-center">
+                            <!-- Desktop Actions -->
+                            <div class="desktop-actions d-inline-flex gap-1">
+                                <button class="action-btn-modern action-btn-edit" title="Edit"
+                                        onclick="openModal('edit', {
+                                            id: '{{ record.id }}', 
+                                            type: '{{ record.attendance_type }}', 
+                                            time: '{{ record.timestamp|date:'Y-m-d\TH:i' }}', 
+                                            location: '{{ record.location|escapejs|default:'' }}', 
+                                            notes: '{{ record.notes|escapejs|default:'' }}'
+                                        })">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="action-btn-modern action-btn-delete" title="Delete"
+                                        onclick="deleteAttendance('{{ record.id }}')">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+
+                            <!-- Mobile Actions Dropdown -->
+                            <div class="mobile-actions dropdown">
+                                <button class="btn btn-sm" style="background: rgba(102,126,234,0.1); color: #667eea; border-radius: 8px;" 
+                                        data-bs-toggle="dropdown">
+                                    <i class="fas fa-ellipsis-v"></i> Actions
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="openModal('edit', {
+                                            id: '{{ record.id }}', 
+                                            type: '{{ record.attendance_type }}', 
+                                            time: '{{ record.timestamp|date:'Y-m-d\TH:i' }}', 
+                                            location: '{{ record.location|escapejs|default:'' }}', 
+                                            notes: '{{ record.notes|escapejs|default:'' }}'
+                                        })">
+                                            <i class="fas fa-edit me-2 text-primary"></i>Edit
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item text-danger" href="#" onclick="deleteAttendance('{{ record.id }}')">
+                                            <i class="fas fa-trash-alt me-2"></i>Delete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state-modern">
+                                <i class="fas fa-folder-open mb-3"></i>
+                                <h5 class="text-muted">No attendance records found</h5>
+                                <p class="text-muted small">Try adjusting your date filters or select a different employee.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        <div class="card-body d-flex flex-column justify-content-center">
-          <div class="d-flex justify-content-center py-4">
-            <div class="position-relative" style="width: 200px; height: 200px; border-radius: 50%; background: conic-gradient(#198754 0% {% widthratio present_employees total_employees 100 %}%, #dc3545 0% 100%); box-shadow: 0 0 15px rgba(0,0,0,0.1);">
-              <div class="position-absolute top-50 start-50 translate-middle bg-white rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 150px; height: 150px;">
-                <div class="text-center">
-                  {% if total_employees > 0 %}
-                    <h2 class="mb-0 fw-bolder text-dark">{% widthratio present_employees total_employees 100 %}%</h2>
-                  {% else %}
-                    <h2 class="mb-0 fw-bolder text-dark">0%</h2>
-                  {% endif %}
-                  <span class="badge bg-light text-muted border mt-1">Present Rate</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="row text-center mt-auto">
-            <div class="col-6 cursor-pointer clickable-badge" onclick="showEmployeeList('present')">
-              <div class="p-3 bg-success bg-opacity-10 rounded-3 border border-success border-opacity-25 h-100">
-                <i class="fas fa-user-check text-success fs-4 mb-2"></i>
-                <h5 class="mb-0 fw-bold text-success">{{ present_employees }}</h5>
-                <small class="text-success text-opacity-75 fw-semibold">Present</small>
-              </div>
-            </div>
-            <div class="col-6 cursor-pointer clickable-badge" onclick="showEmployeeList('absent')">
-              <div class="p-3 bg-danger bg-opacity-10 rounded-3 border border-danger border-opacity-25 h-100">
-                <i class="fas fa-user-times text-danger fs-4 mb-2"></i>
-                <h5 class="mb-0 fw-bold text-danger">{{ absent_employees }}</h5>
-                <small class="text-danger text-opacity-75 fw-semibold">Absent</small>
-              </div>
-            </div>
-          </div>
+
+        <!-- Pagination -->
+        {% if attendance_data.has_other_pages %}
+        <div class="card-footer bg-transparent py-3 border-top">
+            <nav>
+                <ul class="pagination pagination-modern justify-content-center mb-0">
+                    {% if attendance_data.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ attendance_data.previous_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">
+                                <i class="fas fa-chevron-left small"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for i in attendance_data.paginator.page_range %}
+                        {% if attendance_data.number == i %}
+                            <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                        {% elif i > attendance_data.number|add:'-3' and i < attendance_data.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ i }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">{{ i }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if attendance_data.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ attendance_data.next_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">
+                                <i class="fas fa-chevron-right small"></i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Attendance Table -->
-  <div class="card dashboard-card border-0 shadow-sm overflow-hidden">
-    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-
-      <!-- LEFT: Title -->
-      <h5 class="card-title mb-0 fw-bold">
-        <i class="fas fa-list-alt me-2 text-primary"></i>Attendance Logs
-      </h5>
-
-      <!-- RIGHT: Actions -->
-      <div class="d-flex align-items-center gap-2">
-
-        {% if user.is_superuser  or user.employee.role in "Admin Manager" %}
-        <button type="button"
-                class="btn btn-primary rounded-pill px-4 shadow-sm"
-                onclick="openModal('create')">
-          <i class="fas fa-plus me-1"></i> Add Record
-        </button>
         {% endif %}
-
-        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2 rounded-pill">
-          {{ attendance_data.paginator.count }} Records Found
-        </span>
-
-      </div>
     </div>
-    <div class="table-responsive">
-      <table class="table table-hover table-borderless align-middle mb-0">
-        <thead class="table-light border-bottom">
-          <tr>
-            <th class="ps-4 py-3 text-uppercase small fw-bold text-muted">Employee</th>
-            <th class="py-3 text-uppercase small fw-bold text-muted">Type</th>
-            <th class="py-3 text-uppercase small fw-bold text-muted">Date & Time</th>
-            <th class="py-3 text-uppercase small fw-bold text-muted">Shift</th>
-            <th class="py-3 text-uppercase small fw-bold text-muted">Confidence</th>
-            <th class="py-3 text-uppercase small fw-bold text-muted">Location</th>
-            <th class="text-center py-3 text-uppercase small fw-bold text-muted">Status</th>
-            {% if request.user.is_superuser or request.user.employee.role != 'Employee' %}
-            <th class="text-end pe-4 py-3 text-uppercase small fw-bold text-muted">Actions</th>
-            {% endif %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for record in attendance_data %}
-          <tr class="border-bottom" style="transition: background-color 0.2s;">
-            <td class="ps-4 py-3">
-              <div class="d-flex align-items-center">
-                <div class="flex-shrink-0">
-                  {% if record.employee.face_image %}
-                    <img src="{{ record.employee.face_image.url }}"
-                        alt="{{ record.employee.user.get_full_name }}"
-                        class="rounded-circle shadow-sm object-fit-cover"
-                        style="width: 45px; height: 45px;">
-                  {% else %}
-                    <div class="bg-gradient-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm" 
-                        style="width: 45px; height: 45px; font-size: 16px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
-                      {{ record.employee.user.first_name|first|upper }}{{ record.employee.user.last_name|first|upper }}
-                    </div>
-                  {% endif %}
-                </div>
-                <div class="flex-grow-1 ms-3">
-                  <h6 class="mb-0 fw-bold text-dark">{{ record.employee.user.get_full_name|default:record.employee }}</h6>
-                  <span class="badge bg-light text-muted border small mt-1">ID: {{ record.employee.employee_id|default:"N/A" }}</span>
-                </div>
-              </div>
-            </td>
-            <td>
-              <span class="badge rounded-pill px-3 py-2
-                {% if record.attendance_type == 'check_in' %}bg-success bg-opacity-10 text-success border border-success border-opacity-25
-                {% else %}bg-info bg-opacity-10 text-info border border-info border-opacity-25{% endif %}">
-                <i class="fas {% if record.attendance_type == 'check_in' %}fa-sign-in-alt{% else %}fa-sign-out-alt{% endif %} me-1"></i>
-                {{ record.get_attendance_type_display }}
-              </span>
-            </td>
-            <td>
-              <div class="d-flex flex-column">
-                <span class="fw-bold text-dark">{{ record.timestamp|date:"M d, Y" }}</span>
-                <span class="text-muted small"><i class="far fa-clock me-1"></i>{{ record.timestamp|date:"h:i A" }}</span>
-              </div>
-            </td>
-            <td>
-              <span class="badge px-3 py-2
-                {% if record.shift == 'Day' %}
-                  bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25
-                {% else %}
-                  bg-dark bg-opacity-10 text-dark border border-dark border-opacity-25
-                {% endif %}"
-                
-                data-bs-toggle="tooltip"
-                data-bs-placement="top"
-                title="{{ record.shift_time }}"
-              >
-                
-                <i class="fas {% if record.shift == 'Day' %}fa-sun{% else %}fa-moon{% endif %} me-1"></i>
-                {{ record.shift }}
-              </span>
-            </td>
-            <td>
-              {% if record.confidence_score %}
-                <div class="d-flex align-items-center" style="width: 140px;">
-                  <div class="progress flex-grow-1 me-2 shadow-none border" style="height: 8px; border-radius: 4px;">
-                    <div class="progress-bar 
-                      {% if record.confidence_score >= 0.90 %}bg-success
-                      {% elif record.confidence_score >= 0.70 %}bg-warning
-                      {% else %}bg-danger{% endif %}" 
-                      role="progressbar"
-                      style="width: {% widthratio record.confidence_score 1 100 %}%">
-                    </div>
-                  </div>
-                  <span class="small fw-bold text-dark">{% widthratio record.confidence_score 1 100 %}%</span>
-                </div>
-              {% else %}
-                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2 py-1">
-                  <i class="fas fa-keyboard me-1"></i> Manual
-                </span>
-              {% endif %}
-            </td>
-            <td>
-              {% if record.location %}
-                <span class="text-muted small fw-medium">
-                  <i class="fas fa-map-marker-alt me-1 text-danger"></i> {{ record.location|truncatechars:25 }}
-                </span>
-              {% else %}
-                <span class="text-muted fst-italic">—</span>
-              {% endif %}
-            </td>
-            <td class="text-center">
-              {% if record.attendance_type == 'check_in' %}
-                <i class="fas fa-check-circle text-success fs-4" data-bs-toggle="tooltip" title="Successfully Checked In"></i>
-              {% else %}
-                <i class="fas fa-sign-out-alt text-info fs-4" data-bs-toggle="tooltip" title="Successfully Checked Out"></i>
-              {% endif %}
-            </td>
-            
-            {% if user.is_superuser  or user.employee.role in "Admin HR Manager" %}
-            <td class="text-end pe-4">
-              <button class="btn btn-sm btn-light border text-primary me-1 shadow-sm action-btn" data-bs-toggle="tooltip" title="Edit Record"
-                      onclick="openModal('edit', {
-                        id: '{{ record.id }}', 
-                        type: '{{ record.attendance_type }}', 
-                        time: '{{ record.timestamp|date:'Y-m-d\TH:i' }}', 
-                        location: '{{ record.location|escapejs|default:'' }}', 
-                        notes: '{{ record.notes|escapejs|default:'' }}'
-                      })">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-sm btn-light border text-danger shadow-sm action-btn" data-bs-toggle="tooltip" title="Delete Record"
-                      onclick="deleteAttendance('{{ record.id }}')">
-                <i class="fas fa-trash-alt"></i>
-              </button>
-            </td>
-            {% endif %}
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="7" class="text-center py-5">
-              <div class="py-5">
-                <div class="mb-3">
-                    <i class="fas fa-folder-open fa-4x text-muted opacity-25"></i>
-                </div>
-                <h5 class="text-muted fw-bold">No attendance records found</h5>
-                <p class="text-muted small mb-0">Try adjusting your date filters or select a different employee.</p>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    
-    <!-- Pagination -->
-    {% if attendance_data.has_other_pages %}
-    <div class="card-footer bg-white py-3 border-top">
-      <nav aria-label="Attendance navigation">
-        <ul class="pagination justify-content-center mb-0">
-          {% if attendance_data.has_previous %}
-            <li class="page-item"><a class="page-link shadow-sm border" href="?page={{ attendance_data.previous_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}"><i class="fas fa-chevron-left small"></i></a></li>
-          {% else %}
-            <li class="page-item disabled"><span class="page-link border bg-light"><i class="fas fa-chevron-left small text-muted"></i></span></li>
-          {% endif %}
-          
-          {% for i in attendance_data.paginator.page_range %}
-            {% if attendance_data.number == i %}
-              <li class="page-item active"><span class="page-link shadow-sm border-primary">{{ i }}</span></li>
-            {% elif i > attendance_data.number|add:'-3' and i < attendance_data.number|add:'3' %}
-              <li class="page-item"><a class="page-link shadow-sm border" href="?page={{ i }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}">{{ i }}</a></li>
-            {% endif %}
-          {% endfor %}
-          
-          {% if attendance_data.has_next %}
-            <li class="page-item"><a class="page-link shadow-sm border" href="?page={{ attendance_data.next_page_number }}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}&employee={{ selected_employee|default:'' }}"><i class="fas fa-chevron-right small"></i></a></li>
-          {% else %}
-            <li class="page-item disabled"><span class="page-link border bg-light"><i class="fas fa-chevron-right small text-muted"></i></span></li>
-          {% endif %}
-        </ul>
-      </nav>
-    </div>
-    {% endif %}
-  </div>
 </div>
 
-<!-- ========================================== -->
-<!-- LIST MODAL (Displays Present/Absent Employees) -->
-<!-- ========================================== -->
-<div class="modal fade" id="employeeListModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable border-0">
-    <div class="modal-content border-0 shadow-lg">
-      <div class="modal-header border-0 pb-0" id="listModalHeader">
-        <h5 class="modal-title fw-bold text-white mb-3 mt-2 ms-2" id="listModalTitle">Employee List</h5>
-        <button type="button" class="btn-close btn-close-white me-2 mb-3 shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body p-0">
-        <ul class="list-group list-group-flush" id="listModalBody">
-          <!-- Dynamically populated via JS -->
-        </ul>
-      </div>
+<!-- ==================== EMPLOYEE LIST MODAL ==================== -->
+<div class="modal fade modal-modern" id="employeeListModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header text-white pb-0 border-0" id="listModalHeader">
+                <h5 class="modal-title fw-bold mt-2 ms-2" id="listModalTitle">Employee List</h5>
+                <button type="button" class="btn-close btn-close-white me-2 mt-2" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <ul class="list-group list-group-flush" id="listModalBody"></ul>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 
-<!-- HIDDEN DATA FOR MODAL POPULATION -->
+<!-- Hidden Data -->
 <div id="present-list-data" class="d-none">
     {% for emp in present_employees_list %}
     <li class="list-group-item d-flex justify-content-between align-items-center py-3 border-bottom">
-        <div class="d-flex align-items-center">
-            <div class="bg-gradient-primary rounded-circle d-flex align-items-center justify-content-center text-white fw-bold me-3 shadow-sm" style="width: 40px; height: 40px; font-size: 14px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
+        <div class="d-flex align-items-center gap-3">
+            <div class="avatar-circle-modern">
                 {{ emp.user.first_name|first|upper }}{{ emp.user.last_name|first|upper }}
             </div>
             <div>
@@ -454,7 +967,7 @@
                 <small class="text-muted">ID: {{ emp.employee_id }}</small>
             </div>
         </div>
-        <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill"><i class="fas fa-check me-1"></i>Present</span>
+        <span class="badge-status badge-checkin"><i class="fas fa-check me-1"></i>Present</span>
     </li>
     {% empty %}
     <li class="list-group-item text-center text-muted py-5 border-0">
@@ -468,16 +981,18 @@
 <div id="absent-list-data" class="d-none">
     {% for emp in absent_employees_list %}
     <li class="list-group-item d-flex justify-content-between align-items-center py-3 border-bottom">
-        <div class="d-flex align-items-center">
-            <div class="bg-secondary bg-opacity-25 rounded-circle d-flex align-items-center justify-content-center text-secondary fw-bold me-3 border" style="width: 40px; height: 40px; font-size: 14px;">
+        <div class="d-flex align-items-center gap-3">
+            <div class="avatar-circle-modern" style="background: linear-gradient(135deg, #8d99ae, #6c757d);">
                 {{ emp.user.first_name|first|upper }}{{ emp.user.last_name|first|upper }}
             </div>
             <div>
-                <h6 class="mb-0 fw-bold text-dark">{{ emp.user.get_full_name }}</h6>
+                <h6 class="mb-0 fw-bold">{{ emp.user.get_full_name }}</h6>
                 <small class="text-muted">ID: {{ emp.employee_id }}</small>
             </div>
         </div>
-        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill"><i class="fas fa-times me-1"></i>Absent</span>
+        <span class="badge-status" style="background: rgba(250,112,154,0.12); color: #fa709a; border: 1px solid rgba(250,112,154,0.3);">
+            <i class="fas fa-times me-1"></i>Absent
+        </span>
     </li>
     {% empty %}
     <li class="list-group-item text-center text-muted py-5 border-0">
@@ -488,120 +1003,71 @@
     {% endfor %}
 </div>
 
+<!-- ==================== CRUD MODAL ==================== -->
+<div class="modal fade modal-modern" id="crudModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header text-white border-0 py-3" style="background: var(--gradient-blue);">
+                <h5 class="modal-title fw-bold" id="modalTitle">
+                    <i class="fas fa-clipboard-check me-2"></i><span id="modalTitleText">Manage Attendance</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4" style="background: #f8fafc;">
+                <form id="crudForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="modal_id">
+                    
+                    <div class="form-floating mb-3" id="employee_group">
+                        <select id="modal_employee" class="form-select filter-input">
+                            <option value="" disabled selected>Choose an employee...</option>
+                            {% for emp in employees %}
+                            <option value="{{ emp.id }}">{{ emp.user.get_full_name|default:emp.user.username }} ({{ emp.employee_id }})</option>
+                            {% endfor %}
+                        </select>
+                        <label><i class="fas fa-user me-1"></i> Employee</label>
+                    </div>
 
-<!-- ========================================== -->
-<!-- SMART CRUD MODAL (Handles Both Create & Edit) -->
-<!-- ========================================== -->
-<div class="modal fade" id="crudModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered border-0">
-    <div class="modal-content border-0 shadow-lg overflow-hidden">
-      <div class="modal-header bg-primary text-white border-0 py-3">
-        <h5 class="modal-title fw-bold" id="modalTitle">
-            <i class="fas fa-clipboard-check me-2"></i><span id="modalTitleText">Manage Attendance</span>
-        </h5>
-        <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body p-4 bg-light">
-        <form id="crudForm">
-          {% csrf_token %}
-          <input type="hidden" id="modal_id">
-          <!-- Employee Select -->
-          <div class="form-floating mb-3 shadow-sm rounded" id="employee_group">
-            <select id="modal_employee" class="form-select border-0">
-              <option value="" disabled selected>Choose an employee...</option>
-              {% for emp in employees %}
-              <option value="{{ emp.id }}">{{ emp.user.get_full_name|default:emp.user.username }} ({{ emp.employee_id }})</option>
-              {% endfor %}
-            </select>
-            <label for="modal_employee" class="fw-bold text-muted"><i class="fas fa-user me-1"></i> Employee</label>
-          </div>
-          <!-- Type & Date Row -->
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-                <div class="form-floating shadow-sm rounded">
-                    <select id="modal_type" class="form-select border-0" required>
-                      <option value="check_in">Check In</option>
-                      <option value="check_out">Check Out</option>
-                    </select>
-                    <label for="modal_type" class="fw-bold text-muted"><i class="fas fa-sign-in-alt me-1"></i> Type</label>
-                </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <select id="modal_type" class="form-select filter-input" required>
+                                    <option value="check_in">Check In</option>
+                                    <option value="check_out">Check Out</option>
+                                </select>
+                                <label><i class="fas fa-sign-in-alt me-1"></i> Type</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-floating">
+                                <input type="datetime-local" id="modal_time" class="form-control filter-input" required>
+                                <label><i class="fas fa-clock me-1"></i> Timestamp</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-floating mb-3">
+                        <input type="text" id="modal_location" class="form-control filter-input" placeholder="Location">
+                        <label><i class="fas fa-map-marker-alt me-1"></i> Location (Optional)</label>
+                    </div>
+
+                    <div class="form-floating">
+                        <textarea id="modal_notes" class="form-control filter-input" placeholder="Notes" style="height: 100px"></textarea>
+                        <label><i class="fas fa-align-left me-1"></i> Notes (Optional)</label>
+                    </div>
+                </form>
             </div>
-            <div class="col-md-6">
-                <div class="form-floating shadow-sm rounded">
-                    <input type="datetime-local" id="modal_time" class="form-control border-0" required>
-                    <label for="modal_time" class="fw-bold text-muted"><i class="fas fa-clock me-1"></i> Timestamp</label>
-                </div>
+            <div class="modal-footer border-0 bg-white py-3">
+                <button type="button" class="btn btn-outline-light-modern px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="crudForm" class="btn btn-gradient px-4" id="saveBtn">
+                    <i class="fas fa-save me-1"></i> Save Record
+                </button>
             </div>
-          </div>
-          <!-- Location -->
-          <div class="form-floating mb-3 shadow-sm rounded">
-            <input type="text" id="modal_location" class="form-control border-0" placeholder="e.g. Main Office">
-            <label for="modal_location" class="fw-bold text-muted"><i class="fas fa-map-marker-alt me-1"></i> Location (Optional)</label>
-          </div>
-          <!-- Notes -->
-          <div class="form-floating shadow-sm rounded">
-            <textarea id="modal_notes" class="form-control border-0" placeholder="Add notes here" style="height: 100px"></textarea>
-            <label for="modal_notes" class="fw-bold text-muted"><i class="fas fa-align-left me-1"></i> Notes (Optional)</label>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer border-0 bg-white py-3">
-        <button type="button" class="btn btn-light border px-4 rounded-pill" data-bs-dismiss="modal">Cancel</button>
-        <button type="submit" form="crudForm" class="btn btn-primary px-4 rounded-pill shadow-sm" id="saveBtn">
-            <i class="fas fa-save me-1"></i> Save Record
-        </button>
-      </div>
+        </div>
     </div>
-  </div>
 </div>
 
-<!-- ========================================== -->
-<!-- JS & CSS -->
-<!-- ========================================== -->
-<style>
-/* Dashboard Polish & Clickable Cards */
-.dashboard-card {
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-.dashboard-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
-}
-
-.clickable-card {
-  cursor: pointer;
-}
-.clickable-card:hover {
-  border-color: #0d6efd !important;
-  background-color: #f8f9fa;
-}
-.clickable-card:hover .icon-shape {
-  transform: scale(1.1);
-  transition: 0.2s ease-in-out;
-}
-
-.clickable-badge {
-    transition: transform 0.2s;
-}
-.clickable-badge:hover {
-    transform: translateY(-4px);
-}
-
-.icon-shape {
-  width: 50px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: 0.2s ease-in-out;
-}
-.border-start { border-left-width: 5px !important; }
-.action-btn:hover { background-color: #f8f9fa !important; transform: scale(1.05); }
-.table > :not(caption) > * > * { padding: 1rem 0.75rem; vertical-align: middle; }
-.form-floating > .form-control:focus, .form-floating > .form-select:focus { box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15); }
-</style>
-
-<!-- Chart.js -->
+<!-- ==================== SCRIPTS ==================== -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
@@ -609,15 +1075,11 @@ let crudModal;
 let listModal;
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Tooltips
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) { return new bootstrap.Tooltip(tooltipTriggerEl); });
-
-    // Modals
+    // Initialize modals
     crudModal = new bootstrap.Modal(document.getElementById('crudModal'));
     listModal = new bootstrap.Modal(document.getElementById('employeeListModal'));
 
-    // CRUD Logic
+    // CRUD Form Submit
     document.getElementById('crudForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const saveBtn = document.getElementById('saveBtn');
@@ -637,20 +1099,42 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!id) {
             const empId = document.getElementById('modal_employee').value;
-            if (!empId) { alert("Select an employee."); saveBtn.innerHTML = originalText; saveBtn.disabled = false; return; }
+            if (!empId) { 
+                alert("Please select an employee."); 
+                saveBtn.innerHTML = originalText; 
+                saveBtn.disabled = false; 
+                return; 
+            }
             payload.append('employee', empId);
         }
 
         try {
-            const res = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }, body: payload });
+            const res = await fetch(url, { 
+                method: 'POST', 
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }, 
+                body: payload 
+            });
             const data = await res.json();
-            if (data.success) window.location.reload(); 
-            else { alert(data.error); saveBtn.innerHTML = originalText; saveBtn.disabled = false; }
-        } catch (error) { alert('Network error.'); saveBtn.innerHTML = originalText; saveBtn.disabled = false; }
+            if (data.success) {
+                window.location.reload();
+            } else { 
+                alert(data.error || 'An error occurred.'); 
+                saveBtn.innerHTML = originalText; 
+                saveBtn.disabled = false; 
+            }
+        } catch (error) { 
+            alert('Network error. Please try again.'); 
+            saveBtn.innerHTML = originalText; 
+            saveBtn.disabled = false; 
+        }
     });
 
     // Chart
     const ctx = document.getElementById('attendanceChart').getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, 'rgba(102, 126, 234, 0.8)');
+    gradient.addColorStop(1, 'rgba(118, 75, 162, 0.3)');
+
     new Chart(ctx, {
         type: 'bar',
         data: {
@@ -658,23 +1142,39 @@ document.addEventListener('DOMContentLoaded', function() {
             datasets: [{
                 label: 'Employees Present',
                 data: JSON.parse('{{ chart_data|safe }}'),
-                backgroundColor: 'rgba(13, 110, 253, 0.85)',
-                borderColor: 'rgba(13, 110, 253, 1)',
-                borderWidth: 1, borderRadius: 6, maxBarThickness: 45
+                backgroundColor: gradient,
+                borderColor: '#667eea',
+                borderWidth: 2,
+                borderRadius: 8,
+                maxBarThickness: 45
             }]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(43, 45, 66, 0.95)',
+                    padding: 12,
+                    cornerRadius: 8
+                }
+            },
             scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1 } },
-                x: { grid: { display: false } }
+                y: { 
+                    beginAtZero: true, 
+                    ticks: { stepSize: 1 },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                },
+                x: { 
+                    grid: { display: false } 
+                }
             }
         }
     });
 });
 
-// Show Employee List Modal (Present/Absent)
+// Show Employee List Modal
 function showEmployeeList(status) {
     const titleEl = document.getElementById('listModalTitle');
     const headerEl = document.getElementById('listModalHeader');
@@ -682,11 +1182,13 @@ function showEmployeeList(status) {
 
     if (status === 'present') {
         titleEl.innerHTML = '<i class="fas fa-user-check me-2"></i> Present Employees';
-        headerEl.className = 'modal-header border-0 pb-0 bg-success';
+        headerEl.className = 'modal-header text-white pb-0 border-0';
+        headerEl.style.background = 'linear-gradient(135deg, #11998e, #38ef7d)';
         bodyEl.innerHTML = document.getElementById('present-list-data').innerHTML;
     } else {
         titleEl.innerHTML = '<i class="fas fa-user-times me-2"></i> Absent Employees';
-        headerEl.className = 'modal-header border-0 pb-0 bg-danger';
+        headerEl.className = 'modal-header text-white pb-0 border-0';
+        headerEl.style.background = 'linear-gradient(135deg, #fa709a, #fee140)';
         bodyEl.innerHTML = document.getElementById('absent-list-data').innerHTML;
     }
     
@@ -701,30 +1203,38 @@ function openModal(mode, data = {}) {
     if (mode === 'create') {
         document.getElementById('modalTitleText').innerText = 'Add Attendance';
         document.getElementById('employee_group').style.display = 'block';
-        document.getElementById('modal_employee').setAttribute('required', 'required');
-        const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        const now = new Date(); 
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         document.getElementById('modal_time').value = now.toISOString().slice(0, 16);
     } else {
         document.getElementById('modalTitleText').innerText = 'Edit Attendance';
         document.getElementById('employee_group').style.display = 'none';
-        document.getElementById('modal_employee').removeAttribute('required');
         document.getElementById('modal_id').value = data.id;
         document.getElementById('modal_type').value = data.type;
         document.getElementById('modal_time').value = data.time;
-        document.getElementById('modal_location').value = data.location;
-        document.getElementById('modal_notes').value = data.notes;
+        document.getElementById('modal_location').value = data.location || '';
+        document.getElementById('modal_notes').value = data.notes || '';
     }
     crudModal.show();
 }
 
 // Delete Attendance
 async function deleteAttendance(id) {
-    if (!confirm('Delete this record?')) return;
+    if (!confirm('Are you sure you want to delete this attendance record? This action cannot be undone.')) return;
     try {
-        const res = await fetch(`/attendance/delete/${id}/`, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' }});
+        const res = await fetch(`/attendance/delete/${id}/`, { 
+            method: 'POST', 
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        });
         const data = await res.json();
-        if (data.success) window.location.reload(); else alert(data.error);
-    } catch (error) { alert('Network error.'); }
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert(data.error || 'Failed to delete record.');
+        }
+    } catch (error) { 
+        alert('Network error. Please try again.'); 
+    }
 }
 </script>
 {% endblock %}
