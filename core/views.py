@@ -2250,9 +2250,38 @@ def attendance_calendar(request, employee_id, year, month):
             # -------------------------------
             # HOURS FROM SHIFT ENGINE
             # -------------------------------
-            day_data = daily_map.get(day, {"hours": 0, "segments": []})
-            worked_hours = round(day_data["hours"], 2)
+            day_logs = sorted(
+                [
+                    log for log in logs
+                    if timezone.localtime(log.timestamp).date() == day
+                ],
+                key=lambda x: x.timestamp
+            )
 
+            worked_hours = 0
+
+            checkin = None
+
+            for log in day_logs:
+                if log.attendance_type == "check_in":
+                    checkin = timezone.localtime(log.timestamp)
+
+                elif log.attendance_type == "check_out" and checkin:
+                    checkout = timezone.localtime(log.timestamp)
+
+                    if checkout > checkin:
+                        worked_hours += (
+                            checkout - checkin
+                        ).total_seconds() / 3600
+
+                    checkin = None
+
+            worked_hours = round(worked_hours, 2)
+
+            day_data = {
+                "hours": worked_hours,
+                "segments": []
+            }
             is_current_month = (day.month == month)
             is_future = day > today
             is_today = day == today
@@ -2344,6 +2373,11 @@ def attendance_calendar(request, employee_id, year, month):
             # -------------------------------
             # STATUS (FINAL FIXED LOGIC)
             # -------------------------------
+            # -------------------------------
+            # STATUS (USE RAW LOGS ONLY)
+            # -------------------------------
+            has_logs = len(day_logs) > 0
+
             if is_future:
                 present = False
 
@@ -2351,18 +2385,18 @@ def attendance_calendar(request, employee_id, year, month):
                 present = False
                 total_holiday += 1
 
-            elif worked_hours > 0:
+            elif has_logs:
                 present = True
                 total_present += 1
-                total_working_hours += worked_hours
 
-            elif not is_future and is_current_month:
-                present = False
-                total_absent += 1
+                if worked_hours > 0:
+                    total_working_hours += worked_hours
 
             else:
                 present = False
 
+                if is_current_month:
+                    total_absent += 1
             # -------------------------------
             # APPEND DATA
             # -------------------------------
@@ -3188,7 +3222,7 @@ def org_tree_api(request):
         "tree": restricted_tree
     })
 
-    
+
 def employee_detail(request, employee_id):
     employee = get_object_or_404(Employee, employee_id=employee_id)
     return render(request, 'ems/my_profile.html', {'employee': employee})

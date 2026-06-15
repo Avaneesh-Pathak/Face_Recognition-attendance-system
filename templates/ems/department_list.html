@@ -135,7 +135,6 @@
                         <th class="py-3">Head of Dept</th>
                         <th class="py-3">Parent Unit</th>
                         <th class="py-3">Workforce</th>
-                        <th class="py-3">Status</th>
                         <th class="text-center pe-4 py-3">Actions</th>
                     </tr>
                 </thead>
@@ -204,22 +203,11 @@
                             </div>
                         </td>
 
-                        <!-- Status Badge -->
-                        <td data-label="Status" class="py-3">
-                            {% if department.is_active %}
-                            <span class="badge-modern badge-active py-1 px-2.5" style="font-size: 0.725rem;">
-                                <i class="fas fa-circle me-1" style="font-size: 6px;"></i>Active
-                            </span>
-                            {% else %}
-                            <span class="badge-modern badge-inactive py-1 px-2.5" style="font-size: 0.725rem;">
-                                <i class="fas fa-circle me-1" style="font-size: 6px;"></i>Inactive
-                            </span>
-                            {% endif %}
-                        </td>
+                        
 
                         <!-- Actions Column -->
                         <td data-label="Actions" class="text-center pe-4 py-3">
-                            {% if user.is_staff %}
+                            {% if user.is_superuser or user.employee.role in "Admin HR Manager" %}
                             <div class="action-buttons-desktop d-inline-flex gap-1 justify-content-center">
                                 <a href="{% url 'department_edit' department.pk %}" 
                                    class="action-btn action-btn-edit" 

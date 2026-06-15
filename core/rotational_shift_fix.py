@@ -37,50 +37,35 @@ from django.utils import timezone
 def get_work_date_for_checkin(checkin_dt: datetime, work_rule) -> date:
     """
     Returns the canonical 'work date' that the session STARTING at checkin_dt
-    belongs to, based on the employee's shift window.
-
-    Logic:
-      - Build the shift window anchored on checkin_dt.date()
-      - If checkin_dt falls inside that window → work_date = checkin_dt.date()
-      - For night shifts that start yesterday (e.g. shift 20:00–08:00):
-          build window anchored on checkin_dt.date() - 1 day and check again
-      - Fallback: use checkin_dt.date()
+    belongs to, based on the employee's shift window and actual check-in time.
     """
     if work_rule is None:
         return checkin_dt.date()
 
-    shift_start = work_rule.shift_start_time   # e.g. time(20, 0) or time(8, 0)
-    shift_end   = work_rule.shift_end_time     # e.g. time(8, 0)  or time(20, 0)
-    is_night_shift = shift_end <= shift_start  # crosses midnight
+    hour = checkin_dt.hour
 
-    def build_window(anchor: date):
-        s = datetime.combine(anchor, shift_start)
-        if is_night_shift:
-            e = datetime.combine(anchor + timedelta(days=1), shift_end)
-        else:
-            e = datetime.combine(anchor, shift_end)
-        # make aware if needed
-        if timezone.is_naive(s):
-            s = timezone.make_aware(s)
-        if timezone.is_naive(e):
-            e = timezone.make_aware(e)
-        return s, e
+    # 1. Day or Evening shift check-ins (between 6:00 AM and 7:00 PM / 19:00)
+    #    always belong to the calendar day of the check-in.
+    if 6 <= hour < 19:
+        return checkin_dt.date()
 
-    # Widen window slightly (2 h buffer each side) to catch early arrivals /
-    # late starters without wrongly re-attributing the date.
-    BUFFER = timedelta(hours=2)
-    # BUFFER = timedelta(minutes=30)
+    # 2. Night shift check-ins starting in the evening (7:00 PM to midnight)
+    #    also belong to the calendar day of the check-in.
+    if hour >= 19:
+        return checkin_dt.date()
 
-    # Try anchor = today
-    for delta_days in [0, -1, 1]:
-        anchor = checkin_dt.date() + timedelta(days=delta_days)
-        win_start, win_end = build_window(anchor)
-        if (win_start - BUFFER) <= checkin_dt <= (win_end + BUFFER):
-            return anchor
+    # 3. Night shift check-ins after midnight (12:00 AM to 6:00 AM):
+    #    If the employee's default work rule is a night shift, this is likely a 
+    #    late check-in for a shift that started yesterday evening.
+    shift_start = work_rule.shift_start_time
+    shift_end = work_rule.shift_end_time
+    is_rule_night_shift = shift_end <= shift_start
 
-    # Hard fallback
+    if is_rule_night_shift:
+        return checkin_dt.date() - timedelta(days=1)
+
+    # Otherwise, fallback to the current calendar date
     return checkin_dt.date()
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # FIXED: build_sessions  (same interface as before, no change needed here)
