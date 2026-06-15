@@ -10,7 +10,7 @@ from .models import (Employee, AttendanceSettings,Department, SalaryStructure, P
     JoiningDetail, Resignation, Notification,WorkRule,OfficeLocation)
 from django.forms.widgets import ClearableFileInput
 
-# ✅ Custom Multi-File Input
+# ## Custom Multi-File Input
 class MultiFileInput(ClearableFileInput):
     allow_multiple_selected = True
 
@@ -44,7 +44,7 @@ class EmployeeRegistrationForm(forms.Form):
     department = forms.ModelChoiceField(queryset=Department.objects.all(), required=False)
     position = forms.CharField(max_length=100)
     manager = forms.ModelChoiceField(queryset=Employee.objects.all(), required=False, help_text="Reporting Manager")
-    work_rule = forms.ModelChoiceField(   # ✅ ADD THIS
+    work_rule = forms.ModelChoiceField(   # ## ADD THIS
         queryset=WorkRule.objects.all(),
         required=False,
         label="Work Rule",
@@ -78,12 +78,12 @@ class EmployeeRegistrationForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # ✅ Always load active locations
+        # ## Always load active locations
         self.fields["assigned_location"].queryset = (
             OfficeLocation.objects.filter(is_active=True)
         )
 
-        # ✅ Always required (INDOOR + OUTDOOR)
+        # ## Always required (INDOOR + OUTDOOR)
         self.fields["assigned_location"].required = True
 
     def clean(self):
@@ -91,7 +91,7 @@ class EmployeeRegistrationForm(forms.Form):
         location_type = cleaned.get("location_type")
         location = cleaned.get("assigned_location")
 
-        # ✅ VALIDATION RULE
+        # ## VALIDATION RULE
         if not location:
             raise forms.ValidationError(
                 "Assigned office location is required for all employees."
@@ -169,7 +169,7 @@ class DepartmentForm(forms.ModelForm):
         name = cleaned_data.get('name')
         parent = cleaned_data.get('parent_department')
 
-        # ✅ Prevent choosing same department as parent
+        # ## Prevent choosing same department as parent
         if self.instance.pk and parent and parent.pk == self.instance.pk:
             self.add_error('parent_department', "A department cannot be its own parent!")
 
@@ -511,7 +511,7 @@ class LeaveWorkflowStageForm(forms.ModelForm):
 # ============================================================
 # 📄 JOINING & RESIGNATION FORMS
 # ============================================================
-# ✅ Custom widget to support multiple file uploads
+# ## Custom widget to support multiple file uploads
 
 
 class JoiningDetailForm(forms.ModelForm):

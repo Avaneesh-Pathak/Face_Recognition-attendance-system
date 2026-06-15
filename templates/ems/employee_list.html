@@ -132,7 +132,7 @@
         color: #fa709a;
     }
 
-    /* Search & Filter */
+    /* Search & Filter Card */
     .filter-card {
         background: var(--card-gradient);
         backdrop-filter: blur(20px);
@@ -162,6 +162,7 @@
         background: white;
         cursor: pointer;
         transition: all 0.3s ease;
+        height: 43px;
     }
 
     .filter-select:focus {
@@ -354,7 +355,10 @@
     .empty-state-modern i {
         font-size: 4rem;
         background: linear-gradient(135deg, #667eea, #764ba2);
+
         -webkit-background-clip: text;
+        background-clip: text;
+
         -webkit-text-fill-color: transparent;
         opacity: 0.3;
     }
@@ -375,7 +379,7 @@
         animation: fadeInUp 0.5s ease-out;
     }
 
-    /* Responsive */
+    /* Responsive adjustments */
     @media (max-width: 992px) {
         .employee-directory {
             padding: 1rem;
@@ -486,12 +490,12 @@
                     </p>
                 </div>
             </div>
-            <div class="d-flex gap-2 header-buttons">
-                <a href="{% url 'register' %}" class="btn btn-gradient-primary">
-                    <i class="fas fa-plus me-2"></i>Add Employee
+            <div class="d-flex gap-2 header-buttons align-items-center">
+                <a href="{% url 'register' %}" class="btn btn-gradient-primary d-flex align-items-center justify-content-center gap-2">
+                    <i class="fas fa-plus"></i> Add Employee
                 </a>
-                <a href="{% url 'inactive_employee_list' %}" class="btn btn-gradient-danger">
-                    <i class="fas fa-user-slash me-2"></i>Inactive
+                <a href="{% url 'inactive_employee_list' %}" class="btn btn-gradient-danger d-flex align-items-center justify-content-center gap-2">
+                    <i class="fas fa-user-slash"></i> Inactive
                 </a>
             </div>
         </div>
@@ -545,23 +549,25 @@
     <!-- ==================== SEARCH & FILTER BAR ==================== -->
     <div class="filter-card">
         <div class="card-body p-3">
-            <form method="GET" class="row g-2 align-items-center">
+            <form method="GET" class="row row-cols-xl-6 row-cols-lg-3 row-cols-md-2 row-cols-1 g-3 align-items-end">
                 <!-- Text Search -->
-                <div class="col-lg-3 col-md-6">
+                <div>
+                    <label class="form-label text-muted small fw-semibold mb-1">Search Directory</label>
                     <div class="input-group">
-                        <span class="input-group-text bg-transparent border-end-0 text-muted" style="border-radius: 10px 0 0 10px;">
+                        <span class="input-group-text bg-transparent border-end-0 text-muted" style="border-radius: 10px 0 0 10px; height: 43px;">
                             <i class="fas fa-search"></i>
                         </span>
                         <input type="text" 
                                id="searchInput" 
-                               class="filter-input border-start-0" 
-                               placeholder="Search employees..."
-                               style="border-radius: 0 10px 10px 0; width: 100%;">
+                               class="filter-input border-start-0 w-100" 
+                               placeholder="Type name or ID..."
+                               style="border-radius: 0 10px 10px 0; height: 43px; width: calc(100% - 40px) !important;">
                     </div>
                 </div>
 
                 <!-- Department Filter -->
-                <div class="col-lg-2 col-md-6">
+                <div>
+                    <label class="form-label text-muted small fw-semibold mb-1">Department</label>
                     <select name="department" class="filter-select w-100" onchange="this.form.submit()">
                         <option value="">🏢 All Departments</option>
                         {% for dept in departments %}
@@ -572,17 +578,9 @@
                     </select>
                 </div>
 
-                <!-- Salary Sort -->
-                <div class="col-lg-2 col-md-6">
-                    <select name="sort_salary" class="filter-select w-100" onchange="this.form.submit()">
-                        <option value="">💰 Sort by Salary</option>
-                        <option value="highest" {% if selected_sort == 'highest' %}selected{% endif %}>Highest → Lowest</option>
-                        <option value="lowest" {% if selected_sort == 'lowest' %}selected{% endif %}>Lowest → Highest</option>
-                    </select>
-                </div>
-
                 <!-- Role Filter -->
-                <div class="col-lg-2 col-md-6">
+                <div>
+                    <label class="form-label text-muted small fw-semibold mb-1">Role</label>
                     <select name="role" class="filter-select w-100" onchange="this.form.submit()">
                         <option value="">👔 All Roles</option>
                         {% for code, name in roles %}
@@ -591,13 +589,32 @@
                     </select>
                 </div>
 
-                <!-- Clear Filters -->
-                <div class="col-lg-3 col-md-12">
-                    <div class="d-flex gap-2">
-                        <a href="{% url 'employee_list' %}" class="btn btn-light w-100" style="border-radius: 10px;">
-                            <i class="fas fa-undo me-2"></i>Clear Filters
-                        </a>
-                    </div>
+                <!-- Actual punch Shift Filter -->
+                <div>
+                    <label class="form-label text-muted small fw-semibold mb-1">Punch Shift</label>
+                    <select name="shift" class="filter-select w-100" onchange="this.form.submit()">
+                        <option value="">🌗 All Shifts</option>
+                        <option value="day" {% if selected_shift == "day" %}selected{% endif %}>☀ Day Shift</option>
+                        <option value="night" {% if selected_shift == "night" %}selected{% endif %}>🌙 Night Shift</option>
+                    </select>
+                </div>
+
+                <!-- Salary Sort (Admin / Finance display restriction) -->
+                <div>
+                    <label class="form-label text-muted small fw-semibold mb-1">Compensation</label>
+                    <select name="sort_salary" class="filter-select w-100" onchange="this.form.submit()" 
+                            {% if not user.is_superuser and not user.employee.role in "Admin Finance" %}disabled title="Access restricted"{% endif %}>
+                        <option value="">💰 Sort by Salary</option>
+                        <option value="highest" {% if selected_sort == 'highest' %}selected{% endif %}>Highest → Lowest</option>
+                        <option value="lowest" {% if selected_sort == 'lowest' %}selected{% endif %}>Lowest → Highest</option>
+                    </select>
+                </div>
+
+                <!-- Reset Filters Button -->
+                <div>
+                    <a href="{% url 'employee_list' %}" class="btn btn-light w-100 d-flex align-items-center justify-content-center gap-2 fw-semibold" style="border-radius: 10px; height: 43px; border: 1px solid rgba(0,0,0,0.08);">
+                        <i class="fas fa-undo"></i> Reset Filters
+                    </a>
                 </div>
             </form>
         </div>
@@ -612,8 +629,10 @@
                         <th>Employee</th>
                         <th>Department</th>
                         <th>Role</th>
-                        <th>Work Rule</th>
+                        <th>Actual Shift / Punched In</th>
+                        {% if user.is_superuser or user.employee.role in "Admin Finance" %}
                         <th>Base Salary</th>
+                        {% endif %}
                         <th>Status</th>
                         <th class="text-center">Actions</th>
                     </tr>
@@ -654,34 +673,37 @@
                             </span>
                         </td>
 
-                        <!-- Work Rule -->
-                        <td data-label="Work Rule">
-                            {% if e.work_rule %}
-                                <div>
-                                    <span class="fw-medium">{{ e.work_rule.name }}</span>
-                                    <br>
-                                    <span class="shift-badge 
-                                        {% if e.work_rule.shift_type == 'Night' %}shift-night
-                                        {% elif e.work_rule.shift_type == 'Day' %}shift-day
-                                        {% elif e.work_rule.shift_type == 'Evening' %}shift-evening
-                                        {% endif %}">
-                                        {% if e.work_rule.shift_type == 'Night' %}
-                                            🌙 Night
-                                        {% elif e.work_rule.shift_type == 'Day' %}
-                                            ☀ Day
-                                        {% elif e.work_rule.shift_type == 'Evening' %}
-                                            🌆 Evening
-                                        {% else %}
-                                            General
-                                        {% endif %}
-                                    </span>
-                                </div>
-                            {% else %}
-                                <span class="text-muted">Standard</span>
-                            {% endif %}
+                        <!-- Actual Shift (Punches) / Work Rule -->
+                        <td data-label="Actual Shift">
+                            <div>
+                                <span class="fw-medium d-inline-block mb-1 text-dark" style="font-size: 0.85rem;">{{ e.work_rule.name|default:"Standard" }}</span>
+                                <br>
+                                <span class="shift-badge 
+                                    {% if e.actual_shift_type == 'Night' %}shift-night
+                                    {% elif e.actual_shift_type == 'Day' %}shift-day
+                                    {% elif e.actual_shift_type == 'Evening' %}shift-evening
+                                    {% else %}shift-day
+                                    {% endif %}">
+                                    {% if e.actual_shift_type == 'Night' %}
+                                        🌙 Night Shift
+                                    {% elif e.actual_shift_type == 'Day' %}
+                                        ☀ Day Shift
+                                    {% elif e.actual_shift_type == 'Evening' %}
+                                        🌆 Evening Shift
+                                    {% else %}
+                                        ☀ General
+                                    {% endif %}
+                                </span>
+                                {% if e.last_checkin_formatted %}
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.725rem;">
+                                        <i class="far fa-clock me-1"></i>Checked-in: {{ e.last_checkin_formatted }}
+                                    </small>
+                                {% endif %}
+                            </div>
                         </td>
 
                         <!-- Salary -->
+                        {% if user.is_superuser or user.employee.role in "Admin Finance" %}
                         <td data-label="Salary">
                             {% if e.salary_structure %}
                                 <span class="fw-bold" style="color: #11998e;">₹{{ e.salary_structure.base_salary|floatformat:0 }}</span>
@@ -689,21 +711,26 @@
                                 <span class="text-muted">—</span>
                             {% endif %}
                         </td>
+                        {% endif %}
 
                         <!-- Status -->
                         <td data-label="Status">
-                            {% if e.employment_status == 'Active' %}
+                            {% if e.is_active and e.employment_status == 'active' %}
                                 <span class="badge-modern badge-active">Active</span>
-                            {% elif e.employment_status == 'Resigned' or e.employment_status == 'Terminated' %}
-                                <span class="badge-modern badge-inactive">{{ e.employment_status }}</span>
+                            {% elif e.employment_status == 'resigned' or e.employment_status == 'terminated' or not e.is_active %}
+                                <span class="badge-modern badge-inactive">
+                                    {{ e.get_employment_status_display }}
+                                </span>
                             {% else %}
-                                <span class="badge-modern badge-warning-status">{{ e.employment_status }}</span>
+                                <span class="badge-modern badge-warning-status">
+                                    {{ e.get_employment_status_display }}
+                                </span>
                             {% endif %}
                         </td>
 
                         <!-- Actions - Desktop -->
                         <td data-label="Actions" class="text-center">
-                            <div class="action-buttons-desktop d-inline-flex gap-1">
+                            <div class="action-buttons-desktop d-inline-flex gap-1 justify-content-center">
                                 <a href="{% url 'employee_update' e.id %}" 
                                    class="action-btn action-btn-edit" 
                                    data-bs-toggle="tooltip" 
@@ -745,11 +772,13 @@
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
-                                        <a class="dropdown-item text-danger" 
-                                           href="#" 
-                                           onclick="confirmDelete('{% url 'employee_delete' e.id %}', '{{ e.user.get_full_name|escapejs }}')">
-                                            <i class="fas fa-trash me-2"></i>Delete
-                                        </a>
+                                        <button
+                                            class="action-btn action-btn-delete"
+                                            data-delete-url="{% url 'employee_delete' e.id %}"
+                                            data-employee-name="{{ e.user.get_full_name|escapejs }}"
+                                            onclick="confirmDelete(this.dataset.deleteUrl, this.dataset.employeeName)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
                                     </li>
                                 </ul>
                             </div>

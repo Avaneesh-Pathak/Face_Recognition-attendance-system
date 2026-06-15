@@ -119,7 +119,7 @@ from core.utils.payslip_email import email_payslip
 from core.face_system import get_face_system
 from core.models import OfficeLocation
 from core.utils.location import is_inside_office
-
+from django.db.models import Max    
 from django.template.loader import render_to_string
 from django.contrib.auth.decorators import login_required
 from weasyprint import HTML
@@ -127,7 +127,7 @@ from django.http import HttpResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.shortcuts import get_object_or_404
-from core.utils.access import get_visible_employees
+from core.utils.access import get_visible_employees,get_visible_employees_all
 # Setup logging
 logger = logging.getLogger(__name__)
 handler = logging.FileHandler('registration.log')
@@ -294,14 +294,42 @@ def employee_list(request):
     employees = get_visible_employees(request.user).select_related(
         "user", "department", "salary_structure"
     )
-
     # ==========================
     # READ FILTER PARAMS
     # ==========================
     department_id = request.GET.get("department")
     role = request.GET.get("role")
     sort_salary = request.GET.get("sort_salary")
+    shift_filter = request.GET.get("shift")
 
+    if shift_filter in ["day", "night"]:
+
+        employee_ids = []
+
+        latest_checkins = (
+            Attendance.objects
+            .filter(
+                employee_id__in=employees.values_list("id", flat=True),
+                attendance_type="check_in"
+            )
+            .values("employee_id")
+            .annotate(last_checkin=Max("timestamp"))
+        )
+
+        for row in latest_checkins:
+            checkin = timezone.localtime(row["last_checkin"])
+            hour = checkin.hour
+
+            actual_shift = (
+                "night"
+                if hour >= 19 or hour < 6
+                else "day"
+            )
+
+            if actual_shift == shift_filter:
+                employee_ids.append(row["employee_id"])
+
+        employees = employees.filter(id__in=employee_ids)
     # ==========================
     # APPLY FILTERS
     # ==========================
@@ -322,20 +350,37 @@ def employee_list(request):
     # ==========================
     # KPIs (AFTER FILTERING)
     # ==========================
-    total_employees = employees.count()
+    # KPI queryset (independent)
+    if request.user.is_superuser:
+        kpi_qs = Employee.objects.all()
 
-    active_employees = employees.filter(
-        employment_status="Active"
+    elif hasattr(request.user, "employee") and request.user.employee.role in [
+        "Admin", "HR", "Finance"
+    ]:
+        kpi_qs = Employee.objects.all()
+
+    else:
+        # Managers/employees see KPIs only for visible staff
+        kpi_qs = employees
+
+    total_employees = kpi_qs.count()
+
+    active_employees = kpi_qs.filter(
+        is_active=True,
+        employment_status="active"
     ).count()
 
-    inactive_employees = employees.exclude(
-        employment_status="Active"
+    inactive_employees = kpi_qs.exclude(
+        is_active=True,
+        employment_status="active"
     ).count()
 
-    total_payroll = employees.aggregate(
-        total=Sum("salary_structure__base_salary")
-    )["total"] or 0
-
+    total_payroll = (
+        kpi_qs.aggregate(
+            total=Sum("salary_structure__base_salary")
+        )["total"] or 0
+    )
+    
     # ==========================
     # CONTEXT REQUIRED BY TEMPLATE
     # ==========================
@@ -348,6 +393,7 @@ def employee_list(request):
         "selected_dept": department_id,
         "selected_role": role,
         "selected_sort": sort_salary,
+        "selected_shift": shift_filter,
 
         "kpi": {
             "total": total_employees,
@@ -358,7 +404,6 @@ def employee_list(request):
     }
 
     return render(request, "ems/employee_list.html", context)
-
 
 
 class EmployeeUpdateForm(forms.ModelForm):
@@ -455,7 +500,7 @@ def employee_update(request, pk):
                 employee = form.save(commit=False)
 
 
-                # ✅ ADD THIS BLOCK HERE
+                #  ADD THIS BLOCK HERE
                 if is_admin_or_finance:
                     employee.role = request.POST.get("role", employee.role)
                 # =====================
@@ -468,7 +513,7 @@ def employee_update(request, pk):
                         return redirect("employee_list")
 
                     # Only personal allowed
-                    messages.warning(request, "⚠️ Only personal details updated. Official data is locked.")
+                    messages.warning(request, " Only personal details updated. Official data is locked.")
 
                     employee.department = old_employee.department
                     employee.position = old_employee.position
@@ -529,7 +574,7 @@ def employee_update(request, pk):
                     salary.save()
                 else:
                     if is_self:
-                        messages.warning(request, "⚠️ Salary changes are not allowed.")
+                        messages.warning(request, " Salary changes are not allowed.")
 
                 # =====================
                 # JOINING
@@ -547,7 +592,7 @@ def employee_update(request, pk):
                         joining=joining
                     ).delete()
 
-            messages.success(request, "✅ Employee updated successfully.")
+            messages.success(request, " Employee updated successfully.")
 
             if is_self:
                 return redirect("my_profile")
@@ -589,7 +634,7 @@ def employee_delete(request, pk):
         for doc in JoiningDocument.objects.filter(joining__employee=employee):
             doc.delete()
 
-        user.delete()  # ✅ cascades Employee
+        user.delete()  #  cascades Employee
 
         messages.success(request, "Employee deleted permanently")
         return redirect("employee_list")
@@ -602,7 +647,7 @@ def employee_delete(request, pk):
 def inactive_employee_list(request):
     user_role = getattr(request.user.employee, "role", "").lower()
 
-    # ✅ Only allowed roles
+    #  Only allowed roles
     if user_role in ["admin", "hr", "finance"] or request.user.is_superuser:
         employees = Employee.objects.exclude(
             employment_status__iexact="active"
@@ -623,7 +668,7 @@ def reactivate_employee(request, pk):
     employee.is_active = True
     employee.save()
 
-    messages.success(request, f"{employee.user.get_full_name()} reactivated successfully ✅")
+    messages.success(request, f"{employee.user.get_full_name()} reactivated successfully ")
     return redirect("inactive_employee_list")
 
 
@@ -720,15 +765,10 @@ def dashboard(request):
     # Fetch complete relational detail sets for administrative modal reviews
     on_duty_details = visible_employees.filter(id__in=checked_in_now_ids).select_related('user', 'department')
     late_details = visible_employees.filter(id__in=late_today_ids).select_related('user', 'department')
+    present_details = visible_employees.filter(id__in=present_today_ids).select_related('user', 'department')
 
     # Departmental staffing rates
     department_stats = []
-
-    dept_employee_map = defaultdict(set)
-
-    for emp in visible_employees.only("id", "department_id"):
-        if emp.department_id:
-            dept_employee_map[emp.department_id].add(emp.id)
 
     departments = (
         visible_employees
@@ -741,18 +781,22 @@ def dashboard(request):
 
     for dept in departments:
         dept_id = dept["department__id"]
-
-        dept_present = len(
-            dept_employee_map.get(dept_id, set()) & present_today_ids
-        )
+        
+        # Query list of all active employees in this department
+        dept_emps = visible_employees.filter(department_id=dept_id).select_related('user', 'department')
+        # Filter down to those present today
+        dept_present_emps = dept_emps.filter(id__in=present_today_ids)
 
         department_stats.append({
             "department_name": dept["department__name"] or "Unassigned",
             "total_count": dept["total_count"],
-            "present_count": dept_present,
+            "present_count": dept_present_emps.count(),
             "presence_rate": round(
-                (dept_present / dept["total_count"]) * 100
+                (dept_present_emps.count() / dept["total_count"]) * 100
             ) if dept["total_count"] else 0,
+            # Adding objects for modal viewing
+            "managed_employees": dept_emps,
+            "present_employees": dept_present_emps,
         })
 
     # Individual Employee Analytics Dashboard Indicators
@@ -857,6 +901,7 @@ def dashboard(request):
         "on_duty_employees": on_duty_details,
         "not_marked_employees": not_marked_qs,
         "late_employees": late_details,
+        "present_details": present_details,
         "leaves_today": leaves_today_qs,
         
         # Department metrics
@@ -1105,7 +1150,7 @@ def attendance_heartbeat(request):
         "ts": time.time()
     })
 
-# ------------------ ✅ Final mark_attendance Endpoint ------------------
+# ------------------  Final mark_attendance Endpoint ------------------
 # ============================================================
 # 🔁 SHIFT WINDOW (DAY + NIGHT SAFE + BUFFER FIX)
 # ============================================================
@@ -1414,7 +1459,7 @@ def mark_attendance(request):
             )
 
         # ----------------------------------------------------
-        # ✅ Success Response
+        #  Success Response
         # ----------------------------------------------------
         local_time = timezone.localtime(now)
         return JsonResponse({
@@ -2054,87 +2099,89 @@ def get_work_date(attendance, rule=None):
 # ==========================================================
 # 🔥 SESSION ENGINE (SAFE + FIXED)
 # ==========================================================
-def build_sessions(logs):
-    sessions = []
-    open_in = None
+# def build_sessions(logs):
+#     sessions = []
+#     open_in = None
 
-    for log in sorted(logs, key=lambda x: x.timestamp):
+#     for log in sorted(logs, key=lambda x: x.timestamp):
 
-        if log.attendance_type == "check_in":
-            open_in = timezone.localtime(log.timestamp)
+#         if log.attendance_type == "check_in":
+#             open_in = timezone.localtime(log.timestamp)
 
-        elif log.attendance_type == "check_out" and open_in:
-            out_time = timezone.localtime(log.timestamp)
+#         elif log.attendance_type == "check_out" and open_in:
+#             out_time = timezone.localtime(log.timestamp)
 
-            if out_time > open_in:
-                sessions.append({
-                    "start": open_in,
-                    "end": out_time
-                })
+#             if out_time > open_in:
+#                 sessions.append({
+#                     "start": open_in,
+#                     "end": out_time
+#                 })
 
-            open_in = None
+#             open_in = None
 
-    return sessions
+#     return sessions
 
-def split_sessions_by_shift(sessions, rule):
+# def split_sessions_by_shift(sessions, rule):
 
-    daily = defaultdict(lambda: {
-        "hours": 0,
-        "segments": []
-    })
+#     daily = defaultdict(lambda: {
+#         "hours": 0,
+#         "segments": []
+#     })
 
-    boundary_time = rule.shift_start_time if rule else time(8, 0)
+#     boundary_time = rule.shift_start_time if rule else time(8, 0)
 
-    for s in sessions:
-        current = s["start"]
-        end = s["end"]
+#     for s in sessions:
+#         current = s["start"]
+#         end = s["end"]
 
-        while current < end:
+#         while current < end:
 
-            boundary_today = datetime.combine(
-                current.date(),
-                boundary_time,
-                tzinfo=current.tzinfo
-            )
+#             boundary_today = datetime.combine(
+#                 current.date(),
+#                 boundary_time,
+#                 tzinfo=current.tzinfo
+#             )
 
-            if current < boundary_today:
-                boundary = boundary_today
-                work_day = current.date() - timedelta(days=1)
-            else:
-                boundary = datetime.combine(
-                    current.date() + timedelta(days=1),
-                    boundary_time,
-                    tzinfo=current.tzinfo
-                )
-                work_day = current.date()
+#             if current < boundary_today:
+#                 boundary = boundary_today
+#                 work_day = current.date() - timedelta(days=1)
+#             else:
+#                 boundary = datetime.combine(
+#                     current.date() + timedelta(days=1),
+#                     boundary_time,
+#                     tzinfo=current.tzinfo
+#                 )
+#                 work_day = current.date()
 
-            segment_end = min(boundary, end)
+#             segment_end = min(boundary, end)
 
-            duration = (segment_end - current).total_seconds() / 3600
+#             duration = (segment_end - current).total_seconds() / 3600
 
-            daily[work_day]["hours"] += duration
-            daily[work_day]["segments"].append({
-                "start": current,
-                "end": segment_end
-            })
+#             daily[work_day]["hours"] += duration
+#             daily[work_day]["segments"].append({
+#                 "start": current,
+#                 "end": segment_end
+#             })
 
-            current = segment_end
+#             current = segment_end
 
-    return daily
+#     return daily
 
-def get_shift_from_time(dt):
-    hour = dt.hour
+# def get_shift_from_time(dt):
+#     hour = dt.hour
 
-    # 🌙 Night Shift (7 PM → 6 AM)
-    if hour >= 19 or hour < 6:
-        return "Night"
+#     # 🌙 Night Shift (7 PM → 6 AM)
+#     if hour >= 19 or hour < 6:
+#         return "Night"
 
-    # ☀ Day Shift (6 AM → 2 PM)
-    if 6 <= hour < 14:
-        return "Day"
+#     # ☀ Day Shift (6 AM → 2 PM)
+#     if 6 <= hour < 14:
+#         return "Day"
 
-    # 🔁 Transition (2 PM → 7 PM)
-    return "Shift Change"
+#     # 🔁 Transition (2 PM → 7 PM)
+#     return "Shift Change"
+
+from .rotational_shift_fix import build_sessions, split_sessions_by_shift, get_shift_from_time
 
 # ✔ Morning shift (before 11 AM)
 # ✔ Day shift (11 AM – 4 PM)
@@ -2741,15 +2788,57 @@ def office_location_delete(request, pk):
 
 @login_required
 def org_chart_view(request, employee_id=None):
-    # Use logged-in employee if no ID passed
+
+    # Only active employees can be viewed
+    active_filter = {
+        "is_active": True,
+        "employment_status": "active"
+    }
+
+    # Use requested employee or logged-in employee
     if employee_id:
-        employee = get_object_or_404(Employee, employee_id=employee_id)
+        employee = get_object_or_404(
+            Employee,
+            employee_id=employee_id,
+            **active_filter
+        )
     else:
         employee = request.user.employee
 
-    reporting_chain = employee.get_reporting_chain()
+        # If logged-in employee is inactive
+        if not (
+            employee.is_active and
+            employee.employment_status == "active"
+        ):
+            messages.error(
+                request,
+                "This employee is inactive."
+            )
+            return redirect("dashboard")
 
-    return render(request, 'ems/org_chart.html', {'reporting_chain': reporting_chain})
+    # Build reporting chain excluding inactive managers
+    reporting_chain = []
+
+    current = employee
+    while current:
+        if (
+            current.is_active and
+            current.employment_status == "active"
+        ):
+            reporting_chain.append(current)
+
+        current = current.manager
+
+    reporting_chain.reverse()
+
+    return render(
+        request,
+        "ems/org_chart.html",
+        {
+            "reporting_chain": reporting_chain
+        }
+    )
+
 
 # -------- Helpers --------
 def employee_to_dict(emp):
@@ -2805,107 +2894,138 @@ def mark_current_employee(tree, emp_id):
             n["is_current"] = True
         mark_current_employee(n.get("children", []), emp_id)
 
+def get_active_employees_queryset():
+    return Employee.objects.filter(
+        is_active=True,
+        employment_status="active"
+    )
+
 # -------- APIs --------
 @login_required
 def org_tree_api_me(request):
-    """
-    Always returns a valid org tree.
-    If Employee is not linked → show only User card.
-    """
-
     user = request.user
 
-    # -------------------------------------------------
-    # CASE 1: USER HAS NO EMPLOYEE PROFILE
-    # -------------------------------------------------
     if not hasattr(user, "employee"):
-        single_node = {
-            "id": f"user-{user.id}",
-            "name": user.get_full_name() or user.username,
-            "department": "—",
-            "position": "User",
-            "image": "",
-            "profile_url": "",
-            "children": [],
-            "is_current": True,
-        }
-        return JsonResponse({"ok": True, "tree": [single_node]})
+        return JsonResponse({
+            "ok": True,
+            "tree": [{
+                "id": f"user-{user.id}",
+                "name": user.get_full_name() or user.username,
+                "department": "—",
+                "position": "User",
+                "image": "",
+                "profile_url": "",
+                "children": [],
+                "is_current": True,
+            }]
+        })
 
-    # -------------------------------------------------
-    # CASE 2: USER HAS EMPLOYEE PROFILE
-    # -------------------------------------------------
     current_emp = user.employee
-    is_hr = user.is_superuser or current_emp.role in ["HR", "Admin"]
+
+    # Inactive employees cannot appear in org chart
+    if not (
+        current_emp.is_active and
+        current_emp.employment_status == "active"
+    ):
+        return JsonResponse({
+            "ok": True,
+            "tree": []
+        })
+
+    is_hr = (
+        user.is_superuser or
+        current_emp.role in ["HR", "Admin"]
+    )
 
     employees = (
-        current_emp.__class__.objects
+        get_active_employees_queryset()
         .select_related("user", "department", "manager")
         .prefetch_related("subordinates")
     )
 
-    # Build employee map
     emp_map = {}
+
     for emp in employees:
+        try:
+            profile_url = reverse(
+                "employee_detail",
+                args=[emp.employee_id]
+            )
+        except Exception:
+            profile_url = f"/employees/{emp.id}/profile/"
+
         emp_map[emp.id] = {
             "id": emp.id,
             "name": emp.user.get_full_name(),
             "department": emp.department.name if emp.department else "",
             "position": emp.position,
             "manager_id": emp.manager_id,
-            "image": emp.profile_image.url if getattr(emp, "profile_image", None) else "",
-            "profile_url": reverse("employee_detail", args=[emp.employee_id]),
+            "image": (
+                emp.profile_image.url
+                if getattr(emp, "profile_image", None)
+                else ""
+            ),
+            "profile_url": profile_url,
             "children": [],
             "is_current": emp.id == current_emp.id,
         }
 
-    # Build hierarchy
+    if current_emp.id not in emp_map:
+        return JsonResponse({
+            "ok": True,
+            "tree": []
+        })
+
     roots = []
+
     for emp in employees:
         node = emp_map[emp.id]
+
         if emp.manager_id and emp.manager_id in emp_map:
             emp_map[emp.manager_id]["children"].append(node)
         else:
             roots.append(node)
 
-    # -------------------------------------------------
-    # HR / ADMIN → FULL TREE
-    # -------------------------------------------------
     if is_hr:
-        return JsonResponse({"ok": True, "tree": roots})
+        return JsonResponse({
+            "ok": True,
+            "tree": roots
+        })
 
-    # -------------------------------------------------
-    # EMPLOYEE → LIMITED TREE
-    # -------------------------------------------------
     allowed_ids = {current_emp.id}
 
-    # Managers
     mgr = current_emp.manager
+
     while mgr:
-        allowed_ids.add(mgr.id)
+        if mgr.id in emp_map:
+            allowed_ids.add(mgr.id)
         mgr = mgr.manager
 
-    # Subordinates
-    def collect_children(eid):
-        for c in emp_map[eid]["children"]:
-            allowed_ids.add(c["id"])
-            collect_children(c["id"])
+    def collect_children(emp_id):
+        if emp_id not in emp_map:
+            return
+
+        for child in emp_map[emp_id]["children"]:
+            allowed_ids.add(child["id"])
+            collect_children(child["id"])
 
     collect_children(current_emp.id)
 
     def filter_tree(nodes):
         result = []
-        for n in nodes:
-            if n["id"] in allowed_ids:
-                n_copy = n.copy()
-                n_copy["children"] = filter_tree(n["children"])
-                result.append(n_copy)
+
+        for node in nodes:
+            if node["id"] in allowed_ids:
+                copied = node.copy()
+                copied["children"] = filter_tree(
+                    node["children"]
+                )
+                result.append(copied)
+
         return result
 
     restricted_tree = filter_tree(roots)
 
-    # -------------------------------------------------
-    # FALLBACK → ONLY SELF
-    # -------------------------------------------------
     if not restricted_tree:
         return JsonResponse({
             "ok": True,
@@ -2915,8 +3035,10 @@ def org_tree_api_me(request):
             }]
         })
 
-    return JsonResponse({"ok": True, "tree": restricted_tree})
-
+    return JsonResponse({
+        "ok": True,
+        "tree": restricted_tree
+    })
 
 @login_required
 def org_chart_page(request):
@@ -2927,97 +3049,146 @@ def org_chart_page(request):
 
 @login_required
 def org_tree_api(request):
-    """
-    Returns the JSON Org Tree based on user role:
-    - HR/Admin: Full organization
-    - Employee: Only their managers (path to CEO) -> them -> their subordinates
-    If they have no manager/subordinates, returns just their card.
-    """
-    try:
-        current_emp = request.user.employee
-    except getattr(request.user, 'employee', None).DoesNotExist if hasattr(request.user, 'employee') else Exception:
-        return JsonResponse({"ok": False, "error": "Employee not linked"}, status=403)
 
-    # Determine role access
-    emp_role = getattr(current_emp, 'role', '')
-    is_hr = request.user.is_superuser or emp_role in ["HR", "Admin"]
+    if not hasattr(request.user, "employee"):
+        return JsonResponse(
+            {"ok": False, "error": "Employee not linked"},
+            status=403
+        )
 
-    # 1. Fetch all employees to build map efficiently (1 DB query)
-    # Adjust related fields based on your actual model architecture
-    employees = current_emp.__class__.objects.select_related("user", "department", "manager").all()
+    current_emp = request.user.employee
+
+    if not (
+        current_emp.is_active and
+        current_emp.employment_status == "active"
+    ):
+        return JsonResponse({
+            "ok": True,
+            "tree": []
+        })
+
+    is_hr = (
+        request.user.is_superuser or
+        current_emp.role in ["HR", "Admin"]
+    )
+
+    employees = (
+        get_active_employees_queryset()
+        .select_related(
+            "user",
+            "department",
+            "manager"
+        )
+    )
 
     emp_map = {}
+
     for emp in employees:
-        image_url = emp.profile_image.url if getattr(emp, 'profile_image', None) else ""
-        
-        # Safely get profile URL
+
         try:
-            profile_url = reverse('employee_detail', args=[emp.employee_id])
-        except:
+            profile_url = reverse(
+                "employee_detail",
+                args=[emp.employee_id]
+            )
+        except Exception:
             profile_url = f"/employees/{emp.id}/profile/"
 
         emp_map[emp.id] = {
             "id": emp.id,
-            "name": emp.user.get_full_name() if hasattr(emp, 'user') else "Unknown",
-            "department": emp.department.name if getattr(emp, 'department', None) else "",
-            "position": getattr(emp, 'role', getattr(emp, 'designation', 'Employee')),
+            "name": emp.user.get_full_name(),
+            "department": (
+                emp.department.name
+                if emp.department else ""
+            ),
+            "position": getattr(
+                emp,
+                "role",
+                getattr(
+                    emp,
+                    "designation",
+                    "Employee"
+                )
+            ),
             "manager_id": emp.manager_id,
-            "image": image_url,
+            "image": (
+                emp.profile_image.url
+                if getattr(emp, "profile_image", None)
+                else ""
+            ),
             "profile_url": profile_url,
             "children": [],
-            "is_current": (emp.id == current_emp.id)
+            "is_current": (
+                emp.id == current_emp.id
+            )
         }
 
-    # 2. Build Full Tree
+    if current_emp.id not in emp_map:
+        return JsonResponse({
+            "ok": True,
+            "tree": []
+        })
+
     roots = []
+
     for emp in employees:
         node = emp_map[emp.id]
+
         if emp.manager_id and emp.manager_id in emp_map:
             emp_map[emp.manager_id]["children"].append(node)
         else:
             roots.append(node)
 
-    # If HR, return full org chart
     if is_hr:
-        return JsonResponse({"ok": True, "tree": roots})
+        return JsonResponse({
+            "ok": True,
+            "tree": roots
+        })
 
-    # 3. If Normal Employee -> Restrict View Logic
-    allowed_ids = set()
+    allowed_ids = {current_emp.id}
 
-    # Add self
-    allowed_ids.add(current_emp.id)
+    mgr_id = current_emp.manager_id
 
-    # Add managers up to CEO
-    curr_mgr_id = current_emp.manager_id
-    while curr_mgr_id and curr_mgr_id in emp_map:
-        allowed_ids.add(curr_mgr_id)
-        curr_mgr_id = emp_map[curr_mgr_id]["manager_id"]
+    while mgr_id and mgr_id in emp_map:
+        allowed_ids.add(mgr_id)
+        mgr_id = emp_map[mgr_id]["manager_id"]
 
-    # Add all subordinates downward
-    def collect_subordinates(node_id):
-        for child in emp_map[node_id]["children"]:
+    def collect_subordinates(emp_id):
+        if emp_id not in emp_map:
+            return
+
+        for child in emp_map[emp_id]["children"]:
             allowed_ids.add(child["id"])
             collect_subordinates(child["id"])
 
     collect_subordinates(current_emp.id)
 
-    # 4. Filter the tree to only allowed nodes
     def filter_tree(nodes):
         result = []
-        for n in nodes:
-            if n["id"] in allowed_ids:
-                # Copy dict so we don't mutate original during recursion
-                n_copy = n.copy()
-                n_copy["children"] = filter_tree(n["children"])
-                result.append(n_copy)
+
+        for node in nodes:
+            if node["id"] in allowed_ids:
+                copied = node.copy()
+                copied["children"] = filter_tree(
+                    node["children"]
+                )
+                result.append(copied)
+
         return result
 
     restricted_tree = filter_tree(roots)
 
-    # Note: Even if 'restricted_tree' only has 1 node (the user), it perfectly returns just their card!
-    return JsonResponse({"ok": True, "tree": restricted_tree})
+    if not restricted_tree:
+        restricted_tree = [{
+            **emp_map[current_emp.id],
+            "children": []
+        }]
 
+    return JsonResponse({
+        "ok": True,
+        "tree": restricted_tree
+    })
 
+    
 def employee_detail(request, employee_id):
     employee = get_object_or_404(Employee, employee_id=employee_id)
     return render(request, 'ems/my_profile.html', {'employee': employee})
@@ -3461,7 +3632,7 @@ def pay_salary(request, pk):
 
         messages.success(
             request,
-            "✅ Salary marked as PAID. Override recorded if applied."
+            " Salary marked as PAID. Override recorded if applied."
         )
         return redirect("payroll_list")
 
@@ -3577,7 +3748,7 @@ def employee_salary_history(request, employee_id):
     ).order_by('-month')
 
     # -------------------------------------------------
-    # ✅ AUTO-FIX PAID DAYS (UNCHANGED LOGIC)
+    #  AUTO-FIX PAID DAYS (UNCHANGED LOGIC)
     # -------------------------------------------------
     for p in payrolls:
         try:
@@ -3902,7 +4073,7 @@ def joining_detail_list(request):
         'title': 'Joining Details'
     })
 
-# ✅ Download Individual Document
+#  Download Individual Document
 @login_required
 def download_document(request, doc_id):
     doc = get_object_or_404(JoiningDocument, id=doc_id)
@@ -3914,7 +4085,7 @@ def download_document(request, doc_id):
         messages.error(request, "File not found.")
         return redirect('joining_detail_list')
 
-# ✅ Delete a Document
+#  Delete a Document
 @login_required
 def delete_document(request, doc_id):
     doc = get_object_or_404(JoiningDocument, id=doc_id)
@@ -3930,7 +4101,7 @@ def delete_document(request, doc_id):
 
     return redirect('joining_detail_list')
 
-# ✅ Download all documents as a ZIP
+#  Download all documents as a ZIP
 @login_required
 def download_all_documents(request, detail_id):
     detail = get_object_or_404(JoiningDetail, id=detail_id)

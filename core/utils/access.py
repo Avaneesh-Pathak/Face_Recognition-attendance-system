@@ -73,3 +73,30 @@ def get_visible_employees(user):
 
     # Default → only self
     return Employee.objects.filter(id=emp.id)
+
+
+def get_visible_employees_all(user):
+    if not user or not user.is_authenticated:
+        return Employee.objects.none()
+
+    if user.is_superuser:
+        return Employee.objects.all()
+
+    if not hasattr(user, "employee"):
+        return Employee.objects.none()
+
+    emp = user.employee
+
+    if emp.role in ["Admin", "HR", "Finance"]:
+        return Employee.objects.all()
+
+    if emp.role == "Manager":
+        subordinates = get_all_subordinates(emp)
+        return Employee.objects.filter(
+            id__in=[emp.id] + list(subordinates.values_list("id", flat=True))
+        )
+
+    return Employee.objects.filter(id=emp.id)
+
+
+

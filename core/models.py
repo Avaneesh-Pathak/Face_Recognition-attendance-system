@@ -15,6 +15,9 @@ from datetime import date, datetime, time, timedelta
 from core.utils.payslip_pdf import generate_payslip_pdf
 from collections import defaultdict
 from django.db import models, transaction
+from .rotational_shift_fix import get_work_date_for_checkin
+
+
 
 class OfficeLocation(models.Model):
     name = models.CharField(max_length=100)
@@ -45,7 +48,7 @@ class Employee(models.Model):
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
     position = models.CharField(max_length=100)
     manager = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="subordinates")
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='Employee')  # ✅ NEW
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='Employee')  #NEW
     phone_number = models.CharField(max_length=15)
     date_of_joining = models.DateField(default=timezone.now)
     date_of_resignation = models.DateField(blank=True, null=True)
@@ -220,6 +223,7 @@ def get_shift_for_day(employee, day):
         return assignment.work_rule
 
     return employee.work_rule
+
 # ============================================================
 # 📅 WORKING DAY CHECK
 # ============================================================
@@ -335,6 +339,8 @@ def get_employee_rule_from_rule(rule):
         "count_holiday_overtime": rule.count_holiday_overtime,
     }
 
+
+
 # ============================================================
 # 💰 PAYROLL MANAGER (FINAL & CORRECT)
 # class PayrollManager(models.Manager):
@@ -441,14 +447,14 @@ def get_employee_rule_from_rule(rule):
 
 #                 # ---------- ATTENDANCE FETCH ----------
 #                 if emp.work_rule.shift_end_time > emp.work_rule.shift_start_time:
-#                     # ✅ DAY SHIFT → DATE BASED (FIX)
+#                     #DAY SHIFT → DATE BASED (FIX)
 #                     logs = Attendance.objects.filter(
 #                         employee=emp,
 #                         timestamp__date=day
 #                     ).order_by("timestamp")
 #                     print(f"[LOGS] Day-shift logs: {logs.count()}")
 #                 else:
-#                     # ✅ NIGHT SHIFT → SHIFT WINDOW
+#                     #NIGHT SHIFT → SHIFT WINDOW
 #                     shift_start, shift_end = get_shift_window(day, emp.work_rule)
 #                     logs = Attendance.objects.filter(
 #                         employee=emp,
@@ -480,7 +486,7 @@ def get_employee_rule_from_rule(rule):
 
 #                 print(f"[HOURS] Worked: {work_hours}")
 
-#                 # ✅ EVEN 1 HOUR COUNTS
+#                 #EVEN 1 HOUR COUNTS
 #                 if is_work_day:
 #                     total_work_hours += work_hours
 #                 else:
@@ -533,7 +539,7 @@ def get_employee_rule_from_rule(rule):
 #                 processed_at=timezone.now(),
 #             )
 
-#             print(f"✅ Payroll generated: ₹{net_salary}")
+#             print(f"Payroll generated: ₹{net_salary}")
 
 #             try:
 #                 pdf, filename = generate_payslip_pdf(payroll)
@@ -639,7 +645,7 @@ def get_attendance_status(worked_hours, rule):
 class EnterprisePayrollManager(models.Manager):
 
     def generate_salary(self, year, month, employee=None):
-        print(f"\n🚀 [START] Enterprise Payroll Engine → {month}/{year}")
+        print(f"\n## [START] Enterprise Payroll Engine → {month}/{year}")
         
         first_day = date(year, month, 1)
         last_day = date(year, month, calendar.monthrange(year, month)[1])
@@ -755,22 +761,10 @@ class EnterprisePayrollManager(models.Manager):
             # SPLIT INTO DAYS
             # -------------------------------
             daily_hours_map = {}
-
             for start, end in sessions:
-                current = start
-
-                while current.date() <= end.date():
-                    day_start = datetime.combine(current.date(), time.min, tzinfo=start.tzinfo)
-                    day_end = datetime.combine(current.date(), time.max, tzinfo=start.tzinfo)
-
-                    s = max(start, day_start)
-                    e = min(end, day_end)
-
-                    if s < e:
-                        hours = (e - s).total_seconds() / 3600
-                        daily_hours_map[current.date()] = daily_hours_map.get(current.date(), 0) + hours
-
-                    current += timedelta(days=1)
+                work_date = get_work_date_for_checkin(start, emp.work_rule)
+                hours = (end - start).total_seconds() / 3600
+                daily_hours_map[work_date] = daily_hours_map.get(work_date, 0) + hours
 
             # -------------------------------
             # DAILY LOOP (ONLY ONE LOOP)
@@ -888,7 +882,7 @@ class EnterprisePayrollManager(models.Manager):
             Payroll.objects.filter(month=first_day).delete()
             Payroll.objects.bulk_create(payroll_objects, batch_size=500)
 
-        print("✅ Payroll Generated Successfully\n")
+        print("Payroll Generated Successfully\n")
 
 
 
@@ -956,7 +950,7 @@ class PayrollSettings(models.Model):
     professional_tax = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('200.00'))
     esi_limit = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('21000'))
 
-    # ✅ NEW defaults if Employee has no WorkRule
+    #NEW defaults if Employee has no WorkRule
     default_working_days = models.CharField(
         max_length=10,
         choices=[('5_day', 'Mon–Fri'), ('6_day', 'Mon–Sat')],
@@ -1049,7 +1043,7 @@ class WorkRule(models.Model):
 class LeaveType(models.Model):
     name = models.CharField(max_length=100)
     max_days_per_year = models.PositiveIntegerField(default=12)
-    is_paid = models.BooleanField(default=True)  # ✅ new
+    is_paid = models.BooleanField(default=True)  #new
 
     def __str__(self):
         return self.name
@@ -1125,7 +1119,7 @@ class JoiningDocument(models.Model):
     joining = models.ForeignKey(
         JoiningDetail,
         on_delete=models.CASCADE,
-        related_name='joining_documents'   # ✅ avoid conflict
+        related_name='joining_documents'   #avoid conflict
     )
     file = models.FileField(upload_to="joining_documents/")
     uploaded_at = models.DateTimeField(auto_now_add=True)

@@ -69,7 +69,7 @@
         letter-spacing: 0.3px;
     }
 
-    /* KPI Display Metrics */
+    /* KPI Display Metrics & Hover states */
     .kpi-card {
         background: #ffffff;
         border-radius: 12px;
@@ -83,6 +83,27 @@
     .kpi-card:hover {
         transform: translateY(-2px);
         box-shadow: var(--card-shadow-hover);
+    }
+
+    /* Interactive stats elements styling */
+    .kpi-card[data-list-id], .interactive-badge[data-list-id] {
+        cursor: pointer;
+    }
+
+    .kpi-card[data-list-id]:hover {
+        transform: translateY(-4px);
+        border-color: var(--color-primary);
+    }
+
+    .interactive-badge[data-list-id] {
+        transition: var(--transition-smooth);
+    }
+
+    .interactive-badge[data-list-id]:hover {
+        background-color: var(--color-primary) !important;
+        color: #ffffff !important;
+        border-color: var(--color-primary-dark) !important;
+        transform: scale(1.05);
     }
 
     .kpi-icon {
@@ -257,36 +278,13 @@
 
 <div class="dashboard-wrapper">
 
-    <!-- 1. ADMINISTRATIVE HEADER SECTION
-    <div class="header-section d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <div class="header-icon-box">
-                <i class="fas fa-hospital-alt"></i>
-            </div>
-            <div>
-                <h3 class="fw-bold mb-0 text-dark tracking-tight">
-                    Hospital Command Center
-                </h3>
-                <small class="text-muted fw-semibold d-block mt-1">
-                    <i class="fas fa-satellite-dish me-1"></i>
-                    Real-time Attendance & Workforce Monitoring
-                </small>
-            </div>
-        </div>
-
-        {% if is_admin %}
-        <span class="admin-badge">
-            <i class="fas fa-shield-alt me-1"></i>
-            Administrator Console
-        </span>
-        {% endif %}
-    </div> -->
+    <!-- 1. ADMINISTRATIVE HEADER SECTION -->
 
     <!-- 2. KPI PERFORMANCE GRID -->
     <div class="row g-3 mb-4">
 
         <div class="col-lg-2 col-md-4 col-6">
-            <div class="kpi-card">
+            <div class="kpi-card" data-list-id="list-total-staff" data-title="Total Staff List">
                 <div class="kpi-icon icon-total">
                     <i class="fas fa-users"></i>
                 </div>
@@ -296,7 +294,7 @@
         </div>
 
         <div class="col-lg-2 col-md-4 col-6">
-            <div class="kpi-card present">
+            <div class="kpi-card present" data-list-id="list-present-today" data-title="Present Today List">
                 <div class="kpi-icon icon-present">
                     <i class="fas fa-user-check"></i>
                 </div>
@@ -306,7 +304,7 @@
         </div>
 
         <div class="col-lg-2 col-md-4 col-6">
-            <div class="kpi-card onduty">
+            <div class="kpi-card onduty" data-list-id="list-on-duty" data-title="Active On Duty Staff">
                 <div class="kpi-icon icon-onduty">
                     <i class="fas fa-stethoscope"></i>
                 </div>
@@ -316,7 +314,7 @@
         </div>
 
         <div class="col-lg-2 col-md-4 col-6">
-            <div class="kpi-card absent">
+            <div class="kpi-card absent" data-list-id="list-absent" data-title="Absent / Not Marked Today">
                 <div class="kpi-icon icon-absent">
                     <i class="fas fa-user-times"></i>
                 </div>
@@ -326,7 +324,7 @@
         </div>
 
         <div class="col-lg-2 col-md-4 col-6">
-            <div class="kpi-card late">
+            <div class="kpi-card late" data-list-id="list-late-arrivals" data-title="Late Arrivals Today">
                 <div class="kpi-icon icon-late">
                     <i class="fas fa-clock"></i>
                 </div>
@@ -437,8 +435,20 @@
                 {% for stat in department_stats %}
                     <tr>
                         <td class="fw-semibold text-dark">{{ stat.department_name }}</td>
-                        <td><span class="badge bg-light text-dark px-3 py-1.5 border">{{ stat.total_count }}</span></td>
-                        <td><span class="badge bg-light text-dark px-3 py-1.5 border">{{ stat.present_count }}</span></td>
+                        <td>
+                            <span class="badge bg-light text-dark px-3 py-1.5 border interactive-badge" 
+                                  data-list-id="list-dept-managed-{{ forloop.counter }}" 
+                                  data-title="Managed Staff - {{ stat.department_name }}">
+                                {{ stat.total_count }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark px-3 py-1.5 border interactive-badge" 
+                                  data-list-id="list-dept-present-{{ forloop.counter }}" 
+                                  data-title="Present Staff - {{ stat.department_name }}">
+                                {{ stat.present_count }}
+                            </span>
+                        </td>
                         <td style="min-width: 240px;">
                             <div class="d-flex align-items-center gap-3">
                                 <div class="progress flex-grow-1">
@@ -541,10 +551,179 @@
 
 </div>
 
+<!-- 📦 HIDDEN CONTAINERS FOR EMPLOYEE MODAL LISTS (Django-generated) -->
+<div id="hidden-employee-lists" style="display: none;">
+    
+    <!-- KPI Lists -->
+    <div id="list-total-staff">
+        {% for emp in employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.department.get_name_display|default:"Unassigned" }} | {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-info-circle me-1"></i>No active staff records found.</p>
+        {% endfor %}
+    </div>
+
+    <div id="list-present-today">
+        {% for emp in present_details %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-success-subtle text-success border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.department.get_name_display|default:"Unassigned" }} | {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-info-circle me-1"></i>No employees registered present today.</p>
+        {% endfor %}
+    </div>
+
+    <div id="list-on-duty">
+        {% for emp in on_duty_employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-info-subtle text-info border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.department.get_name_display|default:"Unassigned" }} | {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-info-circle me-1"></i>No employees currently active on duty.</p>
+        {% endfor %}
+    </div>
+
+    <div id="list-absent">
+        {% for emp in not_marked_employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-danger-subtle text-danger border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.department.get_name_display|default:"Unassigned" }} | {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-check-circle me-1"></i>All active employees have punched-in.</p>
+        {% endfor %}
+    </div>
+
+    <div id="list-late-arrivals">
+        {% for emp in late_employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-warning-subtle text-warning border px-2 py-1" style="font-size: 0.7rem;">
+                Late Punch
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-smile me-1"></i>No late arrivals registered today.</p>
+        {% endfor %}
+    </div>
+
+    <!-- Department Rosters (Generated Dynamically via Loop counters) -->
+    {% for stat in department_stats %}
+    <div id="list-dept-managed-{{ forloop.counter }}">
+        {% for emp in stat.managed_employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-info-circle me-1"></i>No active staff assigned to this department.</p>
+        {% endfor %}
+    </div>
+
+    <div id="list-dept-present-{{ forloop.counter }}">
+        {% for emp in stat.present_employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-success-subtle text-success border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-info-circle me-1"></i>No staff present today from this department.</p>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+</div>
+
+<!-- 📦 THE INTERACTIVE STATS DETAILS MODAL -->
+<div class="modal fade" id="statsDetailModal" tabindex="-1" aria-labelledby="statsDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+            <div class="modal-header border-bottom bg-light py-3">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="statsDetailModalLabel" style="font-size: 1.05rem;">
+                    <i class="fas fa-list-ul text-primary"></i>
+                    <span>Staff Record Details</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="max-height: 400px; min-height: 120px;">
+                <div id="modal-employee-container" style="max-height: 100%;">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" style="font-size: 0.8rem; font-weight: 500;" data-bs-dismiss="modal">Close Window</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // --- 1. REUSABLE STATS MODAL INTEGRATION ---
+        const clickableStats = document.querySelectorAll('[data-list-id]');
+        const modalElement = document.getElementById('statsDetailModal');
+        
+        if (clickableStats.length > 0 && modalElement) {
+            const statsModal = new bootstrap.Modal(modalElement);
+            const modalTitle = document.getElementById('statsDetailModalLabel').querySelector('span');
+            const container = document.getElementById('modal-employee-container');
+            
+            clickableStats.forEach(elem => {
+                elem.addEventListener('click', function() {
+                    const listId = this.getAttribute('data-list-id');
+                    const titleText = this.getAttribute('data-title') || 'Staff Records';
+                    
+                    const sourceList = document.getElementById(listId);
+                    if (sourceList) {
+                        modalTitle.textContent = titleText;
+                        container.innerHTML = sourceList.innerHTML;
+                        statsModal.show();
+                    }
+                });
+            });
+        }
+
+        // --- 2. ATTENDANCE TREND LINE CHART ---
         const labels = {{ attendance_labels_json|safe|default:"[]" }};
         const values = {{ attendance_values_json|safe|default:"[]" }};
 

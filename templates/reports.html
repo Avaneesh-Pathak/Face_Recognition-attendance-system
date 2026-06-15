@@ -867,13 +867,13 @@
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
                                     <li>
-                                        <a class="dropdown-item" href="#" onclick="openModal('edit', {
-                                            id: '{{ record.id }}', 
-                                            type: '{{ record.attendance_type }}', 
-                                            time: '{{ record.timestamp|date:'Y-m-d\TH:i' }}', 
-                                            location: '{{ record.location|escapejs|default:'' }}', 
-                                            notes: '{{ record.notes|escapejs|default:'' }}'
-                                        })">
+                                        <a class="dropdown-item edit-record"
+                                        href="#"
+                                        data-id="{{ record.id }}"
+                                        data-type="{{ record.attendance_type }}"
+                                        data-time="{{ record.timestamp|date:'Y-m-d\\TH:i' }}"
+                                        data-location="{{ record.location|default_if_none:''|escapejs }}"
+                                        data-notes="{{ record.notes|default_if_none:''|escapejs }}">
                                             <i class="fas fa-edit me-2 text-primary"></i>Edit
                                         </a>
                                     </li>

@@ -1,299 +1,774 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block page_title %}Departments | Organization{% endblock %}
+{% block page_title %}Department Hub | Organization Structure{% endblock %}
+{% load tz %}
 
 {% block content %}
-<div class="container-fluid px-4 fade-in-up" style="max-width: 1200px;">
+<div class="employee-directory fade-in-up">
 
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
-        <div>
-            <h2 class="fw-bold text-dark mb-1">
-                <i class="fas fa-building text-primary me-2"></i>Departments
-            </h2>
-            <p class="text-muted mb-0">Structure your organization and assign leadership.</p>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="{% url 'org_chart' %}" class="btn btn-outline-secondary rounded-pill shadow-sm">
-                <i class="fas fa-sitemap me-2"></i>Org Chart
-            </a>
-            {% if user.is_staff %}
-            <a href="{% url 'department_create' %}" class="btn btn-primary rounded-pill shadow-sm">
-                <i class="fas fa-plus me-2"></i>Add Department
-            </a>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Statistics Cards -->
-    <div class="row g-4 mb-4">
-        <!-- Total Departments -->
-        <div class="col-md-4">
-            <div class="card modern-card h-100 p-3">
-                <div class="d-flex align-items-center">
-                    <div class="icon-box bg-primary-soft text-primary me-3">
-                        <i class="fas fa-layer-group fa-lg"></i>
-                    </div>
-                    <div>
-                        <h6 class="text-muted text-uppercase text-xs fw-bold mb-1">Total Departments</h6>
-                        <h3 class="mb-0 fw-bold text-dark">{{ departments.count }}</h3>
-                    </div>
+    <!-- ==================== HEADER SECTION ==================== -->
+    <div class="directory-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="header-icon-wrapper">
+                    <i class="fas fa-building"></i>
+                </div>
+                <div>
+                    <h2 class="fw-bold mb-1" style="background: linear-gradient(135deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                        Department Directory
+                    </h2>
+                    <p class="text-muted mb-0 small">
+                        <i class="fas fa-sitemap me-1"></i>Manage organizational units, leadership structure, and workforce distributions
+                    </p>
                 </div>
             </div>
-        </div>
-        <!-- With Heads -->
-        <div class="col-md-4">
-            <div class="card modern-card h-100 p-3">
-                <div class="d-flex align-items-center">
-                    <div class="icon-box bg-success-soft text-success me-3">
-                        <i class="fas fa-user-tie fa-lg"></i>
-                    </div>
-                    <div>
-                        <h6 class="text-muted text-uppercase text-xs fw-bold mb-1">Assigned Heads</h6>
-                        <h3 class="mb-0 fw-bold text-dark">{{ departments_with_heads|default:"0" }}</h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Sub Departments -->
-        <div class="col-md-4">
-            <div class="card modern-card h-100 p-3">
-                <div class="d-flex align-items-center">
-                    <div class="icon-box bg-info-soft text-info me-3">
-                        <i class="fas fa-project-diagram fa-lg"></i>
-                    </div>
-                    <div>
-                        <h6 class="text-muted text-uppercase text-xs fw-bold mb-1">Sub-Departments</h6>
-                        <h3 class="mb-0 fw-bold text-dark">{{ sub_departments|default:"0" }}</h3>
-                    </div>
-                </div>
+            <div class="d-flex gap-2 header-buttons align-items-center mt-2 mt-sm-0">
+                <a href="{% url 'org_chart' %}" class="btn btn-light border d-flex align-items-center justify-content-center gap-2 fw-semibold rounded-pill px-3 shadow-sm" style="height: 40px; font-size: 0.85rem;">
+                    <i class="fas fa-sitemap text-secondary"></i> Visual Org Chart
+                </a>
+                {% if user.is_staff %}
+                <a href="{% url 'department_create' %}" class="btn btn-gradient-primary d-flex align-items-center justify-content-center gap-2 rounded-pill px-3 shadow-sm" style="height: 40px; font-size: 0.85rem;">
+                    <i class="fas fa-plus"></i> New Department
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Search Bar -->
-    <div class="card border-0 shadow-sm mb-4 search-card">
+    <!-- ==================== KPI CARDS ==================== -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="kpi-card-modern">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="kpi-icon-circle kpi-icon-total">
+                            <i class="fas fa-layer-group"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted small mb-1">Total Units</h6>
+                            <h3 class="fw-bold mb-0" style="color: #667eea;">{{ departments.count }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="progress mt-3" style="height: 4px; background: #e2e8f0; border-radius: 4px;">
+                    <div class="progress-bar animate-progress" data-width="100" style="width: 0%; background: linear-gradient(90deg, #667eea, #764ba2);"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="kpi-card-modern">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="kpi-icon-circle kpi-icon-active">
+                            <i class="fas fa-user-tie"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted small mb-1">Leadership Assigned</h6>
+                            <h3 class="fw-bold mb-0" style="color: #11998e;">{{ departments_with_heads|default:"0" }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="progress mt-3" style="height: 4px; background: #e2e8f0; border-radius: 4px;">
+                    <div class="progress-bar animate-progress" data-width="{{ departments_with_heads_percentage|default:0 }}" style="width: 0%; background: linear-gradient(90deg, #11998e, #38ef7d);"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="kpi-card-modern">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="kpi-icon-circle kpi-icon-inactive" style="background: linear-gradient(135deg, rgba(79, 172, 254, 0.15), rgba(0, 242, 254, 0.15)); color: #4facfe;">
+                            <i class="fas fa-project-diagram"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted small mb-1">Sub-Departments</h6>
+                            <h3 class="fw-bold mb-0" style="color: #4facfe;">{{ sub_departments|default:"0" }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="progress mt-3" style="height: 4px; background: #e2e8f0; border-radius: 4px;">
+                    <div class="progress-bar animate-progress" data-width="{{ sub_departments_percentage|default:0 }}" style="width: 0%; background: linear-gradient(90deg, #4facfe, #00f2fe);"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== SEARCH & FILTER BAR ==================== -->
+    <div class="filter-card">
         <div class="card-body p-3">
-            <div class="input-group">
-                <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
-                <input type="text" id="searchInput" class="form-control border-start-0 ps-0" placeholder="Search by department name, manager, or parent...">
+            <div class="row g-3 align-items-center">
+                <!-- Search bar -->
+                <div class="col-lg-8 col-md-7">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-end-0 text-muted" style="border-radius: 10px 0 0 10px; height: 43px;">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" 
+                               id="searchInput" 
+                               class="filter-input border-start-0 w-100" 
+                               placeholder="Search departments by name, manager, parent department, or ID..."
+                               style="border-radius: 0 10px 10px 0; height: 43px; width: calc(100% - 40px) !important;">
+                    </div>
+                </div>
+                <!-- Filter Chips -->
+                <div class="col-lg-4 col-md-5">
+                    <div class="d-flex gap-2 justify-content-md-end justify-content-start flex-wrap">
+                        <button class="btn btn-light rounded-pill px-3 py-1.5 filter-chip active" data-filter="all" style="font-size: 0.8rem; font-weight: 600;">All</button>
+                        <button class="btn btn-light rounded-pill px-3 py-1.5 filter-chip" data-filter="with-head" style="font-size: 0.8rem; font-weight: 600;">With Head</button>
+                        <button class="btn btn-light rounded-pill px-3 py-1.5 filter-chip" data-filter="root" style="font-size: 0.8rem; font-weight: 600;">Root Level</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Departments Table -->
-    <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" id="deptTable">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Department Name</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Head of Dept</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Parent Dept</th>
-                            <th class="text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Workforce</th>
-                            <th class="text-end pe-4 text-uppercase text-secondary text-xs font-weight-bolder opacity-7">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for department in departments %}
-                        <tr>
-                            <!-- Name -->
-                            <td class="ps-4">
-                                <div class="d-flex align-items-center">
-                                    <div class="avatar-initials bg-primary-soft text-primary rounded-circle me-3 fw-bold">
-                                        {{ department.name|first|upper }}
-                                    </div>
-                                    <span class="fw-bold text-dark text-sm">{{ department.name }}</span>
+    <!-- ==================== DEPARTMENTS TABLE ==================== -->
+    <div class="table-card">
+        <div class="table-responsive">
+            <table class="modern-table" id="deptTable">
+                <thead>
+                    <tr>
+                        <th class="ps-4 py-3">Department</th>
+                        <th class="py-3">Head of Dept</th>
+                        <th class="py-3">Parent Unit</th>
+                        <th class="py-3">Workforce</th>
+                        <th class="py-3">Status</th>
+                        <th class="text-center pe-4 py-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for department in departments %}
+                    <tr class="department-row" data-head-status="{% if department.head %}with-head{% else %}no-head{% endif %}" data-parent-status="{% if department.parent_department %}child{% else %}root{% endif %}">
+                        <!-- Name with ID -->
+                        <td data-label="Department" class="ps-4 py-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="avatar-initials bg-primary-soft text-primary rounded-circle fw-bold" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: rgba(102,126,234,0.1); color: #667eea; border: 1px solid rgba(102,126,234,0.2);">
+                                    {{ department.name|slice:":2"|upper }}
                                 </div>
-                            </td>
-
-                            <!-- HOD -->
-                            <td>
-                                {% if department.head %}
-                                <div class="d-flex align-items-center">
-                                    {% if department.head.face_image %}
-                                        <img src="{{ department.head.face_image.url }}" class="avatar-sm rounded-circle me-2 border">
-                                    {% else %}
-                                        <div class="avatar-sm rounded-circle me-2 bg-light d-flex align-items-center justify-content-center text-muted border">
-                                            <i class="fas fa-user"></i>
-                                        </div>
-                                    {% endif %}
-                                    <div class="d-flex flex-column">
-                                        <span class="text-sm fw-semibold text-dark">{{ department.head.user.get_full_name }}</span>
-                                        <span class="text-xs text-muted">ID: {{ department.head.employee_id }}</span>
-                                    </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.9rem;">{{ department.name }}</h6>
+                                    <small class="text-muted" style="font-size: 0.725rem;"><i class="fas fa-id-badge me-1"></i>DEP-{{ department.id|stringformat:"04d" }}</small>
                                 </div>
+                            </div>
+                        </td>
+
+                        <!-- Leadership HOD -->
+                        <td data-label="Head of Dept" class="py-3">
+                            {% if department.head %}
+                            <div class="d-flex align-items-center gap-2">
+                                {% if department.head.face_image %}
+                                    <img src="{{ department.head.face_image.url }}" class="avatar-modern" style="width: 38px; height: 38px; border-radius: 10px;">
                                 {% else %}
-                                <span class="badge bg-warning-soft text-warning border border-warning-soft">
-                                    <i class="fas fa-exclamation-circle me-1"></i>Unassigned
-                                </span>
+                                    <div class="avatar-fallback" style="width: 38px; height: 38px; border-radius: 10px; font-size: 0.8rem;">
+                                        {{ department.head.user.first_name|slice:":1" }}{{ department.head.user.last_name|slice:":1" }}
+                                    </div>
                                 {% endif %}
-                            </td>
+                                <div>
+                                    <span class="text-sm fw-bold text-dark d-block" style="font-size: 0.85rem;">{{ department.head.user.get_full_name|default:department.head.user.username }}</span>
+                                    <span class="text-xs text-muted" style="font-size: 0.725rem;">Head of Department</span>
+                                </div>
+                            </div>
+                            {% else %}
+                            <span class="badge-modern badge-warning-status d-inline-flex align-items-center gap-1 py-1 px-2.5">
+                                <i class="fas fa-exclamation-triangle" style="font-size: 0.7rem;"></i> Unassigned
+                            </span>
+                            {% endif %}
+                        </td>
 
-                            <!-- Parent -->
-                            <td>
-                                {% if department.parent_department %}
-                                <span class="badge bg-light text-secondary border">
-                                    <i class="fas fa-level-up-alt me-1"></i>{{ department.parent_department.name }}
-                                </span>
-                                {% else %}
-                                <span class="badge bg-info-soft text-info">
-                                    <i class="fas fa-crown me-1"></i>Root Level
-                                </span>
-                                {% endif %}
-                            </td>
+                        <!-- Parent Division -->
+                        <td data-label="Parent Unit" class="py-3">
+                            {% if department.parent_department %}
+                            <span class="badge-modern text-secondary border bg-light d-inline-flex align-items-center gap-1 py-1 px-2.5" style="font-size: 0.725rem;">
+                                <i class="fas fa-level-up-alt"></i> {{ department.parent_department.name }}
+                            </span>
+                            {% else %}
+                            <span class="badge-modern badge-active d-inline-flex align-items-center gap-1 py-1 px-2.5" style="font-size: 0.725rem; background: linear-gradient(135deg, rgba(79, 172, 254, 0.15), rgba(0, 242, 254, 0.15)); color: #0087a3; border-color: rgba(79, 172, 254, 0.25);">
+                                <i class="fas fa-crown"></i> Root Organization
+                            </span>
+                            {% endif %}
+                        </td>
 
-                            <!-- Workforce -->
-                            <td>
-                                <span class="badge bg-light text-dark border">
-                                    <i class="fas fa-users me-1 text-secondary"></i> {{ department.employee_set.count }} Members
-                                </span>
-                            </td>
+                        <!-- Team Size with visual progress -->
+                        <td data-label="Workforce" class="py-3">
+                            <div class="d-flex flex-column" style="max-width: 130px;">
+                                <div class="d-flex justify-content-between mb-1" style="font-size: 0.75rem;">
+                                    <strong class="text-dark">{{ department.employees.count }}</strong>
+                                    <span class="text-muted">members</span>
+                                </div>
+                                <div class="progress" style="height: 4px; border-radius: 2px;">
+                                    <div class="progress-bar animate-progress" data-width="{{ department.employees.count|default:0 }}" style="width: 0%; background: linear-gradient(90deg, #667eea, #764ba2);"></div>
+                                </div>
+                            </div>
+                        </td>
 
-                            <!-- Actions -->
-                            <td class="text-end pe-4">
-                                {% if user.is_staff %}
-                                <a href="{% url 'department_edit' department.pk %}" class="btn btn-link text-primary p-0 me-3" data-bs-toggle="tooltip" title="Edit">
-                                    <i class="fas fa-edit fa-lg"></i>
+                        <!-- Status Badge -->
+                        <td data-label="Status" class="py-3">
+                            {% if department.is_active %}
+                            <span class="badge-modern badge-active py-1 px-2.5" style="font-size: 0.725rem;">
+                                <i class="fas fa-circle me-1" style="font-size: 6px;"></i>Active
+                            </span>
+                            {% else %}
+                            <span class="badge-modern badge-inactive py-1 px-2.5" style="font-size: 0.725rem;">
+                                <i class="fas fa-circle me-1" style="font-size: 6px;"></i>Inactive
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Actions Column -->
+                        <td data-label="Actions" class="text-center pe-4 py-3">
+                            {% if user.is_staff %}
+                            <div class="action-buttons-desktop d-inline-flex gap-1 justify-content-center">
+                                <a href="{% url 'department_edit' department.pk %}" 
+                                   class="action-btn action-btn-edit" 
+                                   data-bs-toggle="tooltip" 
+                                   title="Edit Department">
+                                    <i class="fas fa-pen"></i>
                                 </a>
-                                <button onclick="confirmDelete('{% url 'department_delete' department.pk %}', '{{ department.name|escapejs }}')" class="btn btn-link text-danger p-0 border-0 bg-transparent" data-bs-toggle="tooltip" title="Delete">
-                                    <i class="fas fa-trash-alt fa-lg"></i>
+                                <button class="action-btn action-btn-delete delete-btn"
+                                        data-delete-url="{% url 'department_delete' department.pk %}"
+                                        data-delete-name="{{ department.name }}"
+                                        data-bs-toggle="tooltip" 
+                                        title="Delete Department">
+                                    <i class="fas fa-trash-alt"></i>
                                 </button>
+                            </div>
+
+                            <!-- Mobile action options -->
+                            <div class="action-buttons-mobile mobile-actions-dropdown dropdown">
+                                <button class="btn btn-sm" 
+                                        style="background: rgba(102,126,234,0.1); color: #667eea; border-radius: 8px;"
+                                        data-bs-toggle="dropdown" 
+                                        aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v"></i> Actions
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'department_edit' department.pk %}">
+                                            <i class="fas fa-pen me-2 text-primary"></i>Edit
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item text-danger delete-btn" 
+                                           href="#" 
+                                           data-delete-url="{% url 'department_delete' department.pk %}"
+                                           data-delete-name="{{ department.name }}">
+                                            <i class="fas fa-trash-alt me-2"></i>Delete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                            {% else %}
+                            <span class="text-muted small" style="font-size: 0.75rem;">None</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state-modern py-5">
+                                <i class="fas fa-building mb-3" style="font-size: 3rem; opacity: 0.4;"></i>
+                                <h5 class="text-muted">No Departments Configured</h5>
+                                <p class="text-secondary small">Start building your organizational structure by creating departments.</p>
+                                {% if user.is_staff %}
+                                <a href="{% url 'department_create' %}" class="btn btn-gradient-primary mt-2">
+                                    <i class="fas fa-plus me-2"></i>Create First Department
+                                </a>
                                 {% endif %}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center py-5">
-                                <div class="empty-state">
-                                    <div class="mb-3">
-                                        <div class="icon-box bg-light text-muted mx-auto rounded-circle" style="width: 60px; height: 60px; font-size: 1.5rem;">
-                                            <i class="fas fa-building"></i>
-                                        </div>
-                                    </div>
-                                    <h5 class="text-muted">No Departments Found</h5>
-                                    <p class="text-secondary small">Get started by building your organizational structure.</p>
-                                    {% if user.is_staff %}
-                                    <a href="{% url 'department_create' %}" class="btn btn-sm btn-primary mt-2">
-                                        <i class="fas fa-plus me-1"></i>Create First Department
-                                    </a>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<!-- Styles -->
+<!-- Styles to maintain visual parity with our modern theme -->
 <style>
-    /* Card & General Styles */
-    .modern-card {
-        background: #fff;
-        border: none;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-        transition: transform 0.2s;
+    :root {
+        --card-gradient: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+        --hover-gradient: linear-gradient(135deg, rgba(102,126,234,0.05), rgba(118,75,162,0.05));
     }
-    .modern-card:hover { transform: translateY(-3px); }
 
-    /* Icon Box */
-    .icon-box {
-        width: 48px;
-        height: 48px;
+    .employee-directory {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 1.5rem;
+    }
+
+    /* Header Panel */
+    .directory-header {
+        background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7));
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(255,255,255,0.5);
+        box-shadow: 0 10px 30px rgba(102,126,234,0.1);
+    }
+
+    .header-icon-wrapper {
+        width: 50px;
+        height: 50px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+        box-shadow: 0 8px 20px rgba(102,126,234,0.3);
+    }
+
+    .btn-gradient-primary {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        padding: 0.7rem 1.8rem;
+        border-radius: 12px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102,126,234,0.3);
+    }
+
+    .btn-gradient-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102,126,234,0.4);
+        color: white;
+    }
+
+    /* Modern KPI Cards styling */
+    .kpi-card-modern {
+        background: var(--card-gradient);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 1.5rem;
+        border: 1px solid rgba(255,255,255,0.5);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.06);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .kpi-card-modern::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+
+    .kpi-card-modern:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(102,126,234,0.15);
+    }
+
+    .kpi-icon-circle {
+        width: 45px;
+        height: 45px;
         border-radius: 12px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.25rem;
+        font-size: 1.3rem;
+    }
+
+    .kpi-icon-total {
+        background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));
+        color: #667eea;
+    }
+
+    .kpi-icon-active {
+        background: linear-gradient(135deg, rgba(17,153,142,0.15), rgba(56,239,125,0.15));
+        color: #11998e;
+    }
+
+    .kpi-icon-inactive {
+        background: linear-gradient(135deg, rgba(250,112,154,0.15), rgba(254,225,64,0.15));
+        color: #fa709a;
+    }
+
+    /* Filter Card & Search Panel */
+    .filter-card {
+        background: var(--card-gradient);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.5);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.04);
+        margin-bottom: 1.5rem;
+    }
+
+    .filter-input {
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 10px;
+        padding: 0.6rem 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .filter-input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        outline: none;
+    }
+
+    /* Filter Chips */
+    .filter-chip {
+        transition: all 0.2s ease;
+        border: 1px solid #e2e8f0;
+        background: white;
     }
     
-    /* Soft Colors */
-    .bg-primary-soft { background: rgba(67, 97, 238, 0.1); color: #4361ee; }
-    .bg-success-soft { background: rgba(25, 135, 84, 0.1); color: #198754; }
-    .bg-info-soft { background: rgba(13, 202, 240, 0.1); color: #0dcaf0; }
-    .bg-warning-soft { background: rgba(255, 193, 7, 0.1); color: #b88a00; }
-    .border-warning-soft { border-color: rgba(255, 193, 7, 0.3) !important; }
+    .filter-chip:hover, .filter-chip.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white !important;
+        border-color: transparent;
+    }
 
-    /* Avatars */
-    .avatar-initials {
-        width: 40px;
-        height: 40px;
+    /* Table & Container Cards */
+    .table-card {
+        background: var(--card-gradient);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        border: 1px solid rgba(255,255,255,0.5);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+
+    .modern-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .modern-table thead th {
+        background: linear-gradient(135deg, rgba(102,126,234,0.08), rgba(118,75,162,0.08));
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        padding: 1rem 1.2rem;
+        border-bottom: 2px solid rgba(102,126,234,0.15);
+        white-space: nowrap;
+    }
+
+    .modern-table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid rgba(0,0,0,0.04);
+    }
+
+    .modern-table tbody tr:hover {
+        background: var(--hover-gradient);
+    }
+
+    .modern-table td {
+        padding: 1rem 1.2rem;
+        vertical-align: middle;
+    }
+
+    /* Avatar Squircle */
+    .avatar-modern {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        object-fit: cover;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    }
+
+    .avatar-fallback {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1rem;
+        font-weight: 700;
+        box-shadow: 0 4px 10px rgba(102,126,234,0.25);
     }
-    .avatar-sm {
+
+    /* Modern Badges */
+    .badge-modern {
+        padding: 0.4rem 0.8rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        letter-spacing: 0.3px;
+    }
+
+    .badge-active {
+        background: linear-gradient(135deg, rgba(17,153,142,0.15), rgba(56,239,125,0.15));
+        color: #11998e;
+        border: 1px solid rgba(17,153,142,0.3);
+    }
+
+    .badge-inactive {
+        background: linear-gradient(135deg, rgba(250,112,154,0.15), rgba(254,225,64,0.15));
+        color: #dc3545;
+        border: 1px solid rgba(220,53,69,0.3);
+    }
+
+    .badge-warning-status {
+        background: linear-gradient(135deg, rgba(255,193,7,0.15), rgba(255,153,0,0.15));
+        color: #b88a00;
+        border: 1px solid rgba(255,193,7,0.3);
+    }
+
+    /* Clean Icon Actions */
+    .action-btn {
         width: 36px;
         height: 36px;
-        object-fit: cover;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        border: none;
+        background: transparent;
+        color: #64748b;
     }
 
-    /* Table Typography */
-    .table thead th {
-        border-bottom-width: 1px;
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-        letter-spacing: 0.5px;
+    .action-btn:hover {
+        transform: scale(1.1);
     }
-    .text-xs { font-size: 0.75rem; }
-    .text-sm { font-size: 0.875rem; }
 
-    /* Animation */
-    .fade-in-up { animation: fadeInUp 0.5s ease-out; }
+    .action-btn-edit:hover {
+        background: rgba(102,126,234,0.1);
+        color: #667eea;
+    }
+
+    .action-btn-delete:hover {
+        background: rgba(220,53,69,0.1);
+        color: #dc3545;
+    }
+
+    /* Empty State */
+    .empty-state-modern {
+        padding: 3rem 1rem;
+        text-align: center;
+    }
+
+    /* Animations */
     @keyframes fadeInUp {
         from { opacity: 0; transform: translateY(15px); }
         to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Search */
-    .search-card .form-control:focus { box-shadow: none; border-color: #e2e8f0; }
+    .fade-in-up {
+        animation: fadeInUp 0.5s ease-out;
+    }
+
+    /* Mobile Responsive Card conversions */
+    @media (max-width: 992px) {
+        .employee-directory {
+            padding: 1rem;
+        }
+
+        .directory-header {
+            padding: 1.5rem;
+        }
+
+        .modern-table thead {
+            display: none;
+        }
+
+        .modern-table tbody tr {
+            display: block;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 12px;
+            padding: 0;
+            background: white;
+        }
+
+        .modern-table td {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(0,0,0,0.04);
+        }
+
+        .modern-table td::before {
+            content: attr(data-label);
+            font-weight: 700;
+            color: #64748b;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-right: 1rem;
+        }
+
+        .modern-table td:last-child {
+            border-bottom: none;
+        }
+
+        .action-buttons-desktop {
+            display: none !important;
+        }
+
+        .action-buttons-mobile {
+            display: flex !important;
+        }
+    }
+
+    @media (min-width: 993px) {
+        .action-buttons-mobile {
+            display: none !important;
+        }
+
+        .action-buttons-desktop {
+            display: flex !important;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .directory-header {
+            flex-direction: column;
+            gap: 1rem;
+            text-align: center;
+        }
+
+        .directory-header .d-flex {
+            flex-direction: column;
+        }
+
+        .header-buttons {
+            flex-direction: column;
+            width: 100%;
+            gap: 0.5rem;
+        }
+
+        .header-buttons .btn {
+            width: 100%;
+        }
+    }
 </style>
 
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    // 1. Search Functionality
-    document.getElementById('searchInput').addEventListener('keyup', function() {
-        const value = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#deptTable tbody tr');
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        // Dynamic progress bar width calculations (Resolves all VS Code CSS linter errors)
+        document.querySelectorAll('.animate-progress[data-width]').forEach(bar => {
+            const width = bar.getAttribute('data-width');
+            if (width) {
+                // Ensure the progress value is constrained between 0 and 100
+                const safeWidth = Math.min(Math.max(parseFloat(width), 0), 100);
+                bar.style.width = safeWidth + '%';
+            }
+        });
+
+        // Bind delete dialog listeners dynamically (Resolves all VS Code JavaScript linter errors)
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const url = this.getAttribute('data-delete-url');
+                const name = this.getAttribute('data-delete-name');
+                if (url && name) {
+                    confirmDelete(url, name);
+                }
+            });
+        });
+
+        // Unified filtration engine (combines Search Input and Filter Chips)
+        const searchInput = document.getElementById('searchInput');
+        const filterChips = document.querySelectorAll('.filter-chip');
+
+        function applyActiveFilters() {
+            const searchValue = searchInput.value.toLowerCase();
+            const activeChip = document.querySelector('.filter-chip.active');
+            const filterType = activeChip ? activeChip.getAttribute('data-filter') : 'all';
+            const rows = document.querySelectorAll('#deptTable tbody tr:not(.empty-row)');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const matchesSearch = text.includes(searchValue);
+                
+                let matchesFilter = true;
+                if (filterType === 'with-head') {
+                    matchesFilter = (row.getAttribute('data-head-status') === 'with-head');
+                } else if (filterType === 'root') {
+                    matchesFilter = (row.getAttribute('data-parent-status') === 'root');
+                }
+                
+                row.style.display = (matchesSearch && matchesFilter) ? '' : 'none';
+            });
+        }
         
-        rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(value) ? '' : 'none';
+        // Listen to search entries
+        searchInput.addEventListener('keyup', applyActiveFilters);
+        
+        // Listen to chip filters
+        filterChips.forEach(chip => {
+            chip.addEventListener('click', function() {
+                filterChips.forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                applyActiveFilters();
+            });
+        });
+        
+        // Smoothly animate KPI numeric labels on dashboard load
+        const statNumbers = document.querySelectorAll('.kpi-card-modern h3');
+        statNumbers.forEach(stat => {
+            const finalValue = parseInt(stat.innerText);
+            if (!isNaN(finalValue) && finalValue > 0) {
+                let current = 0;
+                const increment = finalValue / 25;
+                const timer = setInterval(() => {
+                    current += increment;
+                    if (current >= finalValue) {
+                        stat.innerText = finalValue;
+                        clearInterval(timer);
+                    } else {
+                        stat.innerText = Math.floor(current);
+                    }
+                }, 20);
+            }
         });
     });
-
-    // 2. SweetAlert Delete
+    
+    // SweetAlert delete dialog implementation
     function confirmDelete(deleteUrl, name) {
         Swal.fire({
-            title: 'Delete Department?',
-            html: `Are you sure you want to delete <b>${name}</b>?<br><small class="text-danger">This may affect employees assigned to this department.</small>`,
+            title: 'Remove Department?',
+            html: `<div class="text-start">
+                <p>You are about to delete <strong class="text-danger">${name}</strong></p>
+                <small class="text-muted">This action will also affect employees and sub-departments associated with this unit.</small>
+            </div>`,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#dc3545',
             cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Yes, delete it!'
+            confirmButtonText: 'Yes, Delete Department',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true,
+            customClass: {
+                popup: 'rounded-4',
+                confirmButton: 'rounded-3',
+                cancelButton: 'rounded-3'
+            }
         }).then((result) => {
             if (result.isConfirmed) {
                 window.location.href = deleteUrl;
             }
         });
     }
-
-    // 3. Tooltips
-    document.addEventListener("DOMContentLoaded", function(){
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-    });
 </script>
 {% endblock %}

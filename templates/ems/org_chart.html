@@ -4,55 +4,85 @@
 {% block page_title %}Organization Structure{% endblock %}
 
 {% block content %}
-<div class="card border-0 shadow-sm">
-  <div class="card-header bg-white py-3">
+<div class="card border-0 shadow-sm" style="border-radius: 16px; overflow: hidden;">
+  <div class="card-header bg-white py-3 border-0" style="border-radius: 16px 16px 0 0;">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-      <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-sitemap me-2 text-primary"></i>My Org Chart</h5>
+      <div class="d-flex align-items-center gap-2">
+        <div class="p-2 bg-primary-subtle text-primary rounded-3" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+          <i class="fas fa-sitemap"></i>
+        </div>
+        <div>
+          <h5 class="mb-0 fw-bold text-dark">Organization Directory</h5>
+          <small class="text-muted" style="font-size: 0.75rem;">Explore team hierarchies and direct reports</small>
+        </div>
+      </div>
 
-      <div class="d-flex flex-wrap gap-2">
-        <!-- View switch -->
-        <div class="btn-group shadow-sm" role="group">
-          <button class="btn btn-outline-primary active" id="btnViewFull">
-            <i class="fas fa-sitemap me-1"></i>Full View
+      <div class="d-flex flex-wrap align-items-center gap-3">
+        <!-- Modern Pill View Switcher -->
+        <div class="btn-group btn-group-sm p-1 bg-light border rounded-pill shadow-sm" role="group">
+          <button class="btn btn-white rounded-pill px-3 active" id="btnViewFull">
+            <i class="fas fa-sitemap me-1 text-primary"></i>Full Structure
           </button>
-          <button class="btn btn-outline-primary" id="btnViewTeam">
-            <i class="fas fa-users me-1"></i>Only My Team
+          <button class="btn btn-white rounded-pill px-3" id="btnViewTeam">
+            <i class="fas fa-users me-1 text-success"></i>My Direct Team
           </button>
         </div>
 
-        <!-- Print -->
-        <button class="btn btn-outline-success shadow-sm" id="btnPrint">
-          <i class="fas fa-print me-1"></i>Print
+        <!-- Action Buttons -->
+        <button class="btn btn-light border shadow-sm d-flex align-items-center gap-2 rounded-pill px-3" id="btnPrint" style="font-size: 0.85rem; font-weight: 500; height: 35px;">
+          <i class="fas fa-print text-secondary"></i> Print Directory
         </button>
       </div>
     </div>
   </div>
 
-  <div class="card-body bg-light position-relative overflow-auto" style="min-height: 75vh;">
-    <div class="alert alert-info border-0 shadow-sm d-inline-flex align-items-center py-2 px-3 mb-4">
-      <i class="fas fa-info-circle me-2"></i>
-      <small>Click the arrow on an employee card to expand/collapse their team.</small>
+  <!-- Dotted AI Canvas Container -->
+  <div class="card-body org-canvas position-relative overflow-auto border-top" style="min-height: 75vh; border-radius: 0 0 16px 16px;">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+      <div class="alert alert-primary border-0 shadow-sm d-inline-flex align-items-center py-2 px-3 mb-0" style="border-radius: 10px; z-index: 5;">
+        <i class="fas fa-info-circle me-2"></i>
+        <small class="fw-medium">Click the arrow under any employee card to collapse or expand branches.</small>
+      </div>
+      
+      <div class="org-scroll-hint text-muted d-flex align-items-center gap-1" style="z-index: 5;">
+        <i class="fas fa-arrows-alt-h small"></i>
+        <small style="font-size: 0.75rem;">Pan or swipe horizontally to navigate branches</small>
+      </div>
     </div>
 
     <!-- Chart container -->
     <div id="orgRoot" class="org-viewport mx-auto pb-5">
       <div class="text-center py-5" id="loadingState">
-        <div class="spinner-border text-primary" role="status">
+        <div class="spinner-border text-primary" role="status" style="width: 2.5rem; height: 2.5rem;">
           <span class="visually-hidden">Loading...</span>
         </div>
-        <p class="mt-2 text-muted">Loading your organization structure...</p>
+        <p class="mt-3 text-muted fw-medium" style="font-size: 0.9rem;">Retrieving organizational structure details...</p>
       </div>
     </div>
   </div>
 </div>
 
 <style>
-  /* Viewport */
+  /* Viewport & AI Dotted Canvas Background */
+  .org-canvas {
+    background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-color: #f8fafc !important;
+  }
+
   .org-viewport {
     display: flex;
     justify-content: center;
-    padding: 2rem;
+    padding: 2rem 1rem;
     min-width: max-content;
+  }
+
+  .org-scroll-hint {
+    background: #ffffff;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
   }
 
   /* Tree Nodes Wrapper */
@@ -61,103 +91,265 @@
     flex-direction: column;
     align-items: center;
     position: relative;
-    padding: 20px 10px 0 10px;
-    transition: all 0.3s ease;
+    padding: 24px 12px 0 12px;
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Modern Pill Buttons Switcher */
+  .btn-white {
+    background: transparent;
+    border: none;
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .btn-white.active, .btn-white:hover {
+    background: #ffffff !important;
+    color: #1e293b !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
   }
 
   /* Card Styles */
   .org-card {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(0,0,0,0.05);
-    width: 260px;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    width: 280px;
     padding: 1.25rem;
     position: relative;
     z-index: 2;
-    transition: transform 0.2s;
-  }
-  .org-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    border-color: #cbd5e1;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                border-color 0.3s ease;
+    overflow: hidden;
   }
   
-  /* Highlight Logged-in User */
-  .org-card.is-current {
-    border: 2px solid #3b82f6;
-    background-color: #f0f7ff;
+  /* Internal radial neon hover effect */
+  .org-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.08), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+    z-index: 1;
   }
 
-  /* Node Content */
-  .org-head { display: flex; align-items: center; gap: 1rem; }
-  .org-avatar { width: 55px; height: 55px; border-radius: 50%; object-fit: cover; border: 3px solid #f1f5f9; }
-  .org-info .name { font-weight: 700; color: #1e293b; font-size: 0.95rem; margin-bottom: 0.1rem; }
-  .org-info .position { font-size: 0.8rem; color: #64748b; font-weight: 500; }
-  .org-info .dept { font-size: 0.7rem; color: #3b82f6; font-weight: 600; text-transform: uppercase; }
+  .org-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
+    border-color: #3b82f6;
+  }
+  
+  .org-card:hover::before {
+    opacity: 1;
+  }
 
-  /* Tree Connecting Lines (Pure CSS Magic) */
+  /* Top Accent color indicators */
+  .org-card-accent {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    z-index: 3;
+  }
+  
+  /* Highlight Logged-in User with dynamic glowing border */
+  .org-card.is-current {
+    border: 2px solid #3b82f6;
+    background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%);
+    box-shadow: 0 8px 30px -4px rgba(59, 130, 246, 0.12), 0 4px 12px -2px rgba(59, 130, 246, 0.08);
+  }
+  .org-card.is-current .org-card-accent {
+    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+  }
+
+  /* Node Content Layout */
+  .org-head { display: flex; align-items: center; gap: 1rem; position: relative; z-index: 2; }
+  
+  /* Avatar Square-Circle Design */
+  .avatar-container {
+    position: relative;
+    display: inline-block;
+  }
+  .org-avatar { 
+    width: 54px; 
+    height: 54px; 
+    border-radius: 12px; 
+    object-fit: cover; 
+    border: 2px solid #ffffff; 
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  }
+  
+  /* Manager Reports Count Badge Overlay */
+  .direct-reports-badge {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    font-size: 0.65rem;
+    padding: 0.25rem 0.4rem;
+    border-radius: 6px;
+    border: 1.5px solid #ffffff;
+    font-weight: 700;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .org-info {
+    min-width: 0;
+    flex: 1;
+  }
+  .org-info .name { font-weight: 700; color: #1e293b; font-size: 0.95rem; margin-bottom: 0.15rem; }
+  .org-info .position { font-size: 0.775rem; color: #64748b; font-weight: 500; }
+  
+  /* Department Badges */
+  .dept-badge { 
+    display: inline-block;
+    font-size: 0.65rem; 
+    color: #4f46e5; 
+    background-color: #f5f3ff;
+    border: 1px solid rgba(79, 70, 229, 0.1);
+    font-weight: 700; 
+    text-transform: uppercase; 
+    letter-spacing: 0.3px;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    margin-top: 0.25rem;
+  }
+
+  /* Tree Connecting Lines */
   .org-children {
     display: flex;
     justify-content: center;
-    padding-top: 20px;
+    padding-top: 24px;
     position: relative;
+    /* Animated entry when branches expand */
+    animation: scaleBranch 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
-  /* Top down line from parent */
+  @keyframes scaleBranch {
+    from {
+      opacity: 0;
+      transform: scale(0.97) translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  /* Top down line from parent node */
   .org-children::before {
     content: ''; position: absolute; top: 0; left: 50%;
     border-left: 2px solid #cbd5e1;
-    width: 0; height: 20px; transform: translateX(-50%);
+    width: 0; height: 24px; transform: translateX(-50%);
+    transition: border-color 0.3s ease;
   }
-  /* Vertical line rising from child */
+  /* Vertical line rising from child node */
   .org-node-wrapper::before {
     content: ''; position: absolute; top: 0; left: 50%;
     border-left: 2px solid #cbd5e1;
-    width: 0; height: 20px; transform: translateX(-50%);
+    width: 0; height: 24px; transform: translateX(-50%);
+    transition: border-color 0.3s ease;
   }
-  /* Horizontal line connecting siblings */
+  /* Horizontal line connecting siblings */ 
   .org-node-wrapper::after {
     content: ''; position: absolute; top: 0; left: 0;
     border-top: 2px solid #cbd5e1;
     width: 100%; height: 0;
+    transition: border-color 0.3s ease;
   }
   .org-viewport:has(> .org-node-wrapper:only-child) {
     justify-content: center;
   }
-  /* Adjust horizontal lines for first and last children */
+  /* Adjust horizontal lines for first and last child branches */
   .org-children > .org-node-wrapper:first-child::after { left: 50%; width: 50%; }
   .org-children > .org-node-wrapper:last-child::after { left: 0; width: 50%; }
-  /* No horizontal line if there's only one child */
+  /* Remove horizontal lines if there is only a single branch child */
   .org-children > .org-node-wrapper:only-child::after { display: none; }
 
-  /* Remove top lines for root node */
+  /* Clear top lines for the ultimate parent */
   .org-viewport > .org-node-wrapper { padding-top: 0; }
   .org-viewport > .org-node-wrapper::before,
   .org-viewport > .org-node-wrapper::after { display: none; }
 
-  /* Dropdown line coming out of the bottom of parent card */
+  /* Dropdown line from parent cards with child branches */
   .org-card.has-children::after {
-    content: ''; position: absolute; bottom: -20px; left: 50%;
+    content: ''; position: absolute; bottom: -24px; left: 50%;
     border-left: 2px solid #cbd5e1;
-    width: 0; height: 20px; transform: translateX(-50%);
+    width: 0; height: 24px; transform: translateX(-50%);
+    transition: border-color 0.3s ease;
   }
 
-  /* Toggle Button */
+  /* =========================================================
+     ⚡ AI CONNECTING LINES GLOW-ON-HOVER (CSS :has() SELECTION)
+     ========================================================= */
+  
+  /* 1. Glow line coming down out of hovered card */
+  .org-card.has-children:hover::after {
+    border-color: #3b82f6;
+  }
+  /* 2. Glow vertical child-connectors when card is hovered */
+  .org-node-wrapper:has(> .org-card:hover)::before {
+    border-color: #3b82f6;
+  }
+  /* 3. Glow the vertical top line inside parent branch */
+  .org-node-wrapper:has(> .org-card:hover) > .org-children::before {
+    border-color: #3b82f6;
+  }
+  /* 4. Glow the parent's horizontal bridge branch */
+  .org-children:has(> .org-node-wrapper > .org-card:hover) > .org-node-wrapper::after {
+    border-color: #3b82f6;
+  }
+
+  /* Dynamic Toggle Button styling */
   .org-toggle-btn {
     position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
-    background: #fff; border: 1px solid #cbd5e1; color: #64748b; border-radius: 50%;
+    background: #ffffff; border: 1px solid #cbd5e1; color: #64748b; border-radius: 50%;
     width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
     font-size: 10px; cursor: pointer; z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .org-toggle-btn:hover { background: #f8fafc; color: #3b82f6; border-color: #3b82f6; }
+  .org-toggle-btn:hover { 
+    background: #3b82f6; 
+    color: #ffffff; 
+    border-color: #3b82f6; 
+    transform: translateX(-50%) scale(1.1);
+  }
   .org-node-wrapper.collapsed > .org-children { display: none; }
 
+  /* Profile buttons within card footers */
+  .btn-action {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #4f46e5;
+    font-weight: 600;
+    font-size: 0.725rem;
+    padding: 0.25rem 0.6rem;
+    transition: all 0.2s ease;
+    position: relative;
+    z-index: 3;
+  }
+  .btn-action:hover {
+    background-color: #4f46e5;
+    border-color: #4f46e5;
+    color: #ffffff;
+  }
+
   @media print {
-    .sidebar, .top-header, .btn-group, .alert, .org-toggle-btn { display: none !important; }
+    .sidebar, .top-header, .btn-group, .alert, .org-toggle-btn, .org-scroll-hint, .btn, .card-header { display: none !important; }
     .main-content { margin: 0 !important; }
     .card { border: none !important; box-shadow: none !important; }
     .org-viewport { padding: 0; display: block; overflow: visible; }
+    .org-card { box-shadow: none !important; border: 1px solid #cbd5e1 !important; page-break-inside: avoid; }
   }
 </style>
 
@@ -172,13 +364,16 @@
 
     async function fetchData() {
       try {
-        // CHANGED: Now points to the 'me' endpoint correctly mapped in urls.py
         const res = await fetch("{% url 'org_tree_api_me' %}");
         const data = await res.json();
         if (!data.ok) throw new Error("Failed");
         return data.tree;
       } catch (e) {
-        rootEl.innerHTML = `<div class="text-center text-danger py-5"><i class="fas fa-exclamation-triangle fa-2x mb-3"></i><p>Failed to load structure data.</p></div>`;
+        rootEl.innerHTML = `
+          <div class="text-center text-danger py-5">
+            <i class="fas fa-exclamation-triangle fa-2x mb-3 text-opacity-75"></i>
+            <p class="fw-medium">Failed to retrieve organization hierarchy structure details.</p>
+          </div>`;
         return null;
       }
     }
@@ -194,20 +389,30 @@
       card.className = 'org-card' + (node.is_current ? ' is-current' : '');
 
       const avatarUrl = node.image || '{% static "images/default_profile.png" %}';
+      const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(node.name)}&background=6366f1&color=fff&bold=true`;
+
+      const childrenCount = node.children ? node.children.length : 0;
 
       card.innerHTML = `
+        <div class="org-card-accent"></div>
         <div class="org-head">
-          <img class="org-avatar" src="${avatarUrl}" alt="avatar" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(node.name)}&background=random'">
+          <div class="avatar-container">
+            <img class="org-avatar" src="${avatarUrl}" alt="avatar" onerror="this.src='${fallbackUrl}'">
+            ${childrenCount > 0 ? `
+              <span class="badge bg-primary direct-reports-badge" title="${childrenCount} direct reports">
+                ${childrenCount}
+              </span>` : ''}
+          </div>
           <div class="org-info">
-            <div class="name">${escapeHtml(node.name || 'Unknown')}</div>
-            <div class="position">${escapeHtml(node.position || '-')}</div>
-            <div class="dept">${escapeHtml(node.department || '-')}</div>
+            <div class="name text-truncate" title="${escapeHtml(node.name || 'Unknown')}">${escapeHtml(node.name || 'Unknown')}</div>
+            <div class="position text-truncate" title="${escapeHtml(node.position || '-')}">${escapeHtml(node.position || '-')}</div>
+            <span class="dept-badge text-truncate" title="${escapeHtml(node.department || '-')}">${escapeHtml(node.department || '-')}</span>
           </div>
         </div>
         ${node.profile_url ? `
-        <div class="mt-3 pt-2 border-top d-flex justify-content-end">
-          <a class="btn btn-sm btn-light text-primary fw-medium rounded-pill px-3" href="${node.profile_url}" style="font-size: 0.75rem;">
-            Profile <i class="fas fa-arrow-right ms-1"></i>
+        <div class="mt-3 pt-2 border-top d-flex justify-content-end align-items-center">
+          <a class="btn btn-action rounded-pill" href="${node.profile_url}">
+            Profile <i class="fas fa-arrow-right ms-1" style="font-size: 0.65rem;"></i>
           </a>
         </div>` : ''}
       `;
@@ -253,7 +458,7 @@
     function renderTree(treeArray) {
       rootEl.innerHTML = '';
       if (!treeArray || treeArray.length === 0) {
-        rootEl.innerHTML = '<div class="alert alert-warning">No organization chart data found.</div>';
+        rootEl.innerHTML = '<div class="alert alert-warning border-0">No organization directory branches found.</div>';
         return;
       }
       treeArray.forEach(rootNode => {
@@ -288,7 +493,7 @@
     btnFull.addEventListener('click', () => {
       btnFull.classList.add('active');
       btnTeam.classList.remove('active');
-      renderTree(rawTreeData); // Renders CEO down to User down to Subordinates
+      renderTree(rawTreeData); // Renders complete tree from CEO downwards
     });
 
     btnTeam.addEventListener('click', () => {

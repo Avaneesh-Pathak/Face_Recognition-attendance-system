@@ -684,7 +684,7 @@
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <!-- ==================== SIDEBAR ==================== -->
-    {% if user.is_authenticated %}
+    {% if request.user.is_authenticated %}
     <aside class="sidebar" id="sidebar">
         <!-- Sidebar Header -->
         <div class="sidebar-header">
@@ -779,8 +779,10 @@
     {% endif %}
 
     <!-- ==================== MAIN CONTENT ==================== -->
+     
     <main class="main-wrapper" id="mainWrapper">
         <!-- Top Header -->
+         {% if request.user.is_authenticated %}
         <header class="top-header">
             <div class="d-flex align-items-center gap-3">
                 <button class="header-btn" id="sidebarToggle" title="Toggle Sidebar">
@@ -843,6 +845,7 @@
                 </div>
             </div>
         </header>
+        {% endif %}
 
         <!-- Page Content -->
         <div class="content-body">

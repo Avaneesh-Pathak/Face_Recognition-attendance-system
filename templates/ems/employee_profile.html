@@ -222,10 +222,11 @@
                     </div>
                 </div>
             </div>
-
+           
             <!-- 2. Financial & Documents Grid -->
             <div class="row">
                 <!-- Salary Structure -->
+                {% if user.is_superuser or user.employee.role in "Admin Finance" %}
                 <div class="col-lg-6 mb-4">
                     <div class="card modern-card h-100">
                         <div class="card-header-modern">
@@ -274,7 +275,7 @@
                         </div>
                     </div>
                 </div>
-
+                {% endif %}
                 <!-- Documents -->
                 <div class="col-lg-6 mb-4">
                     <div class="card modern-card h-100">
@@ -318,6 +319,7 @@
                     </div>
                 </div>
             </div>
+            
 
         </div>
     </div>

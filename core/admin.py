@@ -11,7 +11,7 @@ from .models import (
 
 
 # ============================================================
-# 🔧 CUSTOM ADMIN ACTIONS
+# CUSTOM ADMIN ACTIONS
 # ============================================================
 
 @admin.action(description="Mark selected employees as active")
@@ -304,7 +304,7 @@ class PayrollSettingsAdmin(admin.ModelAdmin):
     )
 
     def has_add_permission(self, request):
-        # ✅ Only 1 PayrollSettings allowed
+        #Only 1 PayrollSettings allowed
         return not PayrollSettings.objects.exists()
 
 
@@ -314,7 +314,7 @@ class PayrollSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(LeaveType)
 class LeaveTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'max_days_per_year', 'is_paid')  # ✅ updated
+    list_display = ('name', 'max_days_per_year', 'is_paid')  #updated
     list_editable = ('is_paid',)
     search_fields = ('name',)
 
@@ -428,7 +428,7 @@ class JoiningDocumentAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('joining__employee__user')
 
-    # ✅ Display the filename instead of full path
+    #Display the filename instead of full path
     def file_name(self, obj):
         return obj.file.name.split('/')[-1]
     file_name.short_description = "Document Name"
