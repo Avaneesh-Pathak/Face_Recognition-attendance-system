@@ -2400,6 +2400,14 @@ def attendance_calendar(request, employee_id, year, month):
             # -------------------------------
             # APPEND DATA
             # -------------------------------
+            print(
+                f"DAY={day} "
+                f"LOGS={len(day_logs)} "
+                f"PRESENT={present} "
+                f"HOURS={worked_hours} "
+                f"IN={cin} "
+                f"OUT={cout}"
+            )
             data.append({
                 "day": day.day,
                 "date": day,
@@ -2443,7 +2451,7 @@ def attendance_calendar(request, employee_id, year, month):
     total_expected_hours = 0
     if employee.work_rule:
         total_expected_hours = calendar.monthrange(year, month)[1] * float(employee.work_rule.full_day_hours)
-
+    print("CALENDAR VIEW CALLED")
     return render(request, "attendance_calendar.html", {
         "employee": employee,
         "data": data,
@@ -2656,7 +2664,7 @@ def attendance_calendar_data(request, employee_id, year, month):
             "is_weekend": current.weekday() >= 5,
             "is_future": current > timezone.localdate(),
         })
-
+    print("AJAX CALENDAR DATA CALLED")
     return JsonResponse({
         "employee": emp.user.get_full_name(),
         "year": year,
