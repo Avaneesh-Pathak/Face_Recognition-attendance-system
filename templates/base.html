@@ -734,11 +734,12 @@
                 <i class="fa-solid fa-calendar-day"></i> 
                 <span>Leave Requests</span>
             </a>
+            {% if user.employee.role in "Finance Admin" or user.is_superuser %}
             <a href="{% url 'payroll_list' %}" class="nav-link {% if 'payroll' in request.path %}active{% endif %}">
                 <i class="fa-solid fa-wallet"></i> 
                 <span>Payroll</span>
             </a>
-
+            {% endif %}
             {% if user.employee.role in "Finance Admin" or user.is_superuser %}
             <div>
                 <a class="nav-link nav-dropdown-toggle {% if 'workrule' in request.path %}active{% endif %}" 
@@ -759,20 +760,26 @@
             {% endif %}
 
             <!-- SYSTEM (Admin Only) -->
-            {% if user.is_superuser or user.employee.role == "Admin" %}
             <div class="nav-section">System</div>
+            {% if user.is_superuser or user.employee.role == "Admin" %}
             <a href="{% url 'office_location_list' %}" class="nav-link {% if 'location' in request.path %}active{% endif %}">
                 <i class="fa-solid fa-location-dot"></i> 
                 <span>Locations</span>
             </a>
+            {% endif %}
+            {% if user.is_superuser or user.employee.role == "Admin" or user.employee.role == "HR" or user.employee.role == "Finance" %}
+            
             <a href="{% url 'reports' %}" class="nav-link {% if 'reports' in request.path %}active{% endif %}">
                 <i class="fa-solid fa-file-invoice"></i> 
                 <span>Reports</span>
             </a>
+            {% endif %}
+            {% if user.is_superuser %}
             <a href="{% url 'attendance_settings' %}" class="nav-link {% if 'settings' in request.path %}active{% endif %}">
                 <i class="fa-solid fa-gears"></i> 
                 <span>Settings</span>
             </a>
+
             {% endif %}
         </div>
     </aside>

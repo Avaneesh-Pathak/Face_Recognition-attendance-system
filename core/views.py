@@ -2048,7 +2048,7 @@ def get_attendance_history(request):
     return JsonResponse({'data': data})
 
 
-ALLOWED_ROLES = ["Admin", "Manager"]
+ALLOWED_ROLES = ["Admin", "Manager","HR","Finance"]
 
 def can_manage_attendance(user):
     if not user.is_authenticated:

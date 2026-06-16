@@ -27,7 +27,7 @@
                 <a href="{% url 'org_chart' %}" class="btn btn-light border d-flex align-items-center justify-content-center gap-2 fw-semibold rounded-pill px-3 shadow-sm" style="height: 40px; font-size: 0.85rem;">
                     <i class="fas fa-sitemap text-secondary"></i> Visual Org Chart
                 </a>
-                {% if user.is_staff %}
+                {% if user.is_superuser or user.employee.role == "Admin" or user.employee.role == "HR" or user.employee.role == "Finance" %}
                 <a href="{% url 'department_create' %}" class="btn btn-gradient-primary d-flex align-items-center justify-content-center gap-2 rounded-pill px-3 shadow-sm" style="height: 40px; font-size: 0.85rem;">
                     <i class="fas fa-plus"></i> New Department
                 </a>
@@ -207,7 +207,7 @@
 
                         <!-- Actions Column -->
                         <td data-label="Actions" class="text-center pe-4 py-3">
-                            {% if user.is_superuser or user.employee.role in "Admin HR Manager" %}
+                            {% if user.is_superuser or user.employee.role == "Admin" or user.employee.role == "HR" or user.employee.role == "Finance" %}
                             <div class="action-buttons-desktop d-inline-flex gap-1 justify-content-center">
                                 <a href="{% url 'department_edit' department.pk %}" 
                                    class="action-btn action-btn-edit" 

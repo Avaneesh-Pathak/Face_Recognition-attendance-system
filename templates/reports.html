@@ -742,7 +742,7 @@
             </h5>
 
             <div class="d-flex align-items-center gap-2 header-actions">
-                {% if user.is_superuser or user.employee.role in "Admin Manager" %}
+                {% if user.is_superuser or user.employee.role == "Admin" or user.employee.role == "HR" or user.employee.role == "Finance" or user.employee.role == "Manager"  %}
                 <button type="button" class="btn btn-gradient" onclick="openModal('create')">
                     <i class="fas fa-plus me-1"></i> Add Record
                 </button>
@@ -839,7 +839,7 @@
                             {% endif %}
                         </td>
 
-                        {% if user.is_superuser or user.employee.role in "Admin HR Manager" %}
+                        {% if user.is_superuser or user.employee.role == "Admin" or user.employee.role == "HR" or user.employee.role == "Finance" or user.employee.role == "Manager"  %}
                         <td data-label="Actions" class="text-center">
                             <!-- Desktop Actions -->
                             <div class="desktop-actions d-inline-flex gap-1">
