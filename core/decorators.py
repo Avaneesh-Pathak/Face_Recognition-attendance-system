@@ -86,3 +86,11 @@ def employee_required(view_func):
     return role_required(
         ['Employee', 'Manager', 'HR', 'Finance', 'Admin']
     )(view_func)
+
+
+def hr_finance_required(view_func):
+    return role_required(
+        ['HR', 'Finance', 'Admin']
+    )(view_func)
+
+

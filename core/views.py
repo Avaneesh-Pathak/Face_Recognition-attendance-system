@@ -53,7 +53,7 @@ from django.conf import settings
 from django.urls import reverse
 from dateutil.relativedelta import relativedelta 
 from django.contrib.auth.models import User
-from .decorators import finance_required, hr_required, admin_required
+from .decorators import finance_required, hr_required, admin_required, hr_finance_required
 from .utils_pdf import build_salary_slip_pdf
 from django.core.mail import EmailMessage
 from django.http import FileResponse
@@ -128,6 +128,9 @@ from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.shortcuts import get_object_or_404
 from core.utils.access import get_visible_employees,get_visible_employees_all
+from django.contrib.auth.decorators import user_passes_test
+
+
 # Setup logging
 logger = logging.getLogger(__name__)
 handler = logging.FileHandler('registration.log')
@@ -976,7 +979,7 @@ def employee_profile(request, pk):
 
 
 @login_required
-@hr_required # Assuming this is your custom decorator
+@hr_finance_required # Assuming this is your custom decorator
 def employee_id_card(request, pk):
     # Retrieve data
     employee = get_object_or_404(
