@@ -689,6 +689,13 @@
 
                     {% elif item.is_future %}
                         <span class="time-dash" style="margin-top: 0.3rem;">—</span>
+                    {% elif item.checkout_only %}
+                    <span class="status-tag absent-tag">Absent</span>
+
+                    <div class="time-slot out">
+                        <span class="dot"></span>
+                        {{ item.check_out }}
+                    </div>
                     {% else %}
                         <span class="status-tag absent-tag">Absent</span>
                     {% endif %}

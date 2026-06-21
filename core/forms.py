@@ -76,55 +76,61 @@ class EmployeeRegistrationForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-select"})
     )
     def __init__(self, *args, **kwargs):
+        # Extract organisation from context initialization parameters
+        organisation = kwargs.pop('organisation', None)
         super().__init__(*args, **kwargs)
 
-        # ## Always load active locations
-        self.fields["assigned_location"].queryset = (
-            OfficeLocation.objects.filter(is_active=True)
-        )
+        if organisation:
+            # Explicitly restrict dropdown options to the logged-in administrator's tenant
+            self.fields["department"].queryset = Department.global_objects.filter(organisation=organisation)
+            self.fields["manager"].queryset = Employee.global_objects.filter(
+                organisation=organisation,
+                is_active=True,
+                employment_status='active'
+            ).select_related('user')
+            self.fields["work_rule"].queryset = WorkRule.global_objects.filter(organisation=organisation)
+            self.fields["assigned_location"].queryset = OfficeLocation.global_objects.filter(
+                organisation=organisation,
+                is_active=True
+            )
+        else:
+            self.fields["department"].queryset = Department.global_objects.none()
+            self.fields["manager"].queryset = Employee.global_objects.none()
+            self.fields["work_rule"].queryset = WorkRule.global_objects.none()
+            self.fields["assigned_location"].queryset = OfficeLocation.global_objects.none()
 
-        # ## Always required (INDOOR + OUTDOOR)
         self.fields["assigned_location"].required = True
 
     def clean(self):
         cleaned = super().clean()
-        location_type = cleaned.get("location_type")
         location = cleaned.get("assigned_location")
-
-        # ## VALIDATION RULE
         if not location:
-            raise forms.ValidationError(
-                "Assigned office location is required for all employees."
-            )   
-
+            raise forms.ValidationError("Assigned office location is required for all employees.")   
         return cleaned
     
 
 class AttendanceSettingsForm(forms.ModelForm):
     class Meta:
         model = AttendanceSettings
-        fields = '__all__'
+        # Exclude organisation so it remains protected in the background
+        exclude = ['organisation']
         widgets = {
             'check_in_start': forms.TimeInput(attrs={'type': 'time'}),
             'check_in_end': forms.TimeInput(attrs={'type': 'time'}),
             'check_out_start': forms.TimeInput(attrs={'type': 'time'}),
             'check_out_end': forms.TimeInput(attrs={'type': 'time'}),
             'late_threshold': forms.TimeInput(attrs={'type': 'time'}),
-            # min_hours_before_checkout is a FloatField -> use number input
             'min_hours_before_checkout': forms.NumberInput(attrs={'step': '0.1', 'min': '0', 'max': '24'}),
         }
 
     def clean_min_hours_before_checkout(self):
         val = self.cleaned_data.get('min_hours_before_checkout')
-        if val is None:
-            return val
-        if val < 0 or val > 24:
-            raise ValidationError("Minimum hours must be between 0 and 24.")
-        max_daily = self.cleaned_data.get('max_daily_hours')
-        if max_daily is not None and val > max_daily:
-            raise ValidationError("Minimum hours before checkout cannot exceed maximum daily hours.")
+        if val is not None:
+            if val < 0 or val > 24:
+                raise ValidationError("Minimum hours must be between 0 and 24.")
         return val
-
+    
+    
 # ============================================================
 # 🏢 ORGANISATION STRUCTURE FORMS
 # ============================================================
@@ -134,15 +140,9 @@ class DepartmentForm(forms.ModelForm):
         model = Department
         fields = ['name', 'head', 'parent_department']
         widgets = {
-            'name': forms.Select(attrs={
-                'class': 'form-control select2',
-            }),
-            'head': forms.Select(attrs={
-                'class': 'form-control select2'
-            }),
-            'parent_department': forms.Select(attrs={
-                'class': 'form-control select2'
-            }),
+            'name': forms.Select(attrs={'class': 'form-control select2'}),
+            'head': forms.Select(attrs={'class': 'form-control select2'}),
+            'parent_department': forms.Select(attrs={'class': 'form-control select2'}),
         }
         labels = {
             'name': 'Department Name',
@@ -151,29 +151,27 @@ class DepartmentForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        organisation = kwargs.pop('organisation', None)
         super().__init__(*args, **kwargs)
 
-        # Filter only active employees as possible heads
-        self.fields['head'].queryset = Employee.objects.filter(
-            employment_status='active'
-        ).select_related('user')
+        # Retrieve fallback organisation from existing instance if updating
+        if not organisation and self.instance.pk:
+            organisation = self.instance.organisation
 
-        # Avoid showing self as parent department
-        if self.instance.pk:
-            self.fields['parent_department'].queryset = Department.objects.exclude(pk=self.instance.pk)
-        else:
-            self.fields['parent_department'].queryset = Department.objects.all()
+        if organisation:
+            self.fields['head'].queryset = Employee.global_objects.filter(
+                organisation=organisation,
+                employment_status='active'
+            ).select_related('user')
 
-    def clean(self):
-        cleaned_data = super().clean()
-        name = cleaned_data.get('name')
-        parent = cleaned_data.get('parent_department')
-
-        # ## Prevent choosing same department as parent
-        if self.instance.pk and parent and parent.pk == self.instance.pk:
-            self.add_error('parent_department', "A department cannot be its own parent!")
-
-        return cleaned_data
+            if self.instance.pk:
+                self.fields['parent_department'].queryset = Department.global_objects.filter(
+                    organisation=organisation
+                ).exclude(pk=self.instance.pk)
+            else:
+                self.fields['parent_department'].queryset = Department.global_objects.filter(
+                    organisation=organisation
+                )
 
 
 # ============================================================
@@ -185,70 +183,33 @@ class SalaryStructureForm(forms.ModelForm):
         model = SalaryStructure
         fields = ['employee', 'base_salary', 'hra', 'allowances', 'deductions', 'effective_from']
         widgets = {
-            'employee': forms.Select(attrs={
-                'class': 'form-control select2',
-                'data-placeholder': 'Select employee'
-            }),
-            'base_salary': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'step': '0.01',
-                'min': '0',
-                'placeholder': '0.00'
-            }),
-            'hra': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'step': '0.01',
-                'min': '0',
-                'placeholder': '0.00'
-            }),
-            'allowances': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'step': '0.01',
-                'min': '0',
-                'placeholder': '0.00'
-            }),
-            'deductions': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'step': '0.01',
-                'min': '0',
-                'placeholder': '0.00'
-            }),
-            'effective_from': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date'
-            }),
-        }
-        labels = {
-            'base_salary': 'Basic Salary',
-            'hra': 'House Rent Allowance (HRA)',
-            'allowances': 'Other Allowances',
-            'deductions': 'Deductions',
-            'effective_from': 'Effective From Date'
+            'employee': forms.Select(attrs={'class': 'form-control select2', 'data-placeholder': 'Select employee'}),
+            'base_salary': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'hra': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'allowances': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'deductions': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'effective_from': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
 
     def __init__(self, *args, **kwargs):
+        organisation = kwargs.pop('organisation', None)
         super().__init__(*args, **kwargs)
-        # Only show active employees without existing salary structure
-        existing_employees = SalaryStructure.objects.values_list('employee_id', flat=True)
-        if self.instance.pk:
-            # When editing, include the current employee
-            existing_employees = existing_employees.exclude(employee_id=self.instance.employee_id)
-        
-        self.fields['employee'].queryset = Employee.objects.filter(
-            employment_status='active'
-        ).exclude(id__in=existing_employees).select_related('user')
 
-    def clean_base_salary(self):
-        base_salary = self.cleaned_data.get('base_salary')
-        if base_salary and base_salary < 0:
-            raise ValidationError('Basic salary cannot be negative.')
-        return base_salary
+        if not organisation and self.instance.pk:
+            organisation = self.instance.organisation
 
-    def clean_effective_from(self):
-        effective_from = self.cleaned_data.get('effective_from')
-        if effective_from and effective_from > date.today():
-            raise ValidationError('Effective date cannot be in the future.')
-        return effective_from
+        if organisation:
+            existing_employees = SalaryStructure.global_objects.filter(
+                organisation=organisation
+            ).values_list('employee_id', flat=True)
+            
+            if self.instance.pk:
+                existing_employees = existing_employees.exclude(employee_id=self.instance.employee_id)
+            
+            self.fields['employee'].queryset = Employee.global_objects.filter(
+                organisation=organisation,
+                employment_status='active'
+            ).exclude(id__in=existing_employees).select_related('user')
 
 class PayrollFilterForm(forms.Form):
     MONTH_CHOICES = [
@@ -517,59 +478,28 @@ class LeaveWorkflowStageForm(forms.ModelForm):
 class JoiningDetailForm(forms.ModelForm):
     class Meta:
         model = JoiningDetail
-        fields = [
-            'employee',
-            'date_of_joining',
-            'probation_period_months',
-            'confirmation_date',
-        ]
+        fields = ['employee', 'date_of_joining', 'probation_period_months', 'confirmation_date']
         widgets = {
-            'employee': forms.Select(attrs={
-                'class': 'form-control select2',
-                'data-placeholder': 'Select employee'
-            }),
-            'date_of_joining': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date',
-                'max': str(date.today())
-            }),
-            'probation_period_months': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0',
-                'max': '24',
-                'placeholder': '3'
-            }),
-            'confirmation_date': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date',
-                'readonly': 'readonly'
-            }),
-        }
-        labels = {
-            'probation_period_months': 'Probation Period (Months)',
-        }
-        help_texts = {
-            'confirmation_date': 'Automatically calculated based on joining date + probation period'
+            'employee': forms.Select(attrs={'class': 'form-control select2', 'data-placeholder': 'Select employee'}),
+            'date_of_joining': forms.DateInput(attrs={'class': 'form-control', 'type': 'date', 'max': str(date.today())}),
+            'probation_period_months': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'max': '24', 'placeholder': '3'}),
+            'confirmation_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date', 'readonly': 'readonly'}),
         }
 
-    def clean_probation_period_months(self):
-        probation_months = self.cleaned_data.get('probation_period_months')
-        if probation_months and probation_months > 24:
-            raise ValidationError('Probation period cannot exceed 24 months.')
-        return probation_months
+    def __init__(self, *args, **kwargs):
+        organisation = kwargs.pop('organisation', None)
+        super().__init__(*args, **kwargs)
 
-    def clean(self):
-        cleaned_data = super().clean()
-        date_of_joining = cleaned_data.get('date_of_joining')
-        probation_months = cleaned_data.get('probation_period_months')
+        if not organisation and self.instance.pk:
+            organisation = self.instance.organisation
 
-        if date_of_joining and probation_months:
-            from dateutil.relativedelta import relativedelta
-            cleaned_data['confirmation_date'] = (
-                date_of_joining + relativedelta(months=probation_months)
-            )
-        return cleaned_data
-
+        if organisation:
+            self.fields['employee'].queryset = Employee.global_objects.filter(
+                organisation=organisation,
+                is_active=True,
+                employment_status='active'
+            ).select_related('user')
+            
 
 class ResignationForm(forms.ModelForm):
     class Meta:

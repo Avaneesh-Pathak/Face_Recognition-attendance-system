@@ -1,3 +1,4 @@
+# core/utils/payslip_pdf.py
 from io import BytesIO
 from decimal import Decimal, ROUND_HALF_UP
 import calendar
@@ -58,6 +59,12 @@ def number_to_words(amount):
     except:
         return f"{int(amount)} Rupees Only"
 
+def get_initials(name):
+    """Helper to extract initials for the logo box (e.g., 'Nelson Hospital' -> 'NH')"""
+    if not name:
+        return "ORG"
+    return "".join([word[0] for word in name.split() if word])[:3].upper()
+
 
 class HorizontalLine(Flowable):
     def __init__(self, thickness=0.5, color=colors.lightgrey):
@@ -113,7 +120,7 @@ def generate_payslip_pdf(payroll):
     # -------------------------------------------------
 
     styles.add(ParagraphStyle("CompTitle", fontSize=20, fontName="Helvetica-Bold", textColor=THEME_COLOR))
-    styles.add(ParagraphStyle(name="HospitalHeading",fontName="Helvetica-Bold",fontSize=18,textColor=colors.black,spaceAfter=4))
+    styles.add(ParagraphStyle(name="HospitalHeading", fontName="Helvetica-Bold", fontSize=18, textColor=colors.black, spaceAfter=4))
     styles.add(ParagraphStyle("CompSub", fontSize=8, textColor=colors.grey))
     styles.add(ParagraphStyle("PayslipTitle", fontSize=12, textColor=colors.white, alignment=TA_CENTER))
     styles.add(ParagraphStyle("Label", fontSize=8, textColor=colors.grey))
@@ -127,12 +134,27 @@ def generate_payslip_pdf(payroll):
     emp = payroll.employee
     user = emp.user
 
+    # DYNAMIC MULTI-TENANT CONFIGURATION
+    org_name = emp.organisation.name if getattr(emp, "organisation", None) else "Nelson Hospital"
+    org_name_title = org_name.title()
+    org_initials = get_initials(org_name_title)
+
+    # Dynamic subtitle address fallback
+    if org_name.lower() == "nelson hospital":
+        org_sub = (
+            "Reg. No: RMEE2227209<br/>"
+            "B1/37, Sector F, Kapoorthala,<br/>"
+            "Lucknow – 226024"
+        )
+    else:
+        org_sub = f"Computer Generated Official Payslip<br/>Generated for {org_name_title}"
+
     # -------------------------------------------------
     # HEADER
     # -------------------------------------------------
 
     logo_box = Table(
-        [["NH"]],
+        [[org_initials]],  # Dynamic initials
         colWidths=16 * mm,
         rowHeights=16 * mm,
         style=[
@@ -147,13 +169,8 @@ def generate_payslip_pdf(payroll):
 
     company_text = Table(
         [
-            [Paragraph("NELSON HOSPITAL", styles["HospitalHeading"])],
-            [Paragraph(
-                "Reg. No: RMEE2227209<br/>"
-                "B1/37, Sector F, Kapoorthala,<br/>"
-                "Lucknow – 226024",
-                styles["CompSubRight"]
-            )]
+            [Paragraph(org_name_title.upper(), styles["HospitalHeading"])], # Dynamic company name
+            [Paragraph(org_sub, styles["CompSubRight"])] # Dynamic address/subtitle
         ],
         style=[
             ('LEFTPADDING', (0, 0), (-1, -1), 6),
@@ -162,7 +179,6 @@ def generate_payslip_pdf(payroll):
             ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
         ]
     )
-
 
     header = Table(
         [[logo_box, company_text]],
@@ -198,11 +214,14 @@ def generate_payslip_pdf(payroll):
             Paragraph(l2, styles["Label"]), Paragraph(str(v2), styles["Value"])
         ]
         
-    structure = emp.salary_structure
+    structure = getattr(emp, "salary_structure", None)
+    base_salary_val = structure.base_salary if structure else Decimal("0.00")
+    emp_designation = emp.get_role_display() if hasattr(emp, "get_role_display") else getattr(emp, "position", "-")
+
     emp_table = Table([
         info("Name", user.get_full_name().title(), "Employee ID", emp.employee_id),
-        info("Department", emp.department.name if emp.department else "-", "Designation", emp.get_role_display()),
-        info("Monthly Salary", f"Rs. {format_currency(structure.base_salary)}", "Salary Type", "Monthly"),
+        info("Department", emp.department.name if emp.department else "-", "Designation", emp_designation),
+        info("Monthly Salary", f"Rs. {format_currency(base_salary_val)}", "Salary Type", "Monthly"),
         info("Date of Joining",
              emp.date_of_joining.strftime("%d-%b-%Y") if emp.date_of_joining else "-",
              "Bank Account", getattr(emp, "bank_account_number", "-"))
@@ -226,9 +245,6 @@ def generate_payslip_pdf(payroll):
     half_days = payroll.half_days or Decimal("0")
     absent_days = payroll.absent_days or Decimal("0")
     paid_leave_days = payroll.paid_leave_days_count or Decimal("0")
-
-    # Paid days used internally for salary calculation
-    paid_days = present_days + paid_leave_days + (half_days * Decimal("0.5")) - (payroll.late_penalty_deduction or Decimal("0"))
 
     # Calculate Total Overtime (Regular + Holiday Premium)
     total_ot_hours = (payroll.overtime_hours or Decimal("0.0")) + (payroll.holiday_overtime_hours or Decimal("0.0"))
@@ -361,3 +377,8 @@ def generate_payslip_pdf(payroll):
     buffer.seek(0)
     filename = f"payslip_{emp.employee_id}_{payroll.month.strftime('%Y_%m')}.pdf"
     return buffer, filename
+
+
+
+
+

@@ -740,7 +740,7 @@
                 <span>Payroll</span>
             </a>
             {% endif %}
-            {% if user.employee.role in "Finance Admin" or user.is_superuser %}
+            {% if user.employee.role in "Finance Admin" or user.is_superuser  or user.employee.role == "HR"%}
             <div>
                 <a class="nav-link nav-dropdown-toggle {% if 'workrule' in request.path %}active{% endif %}" 
                    data-bs-toggle="collapse" 
@@ -761,7 +761,7 @@
 
             <!-- SYSTEM (Admin Only) -->
             <div class="nav-section">System</div>
-            {% if user.is_superuser or user.employee.role == "Admin" %}
+            {% if user.is_superuser or user.employee.role == "Admin" or user.employee.role == "HR"%}
             <a href="{% url 'office_location_list' %}" class="nav-link {% if 'location' in request.path %}active{% endif %}">
                 <i class="fa-solid fa-location-dot"></i> 
                 <span>Locations</span>
@@ -774,7 +774,7 @@
                 <span>Reports</span>
             </a>
             {% endif %}
-            {% if user.is_superuser %}
+            {% if user.is_superuser or user.employee.role == "Admin" or user.employee.role == "HR" %}
             <a href="{% url 'attendance_settings' %}" class="nav-link {% if 'settings' in request.path %}active{% endif %}">
                 <i class="fa-solid fa-gears"></i> 
                 <span>Settings</span>

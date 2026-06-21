@@ -167,8 +167,10 @@ def home(request):
 # =====================================================
 
 def register(request):
+     # Retrieve organisation from logged-in HR/Admin user
+    active_org = request.organisation 
     if request.method == "POST":
-        form = EmployeeRegistrationForm(request.POST)
+        form = EmployeeRegistrationForm(request.POST, organisation=active_org)
 
         if form.is_valid():
             try:
@@ -187,6 +189,7 @@ def register(request):
                 # Create Employee
                 # -----------------------------
                 employee = Employee.objects.create(
+                    organisation=active_org,
                     user=user,
                     department=form.cleaned_data["department"],
                     position=form.cleaned_data["position"],
@@ -202,6 +205,7 @@ def register(request):
                 # Create Salary
                 # -----------------------------
                 SalaryStructure.objects.create(
+                    organisation=active_org,
                     employee=employee,
                     base_salary=form.cleaned_data.get("base_salary") or Decimal("0.00"),
                     hra=form.cleaned_data.get("hra") or Decimal("0.00"),
@@ -255,7 +259,7 @@ def register(request):
                             employee.save(update_fields=["face_encoding"])
 
                             # Reload system memory
-                            face_sys.load_from_db()
+                            face_sys.load_from_db(active_org.id)
 
                             print("Face encoding generated successfully")
 
@@ -270,7 +274,7 @@ def register(request):
                 messages.error(request, str(e))
 
     else:
-        form = EmployeeRegistrationForm()
+        form = EmployeeRegistrationForm(organisation=active_org)
 
     return render(request, "register.html", {"form": form})
 
@@ -320,16 +324,16 @@ def employee_list(request):
         )
 
         for row in latest_checkins:
-            checkin = timezone.localtime(row["last_checkin"])
-            hour = checkin.hour
+            checkin_time = timezone.localtime(row["last_checkin"])
+            hour = checkin_time.hour
 
-            actual_shift = (
-                "night"
-                if hour >= 19 or hour < 6
-                else "day"
-            )
+            # classify ONLY from check-in time
+            if 6 <= hour < 19:
+                shift = "day"
+            else:
+                shift = "night"
 
-            if actual_shift == shift_filter:
+            if shift == shift_filter:
                 employee_ids.append(row["employee_id"])
 
         employees = employees.filter(id__in=employee_ids)
@@ -547,7 +551,7 @@ def employee_update(request, pk):
                         employee.face_encoding = json.dumps({"status": "FACE_PENDING"})
                     else:
                         employee.face_encoding = json.dumps([emb])
-                        face_sys.load_from_db()
+                        face_sys.load_from_db(employee.organisation.id)
 
                     employee.save(update_fields=["face_encoding"])
 
@@ -1227,6 +1231,7 @@ def mark_attendance(request):
     if "capture" not in request.FILES:
         return JsonResponse({"success": False, "message": "No image data"}, status=400)
 
+    active_org = request.organisation 
     try:
         # ----------------------------------------------------
         # 1️⃣ Decode Image
@@ -1241,9 +1246,9 @@ def mark_attendance(request):
         # 2️⃣ Face Recognition
         # ----------------------------------------------------
         fs = get_face_system()
-        fs.load_from_db()
+        fs.load_from_db(active_org.id)
 
-        emp_id, score, meta = fs.recognize_from_frame(frame)
+        emp_id, score, meta = fs.recognize_from_frame(frame,organisation_id=active_org.id)
 
         if not emp_id:
             reason = meta.get("reason", "")
@@ -1269,6 +1274,7 @@ def mark_attendance(request):
         # 3️⃣ Employee Validation
         # ----------------------------------------------------
         employee = Employee.objects.filter(
+            organisation=active_org,
             employee_id=emp_id,
             is_active=True
         ).select_related("work_rule", "user", "assigned_location").first()
@@ -1331,10 +1337,9 @@ def mark_attendance(request):
                 })
 
         # 🌍 OUTDOOR → ANY authorized office (NO restriction)
-        # (nothing needed here)
 
         # ----------------------------------------------------
-        # 🔒 ATTENDANCE LOGIC (PERMANENT FIX)
+        # 🔒 ATTENDANCE LOGIC 
         # ----------------------------------------------------
         with transaction.atomic():
             now = timezone.now()
@@ -1343,6 +1348,7 @@ def mark_attendance(request):
             settings_obj = AttendanceSettings.objects.first()
             min_hours = settings_obj.min_hours_before_checkout if settings_obj else 0
             REST_HOURS_AFTER_CHECKOUT = 8  # 🔒 HARD LOCK
+            DOUBLE_SCAN_COOLDOWN_MINUTES = 10
 
             # --------------------------------------------
             # 1️⃣ Check for open shift
@@ -1455,6 +1461,7 @@ def mark_attendance(request):
             # 4️⃣ Create Attendance Record
             # --------------------------------------------
             Attendance.objects.create(
+                organisation=active_org,
                 employee=employee,
                 attendance_type=att_type,
                 confidence_score=score,
@@ -1605,12 +1612,42 @@ def _video_frame_generator(camera_index=0):
             logger.exception("Error releasing camera in video generator")
 
 
-def video_feed():
-    """Live video stream generator used by StreamingHttpResponse."""
+def can_create_attendance(user):
+    # 🔑 Superuser always allowed
+    if user.is_authenticated and user.is_superuser:
+        return True
+
+    if not user.is_authenticated:
+        return False
+
+    try:
+        emp = user.employee
+    except:
+        return False
+
+    return emp.role in ['Admin', 'HR', 'Finance','Manager']
+
+@login_required
+def attendance_page(request):
+    return render(request, 'attendance.html')
+
+
+# views.py
+
+@login_required
+def video_feed_view(request):
+    active_org = request.organisation
+    gen = video_feed(active_org.id)  # <-- Pass organisation ID to secure the stream
+    if gen is None:
+        return HttpResponseServerError("Camera not accessible")
+    return StreamingHttpResponse(gen, content_type='multipart/x-mixed-replace; boundary=frame')
+
+
+def video_feed(organisation_id):  # <-- Update signature
     camera = cv2.VideoCapture(0)
     if not camera.isOpened():
         logger.error("Camera not accessible")
-        return  # generator ends; caller should handle this case
+        return
 
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
@@ -1640,7 +1677,11 @@ def video_feed():
                     settings_obj = AttendanceSettings.objects.first()
                     threshold = settings_obj.confidence_threshold if settings_obj else 0.60
                     best_score = float(threshold)
-                    employees = Employee.objects.exclude(Q(face_encoding__isnull=True) | Q(face_encoding__exact=''))
+                    
+                    # FIX: Use global_objects and filter strictly by active organisation
+                    employees = Employee.global_objects.filter(
+                        organisation_id=organisation_id
+                    ).exclude(Q(face_encoding__isnull=True) | Q(face_encoding__exact=''))
 
                     for emp in employees:
                         try:
@@ -1687,34 +1728,6 @@ def video_feed():
             camera.release()
         except Exception:
             logger.exception("Error releasing camera in video_feed")
-
-def can_create_attendance(user):
-    # 🔑 Superuser always allowed
-    if user.is_authenticated and user.is_superuser:
-        return True
-
-    if not user.is_authenticated:
-        return False
-
-    try:
-        emp = user.employee
-    except:
-        return False
-
-    return emp.role in ['Admin', 'HR', 'Finance','Manager']
-
-@login_required
-def attendance_page(request):
-    return render(request, 'attendance.html')
-
-
-@login_required
-def video_feed_view(request):
-    gen = video_feed()
-    if gen is None:
-        return HttpResponseServerError("Camera not accessible")
-    return StreamingHttpResponse(gen, content_type='multipart/x-mixed-replace; boundary=frame')
-
 
 @login_required
 def attendance_reports(request):
@@ -2009,19 +2022,28 @@ def generate_excel_report(queryset, start_date, end_date):
     return response
 
 
+@login_required
 def attendance_settings(request):
-    settings_obj, created = AttendanceSettings.objects.get_or_create(pk=1)
+    active_org = request.organisation
+    if not active_org:
+        # Fallback security check if a superuser with no employee profile tries to access settings
+        return HttpResponseForbidden("You must be logged in as an organization administrator to access settings.")
+
+    # FIX: Query or create settings mapped strictly to the active organisation
+    settings_obj, created = AttendanceSettings.objects.get_or_create(
+        organisation=active_org
+    )
 
     if request.method == 'POST':
         form = AttendanceSettingsForm(request.POST, instance=settings_obj)
         if form.is_valid():
             form.save()
+            messages.success(request, "Attendance settings updated successfully.")
             return redirect('attendance_settings')
     else:
         form = AttendanceSettingsForm(instance=settings_obj)
 
     return render(request, 'settings.html', {'form': form})
-
 
 @login_required
 def get_attendance_history(request):
@@ -2186,6 +2208,7 @@ def get_work_date(attendance, rule=None):
 
 from .rotational_shift_fix import build_sessions, split_sessions_by_shift, get_shift_from_time
 
+
 # ✔ Morning shift (before 11 AM)
 # ✔ Day shift (11 AM – 4 PM)
 # ✔ Evening shift (4–7 PM)
@@ -2224,7 +2247,7 @@ def attendance_calendar(request, employee_id, year, month):
     # -------------------------------
     # 🔥 SHIFT-BASED SPLIT ENGINE
     # -------------------------------
-    daily_map = split_sessions_by_shift(sessions, employee.work_rule)
+    daily_map = split_sessions_by_shift(sessions, employee)
 
     # -------------------------------
     # HOLIDAYS
@@ -2372,14 +2395,36 @@ def attendance_calendar(request, employee_id, year, month):
 
             if worked_hours > fsh + max_ot:
                 extra = worked_hours - (fsh + max_ot)
-
-            # -------------------------------
-            # STATUS (FINAL FIXED LOGIC)
-            # -------------------------------
             # -------------------------------
             # STATUS (USE RAW LOGS ONLY)
             # -------------------------------
-            has_logs = len(day_logs) > 0
+            has_checkin = any(
+                log.attendance_type == "check_in"
+                for log in day_logs
+            )
+
+            last_checkout = next(
+                (l for l in reversed(day_logs)
+                if l.attendance_type == "check_out"),
+                None
+            )
+
+            checkout_only = (
+                not first_in and
+                last_out is not None
+            )
+
+            checkout_present_rule = False
+
+            if last_checkout:
+                checkout_hour = timezone.localtime(
+                    last_checkout.timestamp
+                ).hour
+
+                # 12 PM → 6 PM
+                if 12 <= checkout_hour < 18:
+                    checkout_present_rule = True
+
 
             if is_future:
                 present = False
@@ -2388,7 +2433,7 @@ def attendance_calendar(request, employee_id, year, month):
                 present = False
                 total_holiday += 1
 
-            elif has_logs:
+            elif has_checkin or checkout_present_rule:
                 present = True
                 total_present += 1
 
@@ -2426,6 +2471,7 @@ def attendance_calendar(request, employee_id, year, month):
                 # 🔥 NEW UI FIELDS
                 "check_in": cin,
                 "check_out": cout,
+                "checkout_only": checkout_only,
                 "timeline": [
                     {
                         "start": seg["start"].strftime("%I:%M %p"),
@@ -2793,7 +2839,9 @@ def office_location_create(request):
     if request.method == "POST":
         form = OfficeLocationForm(request.POST)
         if form.is_valid():
-            form.save()
+            loc = form.save(commit=False)
+            loc.organisation = request.organisation  # <-- Set Organisation
+            loc.save()
             messages.success(request, "Office location added successfully.")
             return redirect("office_location_list")
         else:
@@ -3257,14 +3305,19 @@ def department_list(request):
 
 @login_required
 def department_create(request):
+    active_org = request.organisation
     if request.method == 'POST':
-        form = DepartmentForm(request.POST)
+        # Pass organisation parameter here
+        form = DepartmentForm(request.POST, organisation=active_org)
         if form.is_valid():
-            form.save()
+            dept = form.save(commit=False)
+            dept.organisation = active_org
+            dept.save()
             messages.success(request, 'Department created successfully!')
             return redirect('department_list')
     else:
-        form = DepartmentForm()
+        # Pass organisation parameter here
+        form = DepartmentForm(organisation=active_org)
     
     return render(request, 'ems/department_form.html', {
         'form': form,
@@ -3315,14 +3368,19 @@ def salary_structure_list(request):
 
 @login_required
 def salary_structure_create(request):
+    active_org = request.organisation
     if request.method == 'POST':
-        form = SalaryStructureForm(request.POST)
+        # Pass organisation parameter here
+        form = SalaryStructureForm(request.POST, organisation=active_org)
         if form.is_valid():
-            form.save()
+            struct = form.save(commit=False)
+            struct.organisation = active_org
+            struct.save()
             messages.success(request, 'Salary structure saved successfully.')
             return redirect('salary_structure_list')
     else:
-        form = SalaryStructureForm()
+        # Pass organisation parameter here
+        form = SalaryStructureForm(organisation=active_org)
 
     return render(request, 'ems/salary_structure_form.html', {
         'form': form,
@@ -3693,16 +3751,32 @@ def download_salary_slip(request, pk):
         pk=pk
     )
 
-    # Permission check
+    # 🔒 Unified multi-tenant permission check
+    allow = False
     if hasattr(request.user, 'employee'):
         role = request.user.employee.role
-        if payroll.employee != request.user.employee and role not in ['Finance', 'Admin']:
-            messages.error(request, "Access denied.")
-            return redirect('my_salary')
-    elif not request.user.is_superuser:
-        messages.error(request, "Access denied.")
-        return redirect('payroll_list')
+        if role in ['Finance', 'Admin']:
+            allow = True
+        if payroll.employee_id == request.user.employee.id:
+            allow = True
+    elif request.user.is_superuser:
+        allow = True
 
+    if not allow:
+        messages.error(request, "Access denied.")
+        return redirect('my_salary')
+
+    # FIX: If payslip_pdf is empty (because of bulk creation), generate it on-the-fly!
+    if not payroll.payslip_pdf:
+        pdf_buffer, filename = generate_payslip_pdf(payroll)
+        return FileResponse(
+            pdf_buffer,
+            as_attachment=True,
+            filename=filename,
+            content_type="application/pdf"
+        )
+
+    # Fallback to serving the saved file if it exists
     return FileResponse(
         open(payroll.payslip_pdf.path, 'rb'),
         content_type='application/pdf'
@@ -3866,7 +3940,9 @@ def leave_type_create(request):
     if request.method == 'POST':
         form = LeaveTypeForm(request.POST)
         if form.is_valid():
-            form.save()
+            leave_type = form.save(commit=False)
+            leave_type.organisation = request.organisation  # <-- Set Organisation
+            leave_type.save()
             messages.success(request, 'Leave type created successfully!')
             return redirect('leave_type_list')
     else:
@@ -4004,7 +4080,9 @@ def leave_workflow_create(request):
     if request.method == 'POST':
         form = LeaveWorkflowStageForm(request.POST)
         if form.is_valid():
-            form.save()
+            stage = form.save(commit=False)
+            stage.organisation = request.organisation  # <-- Set Organisation
+            stage.save()
             messages.success(request, 'Workflow stage created successfully!')
             return redirect('leave_workflow_list')
     else:
@@ -4170,14 +4248,19 @@ def download_all_documents(request, detail_id):
 
 @login_required
 def joining_detail_create(request):
+    active_org = request.organisation
     if request.method == 'POST':
-        form = JoiningDetailForm(request.POST)
+        # Pass organisation parameter here
+        form = JoiningDetailForm(request.POST, organisation=active_org)
         if form.is_valid():
-            joining = form.save()
+            joining = form.save(commit=False)
+            joining.organisation = active_org
+            joining.save()
 
-            # 📎 Handle document upload
+            # Handle document upload
             for file in request.FILES.getlist('documents'):
                 JoiningDocument.objects.create(
+                    organisation=active_org,
                     joining=joining,
                     file=file
                 )
@@ -4185,12 +4268,14 @@ def joining_detail_create(request):
             messages.success(request, 'Joining details added successfully!')
             return redirect('joining_detail_list')
     else:
-        form = JoiningDetailForm()
+        # Pass organisation parameter here
+        form = JoiningDetailForm(organisation=active_org)
 
     return render(request, 'ems/joining_detail_form.html', {
         'form': form,
         'title': 'Add Joining Details'
     })
+
 
 @login_required
 def upload_joining_documents(request, detail_id):
@@ -4250,6 +4335,7 @@ def resignation_create(request):
         form = ResignationForm(request.POST)
         if form.is_valid():
             resignation = form.save(commit=False)
+            resignation.organisation = request.organisation
             resignation.employee = employee
             resignation.save()
             messages.success(request, 'Resignation submitted successfully!')
@@ -4355,7 +4441,7 @@ class WorkRuleForm(ModelForm):
 # LIST WORK RULES
 # =========================================================
 @login_required
-@finance_required
+
 def workrule_list(request):
     rules = WorkRule.objects.all().order_by("name")
     return render(request, "ems/workrule_list.html", {
@@ -4368,14 +4454,29 @@ def workrule_list(request):
 # CREATE WORK RULE
 # =========================================================
 @login_required
-@finance_required
+@hr_finance_required
 def workrule_create(request):
     if request.method == "POST":
         form = WorkRuleForm(request.POST)
+
         if form.is_valid():
-            form.save()
+            rule = form.save(commit=False)
+            rule.organisation = request.organisation
+            rule.save()
             messages.success(request, "Work rule created successfully.")
             return redirect("workrule_list")
+
+        # Show all field errors as messages
+        for field, errors in form.errors.items():
+            field_name = (
+                form.fields[field].label
+                if field in form.fields
+                else field.replace("__all__", "Form")
+            )
+
+            for error in errors:
+                messages.error(request, f"{field_name}: {error}")
+
     else:
         form = WorkRuleForm()
 
@@ -4384,21 +4485,32 @@ def workrule_create(request):
         "title": "Create Work Rule"
     })
 
-
 # =========================================================
 # UPDATE WORK RULE
 # =========================================================
 @login_required
-@finance_required
+@hr_finance_required
 def workrule_update(request, pk):
     rule = get_object_or_404(WorkRule, pk=pk)
 
     if request.method == "POST":
         form = WorkRuleForm(request.POST, instance=rule)
+
         if form.is_valid():
             form.save()
             messages.success(request, "Work rule updated successfully.")
             return redirect("workrule_list")
+
+        for field, errors in form.errors.items():
+            field_name = (
+                form.fields[field].label
+                if field in form.fields
+                else field.replace("__all__", "Form")
+            )
+
+            for error in errors:
+                messages.error(request, f"{field_name}: {error}")
+
     else:
         form = WorkRuleForm(instance=rule)
 
@@ -4408,8 +4520,10 @@ def workrule_update(request, pk):
         "title": "Update Work Rule"
     })
 
+
+    
 @login_required
-@finance_required
+@hr_finance_required
 def workrule_delete(request, pk):
     rule = get_object_or_404(WorkRule, pk=pk)
 

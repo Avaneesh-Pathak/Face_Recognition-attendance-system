@@ -1,14 +1,88 @@
+# admin.py
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.utils.html import format_html
 from .models import (
-    Employee, Attendance, AttendanceSettings, DailyReport, Department,
+    Organisation, Employee, Attendance, AttendanceSettings, DailyReport, Department,
     SalaryStructure, Payroll, LeaveType, LeaveApplication, 
-    LeaveWorkflowStage, LeaveApproval, JoiningDetail, Resignation, Notification,JoiningDocument,
-     WorkRule, PayrollSettings,OfficeLocation
+    LeaveWorkflowStage, LeaveApproval, JoiningDetail, Resignation, Notification, JoiningDocument,
+    WorkRule, PayrollSettings, OfficeLocation
 )
 
+# ============================================================
+# BASE ADMIN CLASSES
+# ============================================================
+
+# core/admin.py
+import copy
+
+class TenantBaseAdmin(admin.ModelAdmin):
+    """Base class to restrict Admin Panel viewing limits."""
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        
+        # Safe check: Only filter if model has 'organisation' field
+        has_org_field = any(field.name == 'organisation' for field in self.model._meta.get_fields())
+        
+        if has_org_field and hasattr(request.user, 'employee'):
+            return qs.filter(organisation=request.user.employee.organisation)
+        return qs
+
+    def save_model(self, request, obj, form, change):
+        # Automatically assign the model to the logged-in admin's organisation
+        if not change and hasattr(request.user, 'employee') and hasattr(obj, 'organisation_id'):
+            if not obj.organisation_id:
+                obj.organisation = request.user.employee.organisation
+        super().save_model(request, obj, form, change)
+
+    def get_fields(self, request, obj=None):
+        """Dynamically add/remove organisation field on standard layouts."""
+        fields = list(super().get_fields(request, obj))
+        has_org_field = any(field.name == 'organisation' for field in self.model._meta.get_fields())
+        
+        if has_org_field:
+            if request.user.is_superuser:
+                if 'organisation' not in fields:
+                    fields.insert(0, 'organisation')  # Prepend for superusers
+            else:
+                if 'organisation' in fields:
+                    fields.remove('organisation')  # Hide from standard HR/Admins
+        return fields
+
+    def get_fieldsets(self, request, obj=None):
+        """Dynamically inject organisation field into fieldset layouts (like EmployeeAdmin)."""
+        fieldsets = super().get_fieldsets(request, obj)
+        has_org_field = any(field.name == 'organisation' for field in self.model._meta.get_fields())
+        if not has_org_field:
+            return fieldsets
+
+        # Deep copy to avoid mutating the class-level layout
+        fieldsets = list(copy.deepcopy(fieldsets))
+
+        if request.user.is_superuser:
+            # Find if 'organisation' is already in any of the fieldsets
+            flat_fields = []
+            for name, options in fieldsets:
+                flat_fields.extend(options.get('fields', []))
+            
+            if 'organisation' not in flat_fields:
+                # Add 'organisation' as the first field of the first fieldset
+                first_fieldset_fields = list(fieldsets[0][1]['fields'])
+                first_fieldset_fields.insert(0, 'organisation')
+                fieldsets[0][1]['fields'] = tuple(first_fieldset_fields)
+        else:
+            # Remove 'organisation' from all fieldsets so tenant admins cannot see or edit it
+            for name, options in fieldsets:
+                fields = list(options.get('fields', []))
+                if 'organisation' in fields:
+                    fields.remove('organisation')
+                    options['fields'] = tuple(fields)
+                    
+        return fieldsets
 
 # ============================================================
 # CUSTOM ADMIN ACTIONS
@@ -36,6 +110,16 @@ def mark_notifications_read(modeladmin, request, queryset):
 
 
 # ============================================================
+# ORGANISATION ADMIN
+# ============================================================
+
+@admin.register(Organisation)
+class OrganisationAdmin(admin.ModelAdmin):
+    list_display = ('name', 'created_at', 'is_active')
+    search_fields = ('name',)
+
+
+# ============================================================
 # 👤 EMPLOYEE ADMIN
 # ============================================================
 
@@ -58,10 +142,10 @@ class CustomUserAdmin(UserAdmin):
     def get_department(self, obj):
         return obj.employee.department if hasattr(obj, 'employee') else '-'
     get_department.short_description = 'Department'
- 
+
 
 @admin.register(Employee)
-class EmployeeAdmin(admin.ModelAdmin):
+class EmployeeAdmin(TenantBaseAdmin):
     list_display = (
         'employee_id',
         'user_full_name',
@@ -74,7 +158,6 @@ class EmployeeAdmin(admin.ModelAdmin):
         'location_type',
         'assigned_location',
     )
-
     list_filter = (
         'department',
         'position',
@@ -85,7 +168,6 @@ class EmployeeAdmin(admin.ModelAdmin):
         'location_type',
         'assigned_location',
     )
-
     search_fields = (
         'employee_id',
         'user__first_name',
@@ -94,7 +176,6 @@ class EmployeeAdmin(admin.ModelAdmin):
         'department__name',
         'assigned_location__name',
     )
-
     readonly_fields = ('created_at', 'face_encoding_preview')
 
     fieldsets = (
@@ -142,11 +223,6 @@ class EmployeeAdmin(admin.ModelAdmin):
         }),
     )
 
-    actions = [make_employees_active, make_employees_inactive]
-
-    # ------------------------------
-    # Custom Display Helpers
-    # ------------------------------
     def user_full_name(self, obj):
         return obj.user.get_full_name()
     user_full_name.short_description = 'Full Name'
@@ -161,43 +237,32 @@ class EmployeeAdmin(admin.ModelAdmin):
             )
         return "No encoding"
     face_encoding_preview.short_description = 'Face Encoding Preview'
+
+
 # ============================================================
 # 🕒 ATTENDANCE ADMIN
 # ============================================================
 
 @admin.register(Attendance)
-class AttendanceAdmin(admin.ModelAdmin):
+class AttendanceAdmin(TenantBaseAdmin):
     list_display = ('employee', 'attendance_type', 'timestamp', 'location', 'confidence_score')
     list_filter = ('attendance_type', 'timestamp', 'location')
     search_fields = ('employee__user__first_name', 'employee__user__last_name', 'employee__employee_id')
     date_hierarchy = 'timestamp'
-    
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('employee__user')
 
 
 @admin.register(AttendanceSettings)
-class AttendanceSettingsAdmin(admin.ModelAdmin):
+class AttendanceSettingsAdmin(TenantBaseAdmin):
     list_display = ('check_in_start', 'check_in_end', 'check_out_start', 'check_out_end', 'late_threshold', 'confidence_threshold')
-    
-    def has_add_permission(self, request):
-        return not AttendanceSettings.objects.exists()
 
 
 @admin.register(DailyReport)
-class DailyReportAdmin(admin.ModelAdmin):
+class DailyReportAdmin(TenantBaseAdmin):
     list_display = ('date', 'total_employees', 'present_count', 'absent_count', 'late_count', 'average_hours')
-    list_filter = ('date',)
-    readonly_fields = ('date', 'total_employees', 'present_count', 'absent_count', 'late_count', 'average_hours')
-    date_hierarchy = 'date'
 
-
-# ============================================================
-# 🏢 ORGANISATION ADMIN
-# ============================================================
 
 @admin.register(Department)
-class DepartmentAdmin(admin.ModelAdmin):
+class DepartmentAdmin(TenantBaseAdmin):
     list_display = ('name', 'head_name', 'parent_department')
     list_filter = ('parent_department',)
     search_fields = ('name', 'head__user__first_name', 'head__user__last_name')
@@ -212,7 +277,7 @@ class DepartmentAdmin(admin.ModelAdmin):
 # ============================================================
 
 @admin.register(SalaryStructure)
-class SalaryStructureAdmin(admin.ModelAdmin):
+class SalaryStructureAdmin(TenantBaseAdmin):
     list_display = (
         'employee',
         'base_salary',
@@ -221,14 +286,11 @@ class SalaryStructureAdmin(admin.ModelAdmin):
         'deductions',
         'total_salary_display'
     )
-
     def total_salary_display(self, obj):
         return obj.total_salary()
 
-    total_salary_display.short_description = "Total Salary"
 
-
-
+# Defined before PayrollAdmin to fix the order-of-declaration error
 class PayrollMonthFilter(admin.SimpleListFilter):
     title = 'Month'
     parameter_name = 'month'
@@ -251,7 +313,7 @@ class PayrollMonthFilter(admin.SimpleListFilter):
 
 
 @admin.register(Payroll)
-class PayrollAdmin(admin.ModelAdmin):
+class PayrollAdmin(TenantBaseAdmin):
     list_display = (
         'employee',
         'month',
@@ -261,33 +323,18 @@ class PayrollAdmin(admin.ModelAdmin):
         'net_salary',
         'status'
     )
-
     list_filter = (PayrollMonthFilter, 'status')
     search_fields = ('employee__employee_id', 'employee__user__first_name')
     readonly_fields = ('processed_at',)
 
-    actions = ['generate_payroll']
-
-    def month_display(self, obj):
-        return obj.month.strftime('%B %Y')
-
-    @admin.action(description="Generate Payroll for Current Month")
-    def generate_payroll(self, request, queryset=None):
-        import datetime
-        from .models import Payroll
-        today = datetime.date.today()
-        Payroll.objects.generate_monthly_salary(today.year, today.month)
-        self.message_user(request, "✅ Payroll successfully generated!")
 
 @admin.register(OfficeLocation)
-class OfficeLocationAdmin(admin.ModelAdmin):
+class OfficeLocationAdmin(TenantBaseAdmin):
     list_display = ("name", "latitude", "longitude", "radius_meters", "is_active")
-    list_filter = ("is_active",)
-    search_fields = ("name",)
 
 
 @admin.register(WorkRule)
-class WorkRuleAdmin(admin.ModelAdmin):
+class WorkRuleAdmin(TenantBaseAdmin):
     list_display = (
         'name', 'working_days', 'saturday_is_working', 'sunday_is_working',
         'full_day_hours', 'half_day_hours', 'overtime_rate'
@@ -296,16 +343,12 @@ class WorkRuleAdmin(admin.ModelAdmin):
 
 
 @admin.register(PayrollSettings)
-class PayrollSettingsAdmin(admin.ModelAdmin):
+class PayrollSettingsAdmin(TenantBaseAdmin):
     list_display = (
         'professional_tax', 'default_working_days', 'default_full_day_hours',
         'default_half_day_hours', 'default_overtime_rate',
         'default_saturday_is_working', 'default_sunday_is_working',
     )
-
-    def has_add_permission(self, request):
-        #Only 1 PayrollSettings allowed
-        return not PayrollSettings.objects.exists()
 
 
 # ============================================================
@@ -313,56 +356,29 @@ class PayrollSettingsAdmin(admin.ModelAdmin):
 # ============================================================
 
 @admin.register(LeaveType)
-class LeaveTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'max_days_per_year', 'is_paid')  #updated
+class LeaveTypeAdmin(TenantBaseAdmin):
+    list_display = ('name', 'max_days_per_year', 'is_paid')
     list_editable = ('is_paid',)
-    search_fields = ('name',)
-
-
-class LeaveApprovalInline(admin.TabularInline):
-    model = LeaveApproval
-    extra = 0
-    readonly_fields = ('acted_at',)
-    can_delete = False
 
 
 @admin.register(LeaveApplication)
-class LeaveApplicationAdmin(admin.ModelAdmin):
+class LeaveApplicationAdmin(TenantBaseAdmin):
     list_display = ('employee', 'leave_type', 'start_date', 'end_date', 'total_days', 'status', 'applied_on')
-    list_filter = ('status', 'leave_type', 'start_date', 'applied_on')
-    search_fields = ('employee__user__first_name', 'employee__user__last_name', 'reason')
-    readonly_fields = ('applied_on', 'total_days_display')
-    inlines = [LeaveApprovalInline]
-    actions = [approve_leaves]
-    
-    def total_days_display(self, obj):
-        return obj.total_days()
-    total_days_display.short_description = 'Total Days'
-    
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('employee__user', 'leave_type')
 
 
 @admin.register(LeaveWorkflowStage)
-class LeaveWorkflowStageAdmin(admin.ModelAdmin):
+class LeaveWorkflowStageAdmin(TenantBaseAdmin):
     list_display = ('level', 'role_name', 'next_level')
-    list_editable = ('role_name', 'next_level')
-    ordering = ('level',)
 
 
 @admin.register(LeaveApproval)
-class LeaveApprovalAdmin(admin.ModelAdmin):
+class LeaveApprovalAdmin(TenantBaseAdmin):
     list_display = ('leave', 'level', 'approver_name', 'status', 'acted_at')
-    list_filter = ('level', 'status', 'acted_at')
-    search_fields = ('leave__employee__user__first_name', 'leave__employee__user__last_name')
-    readonly_fields = ('acted_at',)
-    
+
+    # Restored helper method to prevent E108 system error
     def approver_name(self, obj):
         return obj.approver.user.get_full_name() if obj.approver else '-'
     approver_name.short_description = 'Approver'
-    
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('leave__employee__user', 'approver__user')
 
 
 # ============================================================
@@ -370,82 +386,43 @@ class LeaveApprovalAdmin(admin.ModelAdmin):
 # ============================================================
 
 @admin.register(JoiningDetail)
-class JoiningDetailAdmin(admin.ModelAdmin):
+class JoiningDetailAdmin(TenantBaseAdmin):
     list_display = ('employee', 'date_of_joining', 'probation_period_months', 'confirmation_date')
-    list_filter = ('date_of_joining', 'confirmation_date')
-    search_fields = ('employee__user__first_name', 'employee__user__last_name')
-    
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('employee__user')
+
+
+@admin.register(JoiningDocument)
+class JoiningDocumentAdmin(TenantBaseAdmin):
+    list_display = ('joining', 'file_name', 'uploaded_at')
+
+    # Restored helper method to prevent E108 system error
+    def file_name(self, obj):
+        return obj.file.name.split('/')[-1] if obj.file else '-'
+    file_name.short_description = "Document Name"
 
 
 @admin.register(Resignation)
-class ResignationAdmin(admin.ModelAdmin):
+class ResignationAdmin(TenantBaseAdmin):
     list_display = ('employee', 'resignation_date', 'last_working_day', 'approval_status', 'approved_by_name')
-    list_filter = ('resignation_date', 'approval_status')
-    search_fields = ('employee__user__first_name', 'employee__user__last_name', 'reason')
-    
+
     def approved_by_name(self, obj):
         return obj.approved_by.user.get_full_name() if obj.approved_by else '-'
     approved_by_name.short_description = 'Approved By'
-    
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('employee__user', 'approved_by__user')
 
 
 # ============================================================
 # 🔔 NOTIFICATIONS ADMIN
 # ============================================================
 
-
 @admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
+class NotificationAdmin(TenantBaseAdmin):
     list_display = ('recipient', 'message_preview', 'is_read', 'created_at')
-    list_filter = ('is_read', 'created_at')
-    search_fields = ('recipient__username', 'recipient__first_name', 'recipient__last_name', 'message')
-    readonly_fields = ('created_at',)
-    actions = [mark_notifications_read]
-    
+
+    # Restored helper method to prevent E108 system error
     def message_preview(self, obj):
         return obj.message[:50] + '...' if len(obj.message) > 50 else obj.message
     message_preview.short_description = 'Message'
-    
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('recipient')
 
 
-@admin.register(JoiningDocument)
-class JoiningDocumentAdmin(admin.ModelAdmin):
-    list_display = ('joining', 'file_name', 'uploaded_at')
-    list_filter = ('uploaded_at',)
-    search_fields = (
-        'joining__employee__user__first_name',
-        'joining__employee__user__last_name',
-        'file'
-    )
-    readonly_fields = ('uploaded_at',)
-
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('joining__employee__user')
-
-    #Display the filename instead of full path
-    def file_name(self, obj):
-        return obj.file.name.split('/')[-1]
-    file_name.short_description = "Document Name"
-
-
-# ============================================================
-# 🔄 UNREGISTER DEFAULT USER & REGISTER CUSTOM
-# ============================================================
-
+# Register Django User model
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
-
-
-# ============================================================
-# 🎯 ADMIN SITE CUSTOMIZATION
-# ============================================================
-
-admin.site.site_header = "Employee Management System"
-admin.site.site_title = "EMS Admin"
-admin.site.index_title = "Welcome to Employee Management System"

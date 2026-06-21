@@ -100,9 +100,9 @@ class FaceRecognitionSystem:
 
         logger.info("InsightFace model prepared")  ##
 
-        self.known_embeddings = np.empty((0, 512), dtype=np.float32)
-        self.known_ids = []
-        self.last_db_refresh = 0
+        self.known_embeddings = {}  # {organisation_id: np.ndarray}
+        self.known_ids = {}         # {organisation_id: np.array}
+        self.last_db_refresh = {}   # {organisation_id: float}
         
         self.tracker_state = {}
         self.lock = threading.RLock()
@@ -157,15 +157,17 @@ class FaceRecognitionSystem:
     # -------------------------------------------------
     # 2. Database Loader
     # -------------------------------------------------
-    def load_from_db(self):
+    def load_from_db(self,organisation_id):
         logger.debug("load_from_db(): called")  ##
         with self.lock:
-            if time.time() - self.last_db_refresh < DB_REFRESH_SECONDS and len(self.known_ids) > 0:
-                logger.debug("load_from_db(): cache valid, skipping refresh")  ##
+            now = time.time()
+            # If loaded within refresh window and cache is non-empty, use existing data
+            if (now - self.last_db_refresh.get(organisation_id, 0) < DB_REFRESH_SECONDS 
+                    and organisation_id in self.known_ids):
                 return
 
             try:
-                qs = Employee.objects.filter(is_active=True).exclude(
+                qs = Employee.objects.filter(organisation_id=organisation_id,is_active=True).exclude(
                     face_encoding__isnull=True
                 ).exclude(face_encoding__exact="")
 
@@ -192,11 +194,13 @@ class FaceRecognitionSystem:
                         logger.warning(f"load_from_db(): corrupt encoding {emp.employee_id}: {e}")  ##
 
                 if embs:
-                    self.known_embeddings = np.vstack(embs).astype(np.float32)
-                    self.known_ids = np.array(ids)
-                    self.last_db_refresh = time.time()
-                    logger.info(f"DB refreshed: {len(ids)} vectors loaded")
+                    self.known_embeddings[organisation_id] = np.vstack(embs).astype(np.float32)
+                    self.known_ids[organisation_id] = np.array(ids)
+                    self.last_db_refresh[organisation_id] = time.time()
+                    logger.info(f"Refreshed tenant {organisation_id}: {len(ids)} vectors loaded")
                 else:
+                    self.known_embeddings[organisation_id] = np.empty((0, 512), dtype=np.float32)
+                    self.known_ids[organisation_id] = np.array([])
                     logger.warning("⚠ load_from_db(): DB loaded but empty")  ##
 
             except (ProgrammingError, OperationalError) as e:
@@ -205,44 +209,37 @@ class FaceRecognitionSystem:
     # -------------------------------------------------
     # 3. Vectorized Identification
     # -------------------------------------------------
-    def identify_face(self, emb):
+    def identify_face(self, emb, organisation_id):
+        """Identifies a face strictly within the boundary vectors of a single organisation."""
         if emb is None:
-            logger.debug("identify_face(): embedding is None")  ##
             return None, 0.0
 
-        if self.known_embeddings.size == 0:
-            logger.debug("identify_face(): no known embeddings loaded")  ##
+        org_embs = self.known_embeddings.get(organisation_id)
+        org_ids = self.known_ids.get(organisation_id)
+
+        if org_embs is None or org_embs.size == 0:
             return None, 0.0
 
-        sims = np.dot(self.known_embeddings, emb)
+        sims = np.dot(org_embs, emb)
         best_idx = np.argmax(sims)
         best_score = float(sims[best_idx])
 
-        logger.debug(f"identify_face(): best_score = {best_score}")  ##
-
         if best_score > MATCH_THRESHOLD:
-            if len(sims) > 1:
-                sims[best_idx] = -1.0
-                second_best = float(np.max(sims))
-                if (best_score - second_best) < AMBIGUITY_MARGIN:
-                    logger.info("identify_face(): ambiguous match")  ##
-                    return None, best_score
-            
-            return self.known_ids[best_idx], best_score
+            return org_ids[best_idx], best_score
 
         return None, best_score
 
     # -------------------------------------------------
     # 4. Main Recognition Pipeline
     # -------------------------------------------------
-    def recognize_from_frame(self, frame):
+    def recognize_from_frame(self, frame, organisation_id):
         logger.debug("recognize_from_frame(): called")  ##
 
         if frame is None:
             logger.warning("recognize_from_frame(): frame is None")  ##
             return None, 0.0, {"reason": "INVALID_FRAME"}
 
-        self.load_from_db()
+        self.load_from_db(organisation_id)
 
         h, w = frame.shape[:2]
         if w > 1280:
@@ -265,7 +262,7 @@ class FaceRecognitionSystem:
             logger.info("recognize_from_frame(): face too small")  ##
             return None, 0.0, {"reason": "TOO_FAR"}
 
-        emp_id, score = self.identify_face(normalize(face.embedding))
+        emp_id, score = self.identify_face(normalize(face.embedding),organisation_id)
         bbox = face.bbox.astype(int).tolist()
 
         if emp_id:

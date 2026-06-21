@@ -16,10 +16,40 @@ from core.utils.payslip_pdf import generate_payslip_pdf
 from collections import defaultdict
 from django.db import models, transaction
 from .rotational_shift_fix import get_work_date_for_checkin
+from core.tenant_utils import TenantManager
+
+# ============================================================
+# 🏢 ORGANISATION (TENANT)
+# ============================================================
+class Organisation(models.Model):
+    name = models.CharField(max_length=150, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+# ============================================================
+# 🛡 ABSTRACT TENANT BASE MODEL
+# ============================================================
+class TenantModel(models.Model):
+    organisation = models.ForeignKey(
+        Organisation, 
+        on_delete=models.CASCADE, 
+        related_name="%(class)s_records",null=True,   # <-- Temporarily add this
+        blank=True
+    )
+    
+    # Overwrite the default manager with our TenantManager
+    objects = TenantManager()
+    # Provide an unrestricted manager for global background tasks/superadmins if needed
+    global_objects = models.Manager()
+
+    class Meta:
+        abstract = True
 
 
-
-class OfficeLocation(models.Model):
+class OfficeLocation(TenantModel):
     name = models.CharField(max_length=100)
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
@@ -33,7 +63,7 @@ class OfficeLocation(models.Model):
 # 👤 EMPLOYEE MASTER
 # ============================================================
 
-class Employee(models.Model):
+class Employee(TenantModel):
     ROLE_CHOICES = [
         ('Admin', 'Admin'),
         ('HR', 'HR Manager'),
@@ -43,7 +73,7 @@ class Employee(models.Model):
     ]
     
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    employee_id = models.CharField(max_length=20, unique=True)
+    employee_id = models.CharField(max_length=20)
     
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
     position = models.CharField(max_length=100)
@@ -85,6 +115,10 @@ class Employee(models.Model):
         null=True,
         blank=True
     )
+    class Meta:
+        # FIX: Ensure employee_id is unique strictly within each organisation
+        unique_together = ('organisation', 'employee_id')
+
     def __str__(self):
         return f"{self.user.get_full_name()} ({self.employee_id})"
 
@@ -129,26 +163,54 @@ class Employee(models.Model):
 # 🏢 ORGANISATION STRUCTURE
 # ============================================================
 
-class Department(models.Model):
+class Department(TenantModel):
     DEPT_CHOICES = [
+        # Management & Administration
         ('Management', 'Management / CEO Office'),
         ('HR', 'Human Resources'),
         ('Finance', 'Finance / Accounts'),
         ('IT', 'IT / Technical'),
         ('Operations', 'Operations'),
-        ('Pharmacy', 'Pharmacy'),
-        ('House Keeping', 'House Keeping'),
+
+        # Clinical Services
+        ('Doctor', 'Doctor'),
         ('Nursing', 'Nursing'),
-        ('Reception', 'Reception'),
+        ('OPD', 'Out Patient Department (OPD)'),
+        ('IPD', 'In Patient Department (IPD)'),
+        ('Laboratory', 'Laboratory / Pathology'),
+        ('Pharmacy', 'Pharmacy'),
+        ('ICU', 'ICU / Critical Care'),
+        ('OT', 'Operation Theatre'),
+        ('Radiology', 'Radiology / Imaging'),
+        ('Security', 'Security'),
+        ('Maintenance', 'Maintenance & Engineering'),
+        ('Ambulance', 'Ambulance Services'),
+        ('Emergency', 'Emergency / Casualty'),
+        
+        # Patient Support Services
+        ('Reception', 'Reception / Front Desk'),
+        ('Medical Records', 'Medical Records Department'),
+
+        # Facility & Support Services
+        ('Store', 'Store & Inventory'),
+        ('House Keeping', 'House Keeping'),
+
+        # Business Development
         ('Sales', 'Sales & Marketing'),
+
+        # Miscellaneous
         ('Other', 'Other'),
     ]
-    name = models.CharField(max_length=100, choices=DEPT_CHOICES, unique=True)
+    name = models.CharField(max_length=100, choices=DEPT_CHOICES)
     head = models.ForeignKey('Employee', on_delete=models.SET_NULL, null=True, blank=True, related_name='headed_departments')
     parent_department = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='sub_departments')
 
     def __str__(self):
         return self.get_name_display()
+    
+    class Meta:
+        # FIX: Ensure department names are unique strictly within each organisation
+        unique_together = ('organisation', 'name')
 
 # ============================================================
 # 💰 SALARY & PAYROLL
@@ -189,7 +251,6 @@ def daterange(start: date, end: date):
     while d <= end:
         yield d
         d += timedelta(days=1)
-
 
 # ============================================================
 # 📋 EMPLOYEE RULE
@@ -247,7 +308,7 @@ def is_working_day(day: date, rule: dict):
     return True
 
 
-class SalaryStructure(models.Model):
+class SalaryStructure(TenantModel):
     employee = models.OneToOneField(
         "Employee",
         on_delete=models.CASCADE,
@@ -277,7 +338,7 @@ class SalaryStructure(models.Model):
         return f"SalaryStructure({self.employee})"
 
 
-class EmployeeShiftAssignment(models.Model):
+class EmployeeShiftAssignment(TenantModel):
 
     employee = models.ForeignKey(
         "Employee",
@@ -339,217 +400,6 @@ def get_employee_rule_from_rule(rule):
         "count_holiday_overtime": rule.count_holiday_overtime,
     }
 
-
-
-# ============================================================
-# 💰 PAYROLL MANAGER (FINAL & CORRECT)
-# class PayrollManager(models.Manager):
-
-#     def generate_monthly_salary(self, year: int, month: int):
-#         return self.generate_salary(year, month)
-
-#     def generate_salary(self, year, month, employee=None):
-
-#         print(f"\n[START] Payroll generation → {month}/{year}")
-
-#         first_day = date(year, month, 1)
-#         last_day = date(year, month, calendar.monthrange(year, month)[1])
-
-#         employees = Employee.objects.filter(
-#             is_active=True,
-#             employment_status="active"
-#         ).select_related("work_rule")
-
-#         if employee:
-#             employees = employees.filter(id=employee.id)
-
-#         print(f"[INFO] Employees found: {employees.count()}")
-
-#         for emp in employees:
-#             print("\n==============================")
-#             print(f"[EMP] {emp.user.get_full_name()} ({emp.employee_id})")
-
-#             # ----------------------------------
-#             # SAFETY CHECKS
-#             # ----------------------------------
-#             if not emp.work_rule:
-#                 print("❌ No WorkRule → SKIPPED")
-#                 continue
-
-#             existing_payroll = Payroll.objects.filter(
-#                 employee=emp,
-#                 month=first_day
-#             ).first()
-
-#             if existing_payroll:
-#                 print("⚠ Existing payroll found → REGENERATING")
-#                 existing_payroll.delete()
-
-#             try:
-#                 structure = emp.salary_structure
-#             except SalaryStructure.DoesNotExist:
-#                 print("❌ No SalaryStructure → SKIPPED")
-#                 continue
-
-#             rule = get_employee_rule(emp)
-
-#             print(f"[RULE] {rule}")
-
-#             # ----------------------------------
-#             # HOURLY RATE (MONTHLY → HOURLY)
-#             # ----------------------------------
-#             working_days = sum(
-#                 1 for d in daterange(first_day, last_day)
-#                 if is_working_day(d, rule)
-#             )
-
-#             if working_days == 0:
-#                 print("❌ No working days → SKIPPED")
-#                 continue
-
-#             total_month_hours = Decimal(working_days) * rule["full_day_hours"]
-
-#             hourly_rate = (
-#                 structure.base_salary / total_month_hours
-#             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-#             print(f"[RATE] Hourly rate: {hourly_rate}")
-
-#             total_work_hours = Decimal("0.00")
-#             overtime_hours = Decimal("0.00")
-#             lop_days = Decimal("0.00")
-
-#             # ----------------------------------
-#             # DAY LOOP
-#             # ----------------------------------
-#             for day in daterange(first_day, last_day):
-
-#                 is_work_day = is_working_day(day, rule)
-#                 print(f"\n[DAY] {day} | Working: {is_work_day}")
-
-#                 # ---------- HOLIDAY ----------
-#                 if Holiday.objects.filter(date=day).exists():
-#                     if is_work_day:
-#                         total_work_hours += rule["full_day_hours"]
-#                         print("✔ Holiday (paid)")
-#                     continue
-
-#                 # ---------- LEAVE ----------
-#                 is_leave, is_paid = has_approved_leave(emp, day)
-#                 if is_leave:
-#                     if is_paid:
-#                         total_work_hours += rule["full_day_hours"]
-#                         print("✔ Paid leave")
-#                     else:
-#                         lop_days += 1
-#                         print("❌ Unpaid leave")
-#                     continue
-
-#                 # ---------- ATTENDANCE FETCH ----------
-#                 if emp.work_rule.shift_end_time > emp.work_rule.shift_start_time:
-#                     #DAY SHIFT → DATE BASED (FIX)
-#                     logs = Attendance.objects.filter(
-#                         employee=emp,
-#                         timestamp__date=day
-#                     ).order_by("timestamp")
-#                     print(f"[LOGS] Day-shift logs: {logs.count()}")
-#                 else:
-#                     #NIGHT SHIFT → SHIFT WINDOW
-#                     shift_start, shift_end = get_shift_window(day, emp.work_rule)
-#                     logs = Attendance.objects.filter(
-#                         employee=emp,
-#                         timestamp__range=(shift_start, shift_end)
-#                     ).order_by("timestamp")
-#                     print(f"[LOGS] Night-shift logs: {logs.count()}")
-
-#                 if not logs.exists():
-#                     if is_work_day:
-#                         lop_days += 1
-#                         print("❌ No attendance → LOP")
-#                     continue
-
-#                 cin = logs.filter(attendance_type="check_in").first()
-#                 cout = logs.filter(attendance_type="check_out").last()
-
-#                 print(f"[IN ] {cin}")
-#                 print(f"[OUT] {cout}")
-
-#                 if not cin or not cout or cout.timestamp <= cin.timestamp:
-#                     if is_work_day:
-#                         lop_days += 1
-#                         print("❌ Invalid punches → LOP")
-#                     continue
-
-#                 work_hours = Decimal(
-#                     (cout.timestamp - cin.timestamp).total_seconds() / 3600
-#                 ).quantize(Decimal("0.01"))
-
-#                 print(f"[HOURS] Worked: {work_hours}")
-
-#                 #EVEN 1 HOUR COUNTS
-#                 if is_work_day:
-#                     total_work_hours += work_hours
-#                 else:
-#                     if rule["count_weekend_overtime"]:
-#                         overtime_hours += work_hours
-
-#                 # ---------- OVERTIME ----------
-#                 if work_hours > rule["full_day_hours"]:
-#                     overtime_hours += work_hours - rule["full_day_hours"]
-
-#             # ----------------------------------
-#             # FINAL SALARY
-#             # ----------------------------------
-#             print("\n[SUMMARY]")
-#             print(f"Total work hours: {total_work_hours}")
-#             print(f"Overtime hours: {overtime_hours}")
-#             print(f"LOP days: {lop_days}")
-
-#             if total_work_hours == 0 and overtime_hours == 0:
-#                 print("❌ No payable hours → SKIPPED")
-#                 continue
-
-#             basic_pay = (
-#                 total_work_hours * hourly_rate
-#             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-#             ot_pay = (
-#                 overtime_hours * rule["overtime_rate"]
-#             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-#             net_salary = (
-#                 basic_pay
-#                 + structure.hra
-#                 + structure.allowances
-#                 + ot_pay
-#                 - structure.deductions
-#             ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-#             payroll = Payroll.objects.create(
-#                 employee=emp,
-#                 month=first_day,
-#                 basic_pay=basic_pay,
-#                 allowances=structure.hra + structure.allowances,
-#                 deductions=structure.deductions,
-#                 calculated_salary=net_salary,
-#                 net_salary=net_salary,
-#                 absent_days=lop_days,
-#                 overtime_hours=overtime_hours,
-#                 status="processed",
-#                 processed_at=timezone.now(),
-#             )
-
-#             print(f"Payroll generated: ₹{net_salary}")
-
-#             try:
-#                 pdf, filename = generate_payslip_pdf(payroll)
-#                 payroll.payslip_pdf.save(filename, ContentFile(pdf.read()))
-#                 email_payslip(payroll)
-#             except Exception as e:
-#                 print(f"⚠ Payslip/email failed for {emp.employee_id}: {e}")
-
-#         print("\n[END] Payroll generation complete\n")        
-
 # ============================================================
 # 🔥 ADVANCED ATTENDANCE ENGINE (FINAL)
 # ============================================================
@@ -568,7 +418,6 @@ def build_sessions(logs):
             open_in = None
 
     return sessions
-
 
 def split_session_by_day(start, end):
     from datetime import datetime, time, timedelta
@@ -762,7 +611,7 @@ class EnterprisePayrollManager(models.Manager):
             # -------------------------------
             daily_hours_map = {}
             for start, end in sessions:
-                work_date = get_work_date_for_checkin(start, emp.work_rule)
+                work_date = get_work_date_for_checkin(start, emp)
                 hours = (end - start).total_seconds() / 3600
                 daily_hours_map[work_date] = daily_hours_map.get(work_date, 0) + hours
 
@@ -857,6 +706,7 @@ class EnterprisePayrollManager(models.Manager):
 
             payroll_objects.append(
                 Payroll(
+                    organisation=emp.organisation,
                     employee=emp,
                     month=first_day,
                     basic_pay=earned_basic,
@@ -884,9 +734,7 @@ class EnterprisePayrollManager(models.Manager):
 
         print("Payroll Generated Successfully\n")
 
-
-
-class Payroll(models.Model):
+class Payroll(TenantModel):
     employee = models.ForeignKey("Employee", on_delete=models.CASCADE)
     month = models.DateField(help_text="First day of month")
 
@@ -943,10 +791,8 @@ class Payroll(models.Model):
 
     def __str__(self):
         return f"{self.employee.employee_id} | {self.month.strftime('%b %Y')} | ₹{self.net_salary}"
-
-
         
-class PayrollSettings(models.Model):
+class PayrollSettings(TenantModel):
     professional_tax = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('200.00'))
     esi_limit = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('21000'))
 
@@ -971,14 +817,14 @@ class PayrollSettings(models.Model):
         verbose_name = "Payroll Setting"
         verbose_name_plural = "Payroll Settings"
 
-class WorkRule(models.Model):
+class WorkRule(TenantModel):
     WORKING_DAYS_CHOICES = [
         ('5_day', 'Mon–Fri'),
         ('6_day', 'Mon–Sat'),
         ('custom', 'Custom'),
     ]
 
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
 
     working_days = models.CharField(
         max_length=10,
@@ -1015,6 +861,10 @@ class WorkRule(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        # FIX: Ensure work rule names are unique strictly within each organisation
+        unique_together = ('organisation', 'name')
+
     # ⭐ SHIFT TYPE DETECTOR
     @property
     def shift_type(self):
@@ -1035,12 +885,11 @@ class WorkRule(models.Model):
 
         return "General"
 
-
 # ============================================================
 # 📝 LEAVE MANAGEMENT
 # ============================================================
 
-class LeaveType(models.Model):
+class LeaveType(TenantModel):
     name = models.CharField(max_length=100)
     max_days_per_year = models.PositiveIntegerField(default=12)
     is_paid = models.BooleanField(default=True)  #new
@@ -1048,7 +897,7 @@ class LeaveType(models.Model):
     def __str__(self):
         return self.name
 
-class LeaveApplication(models.Model):
+class LeaveApplication(TenantModel):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
@@ -1071,15 +920,18 @@ class LeaveApplication(models.Model):
     def __str__(self):
         return f"{self.employee} - {self.leave_type} ({self.status})"
 
-class LeaveWorkflowStage(models.Model):
-    level = models.PositiveIntegerField(unique=True)
+class LeaveWorkflowStage(TenantModel):
+    level = models.PositiveIntegerField(null=True)
     role_name = models.CharField(max_length=50)
     next_level = models.PositiveIntegerField(blank=True, null=True)
 
+    class Meta:
+        # FIX: Ensure holidays are unique strictly within each organisation
+        unique_together = ('organisation', 'level')
     def __str__(self):
         return f"Level {self.level} - {self.role_name}"
 
-class LeaveApproval(models.Model):
+class LeaveApproval(TenantModel):
     leave = models.ForeignKey(LeaveApplication, on_delete=models.CASCADE, related_name='approvals')
     approver = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True)
     level = models.PositiveIntegerField()
@@ -1094,18 +946,22 @@ class LeaveApproval(models.Model):
     def __str__(self):
         return f"Approval L{self.level} - {self.leave.employee}"
 
-class Holiday(models.Model):
+class Holiday(TenantModel):
     name = models.CharField(max_length=100)
-    date = models.DateField(unique=True)
+    date = models.DateField()
 
     def __str__(self):
         return f"{self.name} ({self.date})"
+
+    class Meta:
+        # FIX: Ensure holidays are unique strictly within each organisation
+        unique_together = ('organisation', 'date')
 
 # ============================================================
 # 📄 JOINING & RESIGNATION
 # ============================================================
 
-class JoiningDetail(models.Model):
+class JoiningDetail(TenantModel):
     employee = models.OneToOneField(Employee, on_delete=models.CASCADE)
     date_of_joining = models.DateField(default=timezone.now)
     
@@ -1115,7 +971,7 @@ class JoiningDetail(models.Model):
     def __str__(self):
         return f"Joining - {self.employee}"
 
-class JoiningDocument(models.Model):
+class JoiningDocument(TenantModel):
     joining = models.ForeignKey(
         JoiningDetail,
         on_delete=models.CASCADE,
@@ -1127,7 +983,7 @@ class JoiningDocument(models.Model):
     def __str__(self):
         return f"Document for {self.joining.employee.employee_id}"
     
-class Resignation(models.Model):
+class Resignation(TenantModel):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     resignation_date = models.DateField(default=timezone.now)
     last_working_day = models.DateField()
@@ -1142,12 +998,11 @@ class Resignation(models.Model):
     def __str__(self):
         return f"Resignation - {self.employee}"
 
-
 # ============================================================
 # 🔔 NOTIFICATIONS
 # ============================================================
 
-class Notification(models.Model):
+class Notification(TenantModel):
     recipient = models.ForeignKey(User, on_delete=models.CASCADE)
     message = models.CharField(max_length=255)
     link = models.URLField(blank=True, null=True)
@@ -1157,12 +1012,11 @@ class Notification(models.Model):
     def __str__(self):
         return f"Notification for {self.recipient.username}"
 
-
 # ============================================================
 # 🕒 ATTENDANCE SYSTEM (If not already exists)
 # ============================================================
 
-class Attendance(models.Model):
+class Attendance(TenantModel):
     ATTENDANCE_TYPES = [
         ('check_in', 'Check In'),
         ('check_out', 'Check Out'),
@@ -1185,7 +1039,7 @@ class Attendance(models.Model):
     def __str__(self):
         return f"{self.employee} - {self.attendance_type} at {self.timestamp}"
 
-class AttendanceSettings(models.Model):
+class AttendanceSettings(TenantModel):
     check_in_start = models.TimeField(default='09:00:00')
     check_in_end = models.TimeField(default='10:00:00')
     check_out_start = models.TimeField(default='17:00:00')
@@ -1203,8 +1057,8 @@ class AttendanceSettings(models.Model):
             raise ValidationError("Only one AttendanceSettings instance allowed.")
         super().save(*args, **kwargs)
 
-class DailyReport(models.Model):
-    date = models.DateField(unique=True)
+class DailyReport(TenantModel):
+    date = models.DateField()
     total_employees = models.IntegerField(default=0)
     present_count = models.IntegerField(default=0)
     absent_count = models.IntegerField(default=0)
@@ -1212,19 +1066,30 @@ class DailyReport(models.Model):
     average_hours = models.FloatField(default=0.0)
     
     class Meta:
+        # FIX: Scoped uniqueness to the organisation level
+        unique_together = ('organisation', 'date')
         ordering = ['-date']
     
     def __str__(self):
         return f"Report for {self.date}"
     
-
-class FaceMatchStats(models.Model):
-    employee_id = models.CharField(max_length=20, unique=True)
+# ============================================================
+# 🧬 BIOMETRICS STATS & THRESHOLDS
+# ============================================================
+class FaceMatchStats(TenantModel):
+    # FIX: Remove unique=True to allow matching employee_ids in different organisations
+    employee_id = models.CharField(max_length=20)
+    
     false_rejects = models.IntegerField(default=0)
     false_accepts = models.IntegerField(default=0)
     total_attempts = models.IntegerField(default=0)
 
-class AttendanceMatchLog(models.Model):
+    class Meta:
+        # FIX: Scoped uniqueness to the organisation level
+        unique_together = ('organisation', 'employee_id')
+
+
+class AttendanceMatchLog(TenantModel):
     employee_id = models.CharField(max_length=20)
     cosine = models.FloatField()
     euclidean = models.FloatField()
@@ -1232,9 +1097,13 @@ class AttendanceMatchLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
-class EmployeeThreshold(models.Model):
-    employee_id = models.CharField(max_length=20, unique=True)
+class EmployeeThreshold(TenantModel):
+    # FIX: Remove unique=True to allow matching employee_ids in different organisations
+    employee_id = models.CharField(max_length=20)
+    
     cos_max = models.FloatField(default=0.85)
     euc_max = models.FloatField(default=1.40)
 
-
+    class Meta:
+        # FIX: Scoped uniqueness to the organisation level
+        unique_together = ('organisation', 'employee_id')
