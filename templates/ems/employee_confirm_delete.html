@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-5">
+    <div class="card border-danger shadow">
+        <div class="card-header bg-danger text-white">
+            <h5>Deactivate Employee</h5>
+        </div>
+        <div class="card-body">
+            <p>
+                Are you sure you want to deactivate
+                <strong>{{ employee.user.get_full_name }}</strong>
+                ({{ employee.employee_id }})?
+            </p>
+
+            <div class="alert alert-warning">
+                Sign-in and attendance will be disabled. Attendance, payroll and audit history will be retained.
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'employee_list' %}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-danger">Yes, Deactivate</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

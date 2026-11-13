@@ -1,0 +1,24 @@
+/* FaceAttend production admin: compact, accessible and mobile-friendly. */
+:root { --fa-brand: #4f46e5; --fa-ink: #172033; }
+#header { background: #111827; color: #fff; padding: 14px 22px; }
+#branding h1, #branding h1 a:link, #branding h1 a:visited { color: #fff; font-weight: 700; }
+.module h2, .module caption, .inline-group h2 { background: var(--fa-brand); }
+.button, input[type=submit], input[type=button], .submit-row input, a.button { border-radius: 8px; }
+.button.default, input[type=submit].default { background: var(--fa-brand); }
+#content { max-width: 1600px; }
+#changelist .results, .results table { width: 100%; }
+#changelist-filter { border-radius: 10px; }
+.object-tools a { border-radius: 8px; }
+@media (max-width: 767px) {
+  #header { padding: 12px 14px; }
+  #content { padding: 12px; }
+  #content-main, #content-related { width: 100%; float: none; }
+  #changelist { overflow-x: auto; }
+  #changelist table { min-width: 720px; }
+  .aligned .form-row { display: block; }
+  .aligned .form-row > div, .aligned .form-row > div input,
+  .aligned .form-row > div select, .aligned .form-row > div textarea { max-width: 100%; width: 100%; }
+  .submit-row { position: sticky; bottom: 0; z-index: 5; margin: 12px -12px -12px; padding: 12px; }
+  .object-tools { float: none; margin: 0 0 12px; }
+  .object-tools li { display: inline-block; margin: 0 6px 6px 0; }
+}

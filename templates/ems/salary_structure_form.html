@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">{{ title }}</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% for field in form %}
+                    <div class="mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label">
+                            {{ field.label }}
+                            {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                        </label>
+                        {{ field }}
+                        {% if field.help_text %}
+                        <div class="form-text">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% for error in field.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+
+                    <!-- Live Preview -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">Salary Preview</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="salary-preview">
+                                <div class="d-flex justify-content-between border-bottom py-2">
+                                    <span>Basic Salary:</span>
+                                    <strong id="preview-basic">₹0</strong>
+                                </div>
+                                <div class="d-flex justify-content-between border-bottom py-2">
+                                    <span>HRA:</span>
+                                    <strong id="preview-hra">₹0</strong>
+                                </div>
+                                <div class="d-flex justify-content-between border-bottom py-2">
+                                    <span>Allowances:</span>
+                                    <strong id="preview-allowances">₹0</strong>
+                                </div>
+                                <div class="d-flex justify-content-between border-bottom py-2">
+                                    <span>Deductions:</span>
+                                    <strong class="text-danger" id="preview-deductions">-₹0</strong>
+                                </div>
+                                <div class="d-flex justify-content-between py-2 bg-light">
+                                    <span class="fw-bold">Total Salary:</span>
+                                    <strong class="text-success" id="preview-total">₹0</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'salary_structure_list' %}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Save Salary Structure</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const inputs = document.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            input.classList.add('form-control');
+        });
+
+        // Live salary calculation
+        const basicField = document.querySelector('#id_base_salary');
+        const hraField = document.querySelector('#id_hra');
+        const allowancesField = document.querySelector('#id_allowances');
+        const deductionsField = document.querySelector('#id_deductions');
+
+        function updatePreview() {
+            const basic = parseFloat(basicField.value) || 0;
+            const hra = parseFloat(hraField.value) || 0;
+            const allowances = parseFloat(allowancesField.value) || 0;
+            const deductions = parseFloat(deductionsField.value) || 0;
+            const total = basic + hra + allowances - deductions;
+
+            document.getElementById('preview-basic').textContent = '₹' + basic.toLocaleString();
+            document.getElementById('preview-hra').textContent = '₹' + hra.toLocaleString();
+            document.getElementById('preview-allowances').textContent = '₹' + allowances.toLocaleString();
+            document.getElementById('preview-deductions').textContent = '-₹' + deductions.toLocaleString();
+            document.getElementById('preview-total').textContent = '₹' + total.toLocaleString();
+        }
+
+        basicField.addEventListener('input', updatePreview);
+        hraField.addEventListener('input', updatePreview);
+        allowancesField.addEventListener('input', updatePreview);
+        deductionsField.addEventListener('input', updatePreview);
+
+        // Initial update
+        updatePreview();
+    });
+</script>
+{% endblock %}

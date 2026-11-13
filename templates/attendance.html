@@ -1,0 +1,1020 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>FaceAttend | Secure Attendance Scanner</title>
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Animate.css -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+  <audio id="successBeep" src="{% static 'sounds/beep.wav' %}" preload="auto"></audio>
+  <audio id="errorBeep" src="{% static 'sounds/error.wav' %}" preload="auto"></audio>
+  <audio id="scanBeep" src="{% static 'sounds/scan.wav' %}" preload="auto"></audio>
+
+  <style>
+    :root {
+      /* Premium Brand Colors */
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --primary-light: #e0e7ff;
+      --secondary: #8b5cf6;
+      --accent: #06b6d4;
+      
+      /* Status Colors */
+      --success: #10b981;
+      --success-light: #d1fae5;
+      --danger: #ef4444;
+      --danger-light: #fee2e2;
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --info: #3b82f6;
+      
+      /* Neutrals */
+      --bg-base: #f8fafc;
+      --surface: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: rgba(226, 232, 240, 0.8);
+      
+      /* Effects */
+      --glass-bg: rgba(255, 255, 255, 0.75);
+      --glass-border: rgba(255, 255, 255, 0.5);
+      --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+      --shadow-lg: 0 20px 40px -10px rgba(79, 70, 229, 0.15);
+      --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.3);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      
+      /* Fonts */
+      --font-display: 'Plus Jakarta Sans', sans-serif;
+      --font-body: 'Inter', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background-color: var(--bg-base);
+      font-family: var(--font-body);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+      /* Smooth scrolling for touch */
+      -webkit-overflow-scrolling: touch; 
+    }
+
+    /* Ambient Animated Background */
+    .ambient-bg {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      z-index: -2;
+      overflow: hidden;
+      background: var(--bg-base);
+    }
+    .ambient-blob {
+      position: absolute;
+      filter: blur(80px);
+      opacity: 0.4;
+      border-radius: 50%;
+      animation: float-blob 20s infinite alternate ease-in-out;
+    }
+    .blob-1 { top: -10%; left: -10%; width: 50vw; height: 50vw; background: var(--primary-light); }
+    .blob-2 { bottom: -20%; right: -10%; width: 60vw; height: 60vw; background: #ede9fe; animation-delay: -5s; }
+    .blob-3 { top: 40%; left: 60%; width: 40vw; height: 40vw; background: #cffafe; animation-delay: -10s; }
+
+    @keyframes float-blob {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(50px, 50px) scale(1.1); }
+    }
+
+    .grid-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background-image: radial-gradient(var(--border-color) 1px, transparent 1px);
+      background-size: 32px 32px;
+      z-index: -1; pointer-events: none; opacity: 0.5;
+    }
+
+    /* Layout & Glassmorphism */
+    .kiosk-wrapper {
+      padding: 2rem;
+      max-width: 1600px;
+      margin: 0 auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
+      padding: 1.5rem;
+      transition: transform 0.3s ease;
+    }
+
+    /* Header */
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      animation: fadeInDown 0.8s ease;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+
+    .logo-box {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 20px;
+      display: flex; justify-content: center; align-items: center;
+      color: white; font-size: 2rem;
+      box-shadow: var(--shadow-glow);
+      transform: rotate(-5deg);
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .logo-box:hover { transform: rotate(0) scale(1.05); }
+
+    .brand-title {
+      font-family: var(--font-display);
+      font-weight: 800; font-size: 2.25rem; line-height: 1.1;
+      background: linear-gradient(135deg, var(--text-main), var(--primary));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin: 0;
+    }
+    .brand-subtitle { color: var(--text-muted); font-size: 1rem; font-weight: 500; letter-spacing: 0.5px; }
+
+    .datetime-pill {
+      background: var(--surface);
+      padding: 0.75rem 1.5rem;
+      border-radius: 50px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-color);
+      text-align: right;
+    }
+    .time-text { font-family: var(--font-display); font-size: 1.75rem; font-weight: 800; color: var(--primary-dark); line-height: 1; }
+    .date-text { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+    /* Camera Section */
+    .camera-container {
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: #0f172a;
+      aspect-ratio: 4/3;
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.1);
+      width: 100%;
+    }
+    #camera, #fullscreenCamera {
+      width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
+    }
+
+    /* High-Tech Scanner Overlays */
+    .scanner-laser {
+      position: absolute; left: 0; width: 100%; height: 3px;
+      background: linear-gradient(90deg, transparent, var(--primary), var(--accent), var(--primary), transparent);
+      box-shadow: 0 0 15px var(--accent), 0 0 30px var(--primary);
+      animation: scan-vertical 3s cubic-bezier(0.54, 0.01, 0.46, 1) infinite;
+      z-index: 10;
+    }
+
+    @keyframes scan-vertical {
+      0% { top: -10%; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { top: 110%; opacity: 0; }
+    }
+
+    .ai-brackets {
+      position: absolute; top: 15%; left: 20%; right: 20%; bottom: 15%;
+      z-index: 8; pointer-events: none;
+    }
+    .ai-brackets::before, .ai-brackets::after { content: ''; position: absolute; width: 100%; height: 100%; }
+    .ai-brackets::before {
+      border-top: 4px solid var(--glass-border); border-bottom: 4px solid var(--glass-border);
+      clip-path: polygon(0 0, 15% 0, 15% 100%, 0 100%, 0 0, 100% 0, 100% 100%, 85% 100%, 85% 0, 100% 0);
+    }
+    .ai-brackets::after {
+      border-left: 4px solid var(--glass-border); border-right: 4px solid var(--glass-border);
+      clip-path: polygon(0 0, 100% 0, 100% 15%, 0 15%, 0 0, 0 100%, 100% 100%, 100% 85%, 0 85%, 0 100%);
+    }
+
+    /* Floating Messages */
+    .message-center {
+      position: absolute; bottom: 30px; left: 0; right: 0;
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      z-index: 20; pointer-events: none;
+    }
+    .toast-msg {
+      padding: 14px 28px; border-radius: 50px;
+      font-family: var(--font-display); font-weight: 700; font-size: 1.1rem;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      animation: popIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    @keyframes popIn {
+      0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .toast-msg.success { background: rgba(16, 185, 129, 0.95); color: white; }
+    .toast-msg.error { background: rgba(239, 68, 68, 0.95); color: white; }
+    .toast-msg.warning { background: rgba(245, 158, 11, 0.95); color: white; }
+    .toast-msg.info { background: rgba(59, 130, 246, 0.95); color: white; }
+
+    /* Live Status Bar */
+    .status-bar {
+      margin-top: 1.5rem; padding: 1rem 1.5rem;
+      background: var(--surface); border-radius: 16px;
+      display: flex; align-items: center; gap: 1rem;
+      border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);
+    }
+    .pulse-dot {
+      width: 14px; height: 14px; border-radius: 50%; background: var(--success);
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); animation: pulse-dot 2s infinite;
+    }
+    @keyframes pulse-dot {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .status-text { font-weight: 600; color: var(--text-main); font-size: 1rem; }
+    .badge-fps {
+      background: var(--primary-light); color: var(--primary-dark);
+      padding: 4px 12px; border-radius: 20px; font-weight: 700; font-size: 0.85rem;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem;
+    }
+    .stat-box {
+      background: var(--surface); border: 1px solid var(--border-color);
+      border-radius: 16px; padding: 1.25rem;
+      text-align: center; transition: all 0.3s ease;
+    }
+    .stat-box:hover { border-color: var(--primary); transform: translateY(-3px); box-shadow: var(--shadow-sm); }
+    .stat-num { font-family: var(--font-display); font-size: 2.25rem; font-weight: 800; color: var(--text-main); line-height: 1; }
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-top: 8px; letter-spacing: 0.5px; }
+
+    /* Button */
+    .btn-glass {
+      background: var(--surface); color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 0.8rem 2rem; border-radius: 50px;
+      font-weight: 700; font-size: 1rem; font-family: var(--font-display);
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      transition: all 0.3s ease; box-shadow: var(--shadow-sm); cursor: pointer;
+    }
+    .btn-glass:hover {
+      background: var(--primary); color: white; border-color: var(--primary);
+      transform: translateY(-2px); box-shadow: var(--shadow-glow);
+    }
+
+    /* Activity Panel */
+    .activity-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);
+    }
+    .activity-header h5 { margin: 0; font-family: var(--font-display); font-weight: 700; color: var(--text-main); }
+    
+    .record-list {
+      max-height: calc(100vh - 300px);
+      overflow-y: auto; padding-right: 8px;
+    }
+    /* Touch-friendly Scrollbar */
+    .record-list::-webkit-scrollbar { width: 8px; }
+    .record-list::-webkit-scrollbar-track { background: transparent; }
+    .record-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+    .record-list::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    .record-card {
+      background: var(--surface); border: 1px solid var(--border-color);
+      border-radius: 16px; padding: 1rem; margin-bottom: 0.8rem;
+      display: flex; align-items: center; gap: 1rem;
+      transition: all 0.2s ease;
+      animation: slideInRight 0.4s ease forwards;
+    }
+    .record-card:hover { border-color: var(--primary-light); transform: translateX(4px); box-shadow: var(--shadow-sm); }
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .record-avatar {
+      width: 48px; height: 48px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 1.1rem; color: white; flex-shrink: 0;
+    }
+    .avatar-in { background: linear-gradient(135deg, var(--success), #059669); }
+    .avatar-out { background: linear-gradient(135deg, var(--warning), #d97706); }
+
+    .record-details { flex: 1; overflow: hidden; }
+    .record-name { font-weight: 700; color: var(--text-main); margin-bottom: 2px; font-family: var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .record-meta { display: flex; align-items: center; gap: 0.8rem; font-size: 0.85rem; color: var(--text-muted); font-weight: 500;}
+    
+    .status-badge { padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px;}
+    .badge-in { background: var(--success-light); color: #065f46; }
+    .badge-out { background: var(--warning-light); color: #92400e; }
+
+    .record-time { font-size: 1.4rem; font-weight: 800; color: var(--text-main); font-family: var(--font-display); white-space: nowrap; }
+
+    /* Fullscreen Kiosk Mode Overlay */
+    #fullscreenMode {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: var(--bg-base); z-index: 9999; display: none; padding: 2rem;
+      background-image: radial-gradient(var(--border-color) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+    #fullscreenMode.active { display: block; animation: fadeIn 0.4s ease; }
+    
+    .fs-layout { display: grid; grid-template-columns: 1fr 450px; gap: 2rem; height: calc(100vh - 120px); margin-top: 1.5rem; }
+    .fs-camera-wrap { height: 100%; border-radius: var(--radius-xl); overflow: hidden; position: relative; box-shadow: var(--shadow-lg); background:#000;}
+    .fs-sidebar { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 1.5rem; box-shadow: var(--shadow-lg); display: flex; flex-direction: column;}
+
+
+    /* =========================================================
+       📱 PERFECT RESPONSIVENESS (TABLETS & MOBILE)
+    ========================================================= */
+
+    /* Tablet Landscape (1024px) */
+    @media (max-width: 1199px) {
+      .fs-layout { grid-template-columns: 1fr 320px; gap: 1.5rem; }
+      .brand-title { font-size: 1.8rem; }
+      .time-text { font-size: 1.4rem; }
+      .stat-num { font-size: 1.8rem; }
+      .record-time { font-size: 1.2rem; }
+      .btn-glass { padding: 0.6rem 1.5rem; font-size: 0.95rem; }
+    }
+
+    /* Tablet Portrait (768px - 991px) */
+    @media (max-width: 991px) {
+      .kiosk-wrapper { padding: 1.25rem; }
+      .header-bar { margin-bottom: 1.5rem; }
+      
+      /* Camera Aspect Ratio trick: 
+         Makes it wider & shorter in portrait so the list stays visible! */
+      .camera-container { aspect-ratio: 16/9; }
+      
+      .stats-grid { gap: 0.75rem; margin-top: 1rem; }
+      .stat-box { padding: 1rem; }
+      .stat-num { font-size: 1.6rem; }
+      .stat-label { font-size: 0.75rem; }
+      
+      /* Limit height of list so user doesn't have to scroll body much */
+      .record-list { max-height: 380px; }
+      
+      /* Fullscreen fixes for Portrait Tablet */
+      .fs-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; gap: 1rem; }
+      .fs-camera-wrap { aspect-ratio: 16/9; height: auto; }
+      .fs-sidebar { height: 400px; padding: 1rem; }
+      #fsAttendanceList { max-height: 100%; }
+    }
+
+    /* Mobile (Sub 767px) */
+    @media (max-width: 767px) {
+      .kiosk-wrapper { padding: 1rem; }
+      .header-bar { flex-direction: column; text-align: center; gap: 1rem; margin-bottom: 1.2rem;}
+      .datetime-pill { text-align: center; width: 100%; }
+      .brand-group { flex-direction: column; gap: 0.5rem; }
+      .brand-title { font-size: 1.5rem; }
+      
+      /* Revert camera back to natural on phones */
+      .camera-container { aspect-ratio: 4/3; }
+      
+      /* Tighten Stats for mobile */
+      .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.8rem;}
+      .stat-box { padding: 0.75rem 0.5rem; border-radius: 12px;}
+      .stat-num { font-size: 1.2rem; }
+      .stat-label { font-size: 0.65rem; }
+      
+      .record-list { max-height: 350px; }
+      .record-time { font-size: 1.1rem; }
+      
+      .fs-camera-wrap { aspect-ratio: 4/3; }
+    }
+  </style>
+<style>
+@media(max-width:767.98px){body{overflow-x:hidden} .container,.container-fluid{max-width:100%;padding-left:12px;padding-right:12px}
+  video,canvas{max-width:100%;object-fit:cover}button,input,select{min-height:42px}
+  .record-card{padding:.7rem;gap:.6rem} .record-name{overflow-wrap:anywhere} }
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+<link rel="stylesheet" href="{% static 'css/attendance-kiosk.css' %}">
+</head>
+<body data-kiosk-locked="{{ kiosk_locked|yesno:'true,false' }}">
+
+  <!-- Ambient Background -->
+  <div class="ambient-bg">
+    <div class="ambient-blob blob-1"></div>
+    <div class="ambient-blob blob-2"></div>
+    <div class="ambient-blob blob-3"></div>
+  </div>
+  <div class="grid-overlay"></div>
+  <div id="particles"></div>
+
+  <!-- Main Normal Mode -->
+  <div id="normalMode" class="kiosk-wrapper">
+    
+    <!-- Header -->
+    <header class="header-bar">
+      <div class="brand-group">
+        <div class="logo-box"><i class="fas fa-fingerprint"></i></div>
+        <div>
+          <h1 class="brand-title">
+              {{ request.organisation.name }}
+          </h1>
+          <div class="brand-subtitle">AI-Powered Face Recognition Attendance</div>
+        </div>
+      </div>
+      <div class="datetime-pill">
+        <div class="time-text" id="currentTime">--:--:--</div>
+        <div class="date-text" id="currentDate">Loading Date...</div>
+      </div>
+    </header>
+
+    
+    <div class="row g-3 g-lg-4 flex-grow-1">
+      <!-- Left Column: Camera & Stats -->
+      <div class="col-12 col-lg-7 col-xl-8 d-flex flex-column gap-3 gap-lg-4">
+        <div class="glass-panel flex-grow-1 d-flex flex-column p-3 p-lg-4">
+          
+          <!-- Camera Feed -->
+          <div class="camera-container flex-grow-1">
+            <video id="camera" autoplay playsinline></video>
+            <canvas id="canvas" class="d-none"></canvas>
+            
+            <!-- High-Tech Overlays -->
+            <div class="scanner-laser"></div>
+            <div class="ai-brackets"></div>
+            
+            <!-- Floating Messages -->
+            <div class="message-center" id="messageCenter">
+              <div id="successMessage" class="toast-msg success" style="display: none;"></div>
+              <div id="errorMessage" class="toast-msg error" style="display: none;"></div>
+              <div id="warningMessage" class="toast-msg warning" style="display: none;"></div>
+              <div id="infoMessage" class="toast-msg info" style="display: none;"></div>
+            </div>
+          </div>
+
+          <!-- Status Bar -->
+          <div class="status-bar">
+            <div id="statusLed" class="pulse-dot"></div>
+            <div class="status-text" id="statusText">{% if liveness_unconfigured %}Scanner setup required{% elif face_only_mode %}Face-only mode · supervised use{% else %}Camera ready{% endif %}</div>
+            <div class="ms-auto badge-fps" id="fps"><i class="fas fa-video me-1"></i> 30 FPS</div>
+          </div>
+
+          <!-- Quick Stats -->
+          <div class="stats-grid">
+            <div class="stat-box">
+              <div class="stat-num" id="todayCount">0</div>
+              <div class="stat-label">Total Scans</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-num" id="checkIns">0</div>
+              <div class="stat-label">Check-Ins</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-num" id="checkOuts">0</div>
+              <div class="stat-label">Check-Outs</div>
+            </div>
+          </div>
+
+          <!-- Controls -->
+          <div class="mt-3 mt-lg-4 text-center">
+            {% if can_manage_kiosk %}<button id="fullscreenBtn" class="btn-glass">
+              <i class="fas fa-lock"></i> Lock Kiosk Mode
+            </button>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Activity Log -->
+      <div class="col-12 col-lg-5 col-xl-4 d-flex">
+        <div class="glass-panel w-100 d-flex flex-column p-3 p-lg-4">
+          <div class="activity-header">
+            <h5><i class="fas fa-clipboard-list text-primary me-2"></i> Live Activity</h5>
+            <span class="badge bg-primary rounded-pill px-3 py-2">Real-time</span>
+          </div>
+          
+          <div id="historyList" class="record-list flex-grow-1">
+            <div class="text-center py-5 text-muted">
+              <i class="fas fa-circle-notch fa-spin fa-2x mb-3 text-primary"></i>
+              <p class="fw-medium">Syncing records...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fullscreen Immersive Mode -->
+  <div id="fullscreenMode">
+    <header class="header-bar" style="margin-bottom: 0;">
+      <div class="brand-group">
+        <div class="logo-box" style="width: 54px; height: 54px; font-size: 1.5rem;"><i class="fas fa-fingerprint"></i></div>
+        <div><h2 class="brand-title" style="font-size: 1.8rem;">{{ request.organisation.name }}</h2>
+          {% if face_only_mode %}<div class="brand-subtitle">Face-only mode · no anti-spoofing · supervised use</div>{% endif %}
+          <div class="kiosk-lock-badge"><i class="fas fa-lock" aria-hidden="true"></i> Kiosk locked · scan attendance</div>
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-3 gap-lg-4 kiosk-controls">
+        <div class="datetime-pill text-end border-0 bg-transparent shadow-none p-0 d-none d-sm-block">
+          <div id="fsCurrentTime" class="time-text" style="font-size: 1.5rem;">--:--</div>
+          <div id="fsCurrentDate" class="date-text" style="color: var(--text-main);">--</div>
+        </div>
+        <button id="kioskExpand" class="btn-glass" type="button" aria-label="Toggle fullscreen"><i class="fas fa-expand" aria-hidden="true"></i></button>
+        <button id="exitFullscreenBtn" class="btn-glass" style="padding: 0.6rem 1.5rem;">
+          <i class="fas fa-unlock-keyhole"></i> Unlock kiosk
+        </button>
+      </div>
+    </header>
+
+    <div class="fs-layout">
+      <!-- Big Camera -->
+      <div class="fs-camera-wrap">
+        <video id="fullscreenCamera" autoplay playsinline></video>
+        <canvas id="fullscreenCanvas" class="d-none"></canvas>
+        <div class="scanner-laser"></div>
+        <div class="ai-brackets"></div>
+        
+        <div class="message-center" id="fsMessageCenter" style="bottom: 50px;">
+          <div id="fsSuccessMessage" class="toast-msg success" style="display: none; font-size: 1.5rem; padding: 20px 40px;"></div>
+          <div id="fsErrorMessage" class="toast-msg error" style="display: none; font-size: 1.5rem; padding: 20px 40px;"></div>
+          <div id="fsWarningMessage" class="toast-msg warning" style="display: none; font-size: 1.5rem; padding: 20px 40px;"></div>
+          <div id="fsInfoMessage" class="toast-msg info" style="display: none; font-size: 1.5rem; padding: 20px 40px;"></div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="fs-sidebar">
+        <div class="activity-header">
+          <h5><i class="fas fa-bolt text-warning me-2"></i> Recent Scans</h5>
+        </div>
+        <div id="fsAttendanceList" class="record-list flex-grow-1">
+          <div class="text-center py-5 text-muted">
+            <i class="fas fa-user-clock fa-3x mb-3 opacity-50"></i>
+            <p>Awaiting employee scans...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="kioskConfig" data-lock-url="{% url 'kiosk_lock' %}" data-unlock-url="{% url 'kiosk_unlock' %}" data-status-url="{% url 'kiosk_status' %}" data-attendance-url="{% url 'attendance_page' %}" hidden></div>
+  <dialog id="kioskDialog" class="kiosk-dialog" aria-labelledby="kioskTitle" aria-describedby="kioskDescription">
+    <div class="kiosk-dialog-icon" aria-hidden="true"><i class="fas fa-shield-halved"></i></div>
+    <h2 id="kioskTitle">Set your kiosk code</h2>
+    <p id="kioskDescription"></p>
+    <form id="kioskForm">{% csrf_token %}
+      <label for="kioskCode">Secret code</label>
+      <input id="kioskCode" name="code" type="password" minlength="6" maxlength="128" required autocomplete="new-password" spellcheck="false" placeholder="At least 6 characters">
+      <div id="kioskConfirmGroup"><label for="kioskConfirm">Confirm secret code</label><input id="kioskConfirm" name="confirm_code" type="password" minlength="6" maxlength="128" required autocomplete="new-password"></div>
+      <p id="kioskSetupHelp" class="kiosk-help">Keep this code with the terminal supervisor. Browser and device shortcuts require your device’s own kiosk controls.</p>
+      <p id="kioskError" role="alert"></p>
+      <div class="kiosk-dialog-actions"><button type="button" id="kioskCancel">Cancel</button><button type="submit" id="kioskSubmit">Lock terminal</button></div>
+    </form>
+  </dialog>
+  <script src="{% static 'js/attendance-kiosk.js' %}"></script>
+
+  <!-- Hidden Coordinates -->
+  <input type="hidden" name="latitude" id="lat">
+  <input type="hidden" name="longitude" id="lng">
+
+  <script>
+  document.addEventListener("DOMContentLoaded", async () => {
+
+    /* =====================================================
+       GLOBAL STATE
+    ===================================================== */
+    window.CURRENT_LAT = null;
+    window.CURRENT_LNG = null;
+    window.CURRENT_ACCURACY = null;
+    let locationUpdatedAt = 0;
+    let locationRefresh = null;
+    let nextLocationRefreshAt = 0;
+
+    let AUDIO_UNLOCKED = false;
+    let isProcessing = false;
+    let cameraStream = null;
+
+    /* =====================================================
+       CLOCK UPDATER
+    ===================================================== */
+    function updateClock() {
+      const now = new Date();
+
+      const timeStr = now.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+
+      const dateStr = now.toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+
+      document.getElementById('currentTime').textContent = timeStr;
+      document.getElementById('currentDate').textContent = dateStr;
+      document.getElementById('fsCurrentTime').textContent = timeStr;
+      document.getElementById('fsCurrentDate').textContent = dateStr;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    /* =====================================================
+       AUDIO (iOS Tablet Compatibility Fix)
+    ===================================================== */
+    const successBeep = document.getElementById("successBeep");
+    const errorBeep   = document.getElementById("errorBeep");
+    const scanBeep    = document.getElementById("scanBeep");
+
+    function unlockAudio() {
+      if (AUDIO_UNLOCKED) return;
+      [successBeep, errorBeep, scanBeep].forEach(a => {
+        if (!a) return;
+        a.muted = true;
+        a.play().then(() => {
+          a.pause();
+          a.currentTime = 0;
+          a.muted = false;
+        }).catch(() => {});
+      });
+
+      AUDIO_UNLOCKED = true;
+      console.log("🔓 Audio unlocked via touch");
+    }
+
+    // Force unlock audio heavily on first touch for iOS tablets
+    document.body.addEventListener('click', unlockAudio, { once: true });
+    document.body.addEventListener('touchstart', unlockAudio, { once: true });
+
+    function playSound(audio) {
+      if (!AUDIO_UNLOCKED || !audio) return;
+      audio.pause();
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+
+    /* =====================================================
+       FULLSCREEN TOGGLE LOGIC
+    ===================================================== */
+    const normalMode = document.getElementById('normalMode');
+    const fullscreenMode = document.getElementById('fullscreenMode');
+    const videoNormal = document.getElementById('camera');
+    const videoFs = document.getElementById('fullscreenCamera');
+
+    window.initializeAttendanceKiosk(locked => {
+      normalMode.style.display = locked ? 'none' : 'flex';
+      fullscreenMode.classList.toggle('active', locked);
+      if (cameraStream) {
+        const activeVideo = locked ? videoFs : videoNormal;
+        activeVideo.srcObject = cameraStream;
+        activeVideo.play().catch(e => console.error(e));
+      }
+    });
+
+    /* =====================================================
+       ELEMENTS
+    ===================================================== */
+    const canvas = document.getElementById("canvas");
+
+    // Messages
+    const successMsg = document.getElementById("successMessage");
+    const errorMsg   = document.getElementById("errorMessage");
+    const warningMsg = document.getElementById("warningMessage");
+    const infoMsg    = document.getElementById("infoMessage");
+    const fsSuccessMsg = document.getElementById("fsSuccessMessage");
+    const fsErrorMsg   = document.getElementById("fsErrorMessage");
+    const fsWarningMsg = document.getElementById("fsWarningMessage");
+    const fsInfoMsg    = document.getElementById("fsInfoMessage");
+
+    const historyList = document.getElementById("historyList");
+    const fsHistoryList = document.getElementById("fsAttendanceList");
+
+    /* =====================================================
+       UI MESSAGES
+    ===================================================== */
+    function hideMessages() {[successMsg, errorMsg, warningMsg, infoMsg, 
+       fsSuccessMsg, fsErrorMsg, fsWarningMsg, fsInfoMsg].forEach(m => {
+        if (m) m.style.display = "none";
+      });
+    }
+
+    function showMessage(text, type) {
+      hideMessages();
+
+      const isFs = fullscreenMode.classList.contains('active');
+      let el;
+      if (isFs) {
+        el = type === "success" ? fsSuccessMsg : type === "warning" ? fsWarningMsg : type === "error" ? fsErrorMsg : fsInfoMsg;
+      } else {
+        el = type === "success" ? successMsg : type === "warning" ? warningMsg : type === "error" ? errorMsg : infoMsg;
+      }
+
+      if (!el) return;
+      el.textContent = text;
+      el.style.display = "block";
+
+      if (type === "success") playSound(successBeep);
+      else if (type === "warning" || type === "error") playSound(errorBeep);
+      else playSound(scanBeep);
+
+      setTimeout(() => el.style.display = "none", 5000);
+    }
+
+    /* =====================================================
+       LOCATION (REQUIRED)
+    ===================================================== */
+    async function getLocation() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject("Geolocation not supported");
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            window.CURRENT_LAT = pos.coords.latitude;
+            window.CURRENT_LNG = pos.coords.longitude;
+            window.CURRENT_ACCURACY = pos.coords.accuracy;
+            locationUpdatedAt = Date.now();
+            console.log("📍 Location OK:", CURRENT_LAT, CURRENT_LNG);
+            resolve();
+          },
+          err => {
+            console.error("GPS error:", err);
+            showMessage("Location permission required", "error");
+            reject(err);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      });
+    }
+
+    /* =====================================================
+       CAMERA
+    ===================================================== */
+    async function startCamera() {
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }
+        });
+        videoNormal.srcObject = cameraStream;
+        videoFs.srcObject = cameraStream;
+        unlockAudio(); // Browser permission might count as gesture
+        console.log("📷 Camera started");
+      } catch (err) {
+        console.error("Camera error:", err);
+        showMessage("Camera permission required", "error");
+      }
+    }
+
+    /* =====================================================
+       LOAD TODAY ATTENDANCE
+    ===================================================== */
+    async function loadTodayAttendance() {
+  try {
+
+    const res = await fetch("{% url 'attendance_log_api' %}");
+    const data = await res.json();
+
+    historyList.innerHTML = "";
+    fsHistoryList.innerHTML = "";
+
+    if (!data.length) {
+
+      const emptyHtml = `
+        <div class="text-center py-5 text-muted">
+          <i class="fas fa-clipboard-check fa-3x mb-3 opacity-25"></i>
+          <p class="fw-medium">No attendance recorded today</p>
+        </div>`;
+
+      historyList.innerHTML = emptyHtml;
+      fsHistoryList.innerHTML = emptyHtml;
+      return;
+    }
+
+    data.forEach(record => {
+
+      renderApiAttendance({
+        name: record.name,
+        attendance_type: record.type,
+        time: record.time || ""
+      });
+
+    });
+
+  } catch (err) {
+    console.error("Attendance load error:", err);
+  }
+}
+
+    function renderApiAttendance(data) {
+
+  const isCheckIn = data.attendance_type.toLowerCase().includes("in");
+  const badgeClass = isCheckIn ? "badge-in" : "badge-out";
+  const avatarClass = isCheckIn ? "avatar-in" : "avatar-out";
+  const icon = isCheckIn
+      ? "fa-arrow-right-to-bracket"
+      : "fa-person-walking-arrow-right";
+
+  const html = `
+    <div class="record-card">
+      <div class="record-avatar ${avatarClass}">
+        <i class="fas ${icon}"></i>
+      </div>
+      <div class="record-details">
+        <div class="record-name">${escapeAttendanceText(data.name)}</div>
+        <div class="record-meta">
+          <span class="status-badge ${badgeClass}">
+            ${escapeAttendanceText(data.attendance_type.toUpperCase())}
+          </span>
+        </div>
+      </div>
+      <div class="record-time">${escapeAttendanceText(data.time)}</div>
+    </div>
+  `;
+
+  // API history goes to bottom
+  historyList.insertAdjacentHTML("beforeend", html);
+  fsHistoryList.insertAdjacentHTML("beforeend", html);
+}
+    /* =====================================================
+       ATTENDANCE UI BUILDER
+    ===================================================== */
+    function addAttendanceRecord(data) {
+
+  if(historyList.querySelector('.text-center')) historyList.innerHTML = "";
+  if(fsHistoryList.querySelector('.text-center')) fsHistoryList.innerHTML = "";
+
+  const isCheckIn = data.attendance_type.toLowerCase().includes("in");
+  const badgeClass = isCheckIn ? "badge-in" : "badge-out";
+  const avatarClass = isCheckIn ? "avatar-in" : "avatar-out";
+  const icon = isCheckIn
+      ? "fa-arrow-right-to-bracket"
+      : "fa-person-walking-arrow-right";
+
+  const countEl = document.getElementById("todayCount");
+  countEl.innerText = parseInt(countEl.innerText) + 1;
+
+  if(isCheckIn){
+      const inEl = document.getElementById("checkIns");
+      inEl.innerText = parseInt(inEl.innerText) + 1;
+  } else {
+      const outEl = document.getElementById("checkOuts");
+      outEl.innerText = parseInt(outEl.innerText) + 1;
+  }
+
+  const html = `
+    <div class="record-card">
+      <div class="record-avatar ${avatarClass}">
+        <i class="fas ${icon}"></i>
+      </div>
+      <div class="record-details">
+        <div class="record-name">${escapeAttendanceText(data.name)}</div>
+        <div class="record-meta">
+          <span class="status-badge ${badgeClass}">
+            ${escapeAttendanceText(data.attendance_type.toUpperCase())}
+          </span>
+        </div>
+      </div>
+      <div class="record-time">${escapeAttendanceText(data.time)}</div>
+    </div>
+  `;
+
+  // LIVE scans go to TOP
+  historyList.insertAdjacentHTML("afterbegin", html);
+  fsHistoryList.insertAdjacentHTML("afterbegin", html);
+
+  // limit records for performance
+  const maxRecords = 20;
+
+  while(historyList.children.length > maxRecords){
+      historyList.removeChild(historyList.lastChild);
+  }
+
+  while(fsHistoryList.children.length > maxRecords){
+      fsHistoryList.removeChild(fsHistoryList.lastChild);
+  }
+}
+
+    function escapeAttendanceText(value) {
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+    /* =====================================================
+       FRAME PROCESS
+    ===================================================== */
+    let pauseScansUntil = 0;
+    let scannerBlocked = {{ liveness_unconfigured|yesno:'true,false' }};
+    async function processFrame() {
+      const activeVideo = fullscreenMode.classList.contains('active') ? videoFs : videoNormal;
+
+      if (scannerBlocked || Date.now() < pauseScansUntil || isProcessing || activeVideo.readyState < 2 || CURRENT_LAT === null || CURRENT_LNG === null) return;
+
+      if (Date.now() - locationUpdatedAt > 20000) {
+        if (!locationRefresh && Date.now() >= nextLocationRefreshAt) {
+          locationRefresh = getLocation().catch(() => {}).finally(() => {
+            locationRefresh = null;
+            nextLocationRefreshAt = Date.now() + 10000;
+          });
+        }
+        return;
+      }
+
+      isProcessing = true;
+
+      try {
+        canvas.width = activeVideo.videoWidth;
+        canvas.height = activeVideo.videoHeight;
+        canvas.getContext("2d").drawImage(activeVideo, 0, 0);
+
+        const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.8));
+        const fd = new FormData();
+        fd.append("capture", blob, "frame.jpg");
+        fd.append("scan_session", window.attendanceScanSession || (window.attendanceScanSession = crypto.randomUUID()));
+        fd.append("latitude", CURRENT_LAT);
+        fd.append("longitude", CURRENT_LNG);
+        fd.append("accuracy", CURRENT_ACCURACY);
+
+        const res = await fetch("{% url 'mark_attendance' %}", {
+          method: "POST",
+          headers: { "X-CSRFToken": "{{ csrf_token }}" },
+          body: fd
+        });
+
+        const data = await res.json();
+
+        if (['liveness_required', 'model_unavailable'].includes(data.error)) {
+          scannerBlocked = true;
+          document.getElementById('statusText').textContent = 'Scanner setup required · reload after configuration';
+        }
+
+        if (res.status === 429 || res.status === 503) {
+          const wait = Math.min(15, Math.max(2, Number(res.headers.get('Retry-After')) || 3));
+          pauseScansUntil = Date.now() + wait * 1000;
+        }
+        if (data.success) {
+          window.attendanceScanSession = crypto.randomUUID();
+          pauseScansUntil = Date.now() + 2500;
+          if (data.status === "new") {
+            addAttendanceRecord(data);
+            playSound(successBeep);
+          }
+          showMessage(data.message, "success");
+        } else {
+          const type = data.color === "yellow" ? "warning" : data.color === "blue" ? "info" : "error";
+          showMessage(data.message || ({scanner_busy: 'Scanner busy. Retrying shortly.',
+            liveness_unavailable: 'Anti-spoofing service unavailable. Retrying shortly.',
+            scan_rate_limit: 'Too many scans. Please wait.'}[data.error]) || 'Scan failed. Please try again.', type);
+        }
+      } catch (e) {
+        console.error("Frame error:", e);
+      } finally {
+        isProcessing = false;
+      }
+    }
+
+    /* =====================================================
+       LOOP
+    ===================================================== */
+    function loop() {
+      processFrame();
+      setTimeout(loop, 1200);
+    }
+
+    /* =====================================================
+       START ORDER
+    ===================================================== */
+    await getLocation();
+    await startCamera();
+    await loadTodayAttendance();  
+    loop();
+
+  });
+  </script>
+</body>
+</html>

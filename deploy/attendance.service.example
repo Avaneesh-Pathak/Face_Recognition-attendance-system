@@ -1,0 +1,25 @@
+[Unit]
+Description=Face attendance Django/Gunicorn
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+# Create an unprivileged user; do not run the web application as root.
+User=attendance
+Group=attendance
+WorkingDirectory=/srv/face-attendance
+EnvironmentFile=/srv/face-attendance/.env
+ExecStart=/srv/face-attendance/.venv/bin/gunicorn attendance.wsgi:application --bind 127.0.0.1:8000 --workers 2 --threads 2 --timeout 90 --max-requests 500 --max-requests-jitter 50 --access-logfile - --error-logfile -
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/face-attendance/private_media
+# Test restrictive settings against your face-model path and PostgreSQL sockets.
+
+[Install]
+WantedBy=multi-user.target

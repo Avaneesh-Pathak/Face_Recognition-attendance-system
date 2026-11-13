@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block title %}Audit history | FaceAttend{% endblock %}
+{% block page_title %}Audit history{% endblock %}
+{% block content %}
+<style>
+.audit-page{--audit-ink:#172638;--audit-muted:#64748b;--audit-line:#dfe6ed;--audit-paper:#fff;--audit-canvas:#f4f7f8;--audit-teal:#087f82;--audit-navy:#102a36;max-width:1440px;margin:0 auto;color:var(--audit-ink)}
+.audit-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:26px 28px;margin-bottom:18px;border-radius:16px;background:var(--audit-navy);color:#fff}
+.audit-heading-main{display:flex;align-items:flex-start;gap:16px}.audit-emblem{display:grid;place-items:center;width:48px;height:48px;flex:0 0 48px;border:1px solid #ffffff38;border-radius:12px;color:#a7e4df;font-size:19px}
+.audit-kicker{margin:0 0 7px;color:#a7e4df;font-size:10px;font-weight:750;letter-spacing:.14em;text-transform:uppercase}.audit-heading h1{margin:0;font-size:clamp(24px,3vw,34px);font-weight:680;letter-spacing:-.04em}.audit-heading p{max-width:620px;margin:7px 0 0;color:#d0dde0;font-size:13px;line-height:1.55}
+.audit-access{display:inline-flex;align-items:center;gap:8px;padding:8px 11px;border:1px solid #ffffff36;border-radius:7px;color:#e1eeef;font-size:11px;white-space:nowrap}.audit-access i{color:#a7e4df}
+.audit-panel{overflow:hidden;border:1px solid var(--audit-line);border-radius:14px;background:var(--audit-paper);box-shadow:0 8px 28px #2037440a}.audit-filters{padding:20px 22px}.audit-filters .form-label{font-size:11px;color:#415363}.audit-filters .form-select,.audit-filters .form-control{min-height:42px;border-color:#d8e1e7;border-radius:8px;font-size:13px}.audit-filters .form-control:focus,.audit-filters .form-select:focus{border-color:#48a7a6;box-shadow:0 0 0 .2rem #087f821a}
+.audit-feed-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:17px 22px;border-top:1px solid var(--audit-line);border-bottom:1px solid var(--audit-line);background:#f9fbfb}.audit-feed-head h2{margin:0;font-size:14px;font-weight:700;letter-spacing:-.01em}.audit-feed-head p{margin:4px 0 0;color:var(--audit-muted);font-size:11px}.audit-page-count{padding:6px 9px;border:1px solid #d7e3e6;border-radius:6px;background:#fff;color:#3d5962;font-size:11px;font-weight:650;white-space:nowrap}
+.audit-timeline{position:relative;list-style:none;margin:0;padding:6px 22px 8px 38px}.audit-timeline:before{position:absolute;top:22px;bottom:22px;left:23px;width:1px;background:#dbe5e8;content:""}.audit-event{position:relative;margin:16px 0;border:1px solid var(--audit-line);border-radius:11px;background:#fff}.audit-event:before{position:absolute;top:24px;left:-21px;width:9px;height:9px;border:2px solid #fff;border-radius:50%;background:#18878a;box-shadow:0 0 0 1px #8ebdbc;content:""}
+.audit-event-head{display:grid;grid-template-columns:minmax(145px,180px) minmax(160px,1fr) minmax(160px,1fr) auto;align-items:center;gap:14px;padding:15px 17px}.audit-event-time time{display:block;font-size:12px;font-weight:720;font-variant-numeric:tabular-nums}.audit-event-time span{display:block;margin-top:3px;color:var(--audit-muted);font-size:11px;font-variant-numeric:tabular-nums}
+.audit-actor{display:flex;align-items:center;gap:10px;min-width:0}.audit-avatar{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;border-radius:50%;background:#e4f1ef;color:#17686a;font-size:12px;font-weight:750}.audit-actor-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:650}.audit-actor-id{display:block;margin-top:2px;color:var(--audit-muted);font-size:10px}
+.audit-record{min-width:0}.audit-record strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:650}.audit-record span{display:block;margin-top:3px;color:var(--audit-muted);font-size:10px;font-variant-numeric:tabular-nums}
+.audit-event-actions{display:flex;align-items:center;gap:10px}.audit-action{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #dce5e9;border-radius:6px;background:#f7f9fa;color:#415363;font-size:10px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}.audit-action.is-create{border-color:#c9e7d7;background:#eff8f2;color:#28734b}.audit-action.is-update{border-color:#c9dfed;background:#eff6fa;color:#28617b}.audit-action.is-delete{border-color:#f0d2d0;background:#fff4f2;color:#9e453e}.audit-action.is-auth{border-color:#dce5e9;background:#f3f6f7;color:#586b75}.audit-action.is-system{border-color:#e7dfca;background:#faf7ef;color:#79643a}
+.audit-detail{border-top:1px solid #edf1f3}.audit-detail summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 17px;cursor:pointer;color:#176f72;font-size:11px;font-weight:700;list-style:none}.audit-detail summary::-webkit-details-marker{display:none}.audit-detail summary:after{content:"+";font-size:17px;font-weight:400;line-height:1}.audit-detail[open] summary:after{content:"−"}.audit-detail summary:focus-visible{outline:3px solid #087f823b;outline-offset:-3px}.audit-change-count{margin-left:auto;color:var(--audit-muted);font-size:10px;font-weight:500}
+.audit-detail-body{padding:0 17px 16px}.audit-reason{display:flex;align-items:flex-start;gap:9px;margin:0 0 12px;padding:10px 12px;border-left:3px solid #d6a950;border-radius:0 6px 6px 0;background:#fcf8ee;color:#604e2d;font-size:12px;line-height:1.5}.audit-reason strong{flex:0 0 auto;font-size:10px;letter-spacing:.04em;text-transform:uppercase}.audit-diff-wrap{overflow-x:auto;border:1px solid #e3e9ec;border-radius:8px}.audit-diff{width:100%;margin:0;border-collapse:collapse;font-size:11px}.audit-diff th{padding:9px 11px;background:#f5f8f9;color:#586b75;text-align:left;font-size:9px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}.audit-diff td{width:40%;padding:9px 11px;border-top:1px solid #edf1f3;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}.audit-diff td:first-child{width:20%;color:#485d68;font-weight:650}.audit-value-empty{color:#98a4aa;font-style:italic}.audit-no-changes{margin:0;padding:12px;border:1px dashed #dce5e9;border-radius:7px;background:#f8fafb;color:#586b75;font-size:12px}.audit-request{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--audit-muted);font-size:10px}.audit-request code{overflow-wrap:anywhere;color:#425763;font-size:10px}
+.audit-empty{padding:54px 20px;text-align:center}.audit-empty-icon{display:grid;place-items:center;width:46px;height:46px;margin:0 auto 12px;border-radius:12px;background:#eef4f4;color:#52777b;font-size:18px}.audit-empty h3{margin:0;font-size:14px;font-weight:700}.audit-empty p{margin:5px 0 0;color:var(--audit-muted);font-size:12px}
+.audit-pagination{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px 22px;border-top:1px solid var(--audit-line);color:var(--audit-muted);font-size:11px}.audit-pagination .btn{min-height:36px;display:inline-flex;align-items:center;gap:6px;border-radius:7px;font-size:11px}
+@media(max-width:900px){.audit-event-head{grid-template-columns:minmax(120px,150px) minmax(145px,1fr) minmax(130px,1fr);}.audit-event-actions{grid-column:2/4;justify-content:space-between}.audit-action{order:1}}
+@media(max-width:600px){.audit-heading{align-items:flex-start;flex-direction:column;padding:20px}.audit-heading-main{gap:12px}.audit-emblem{width:40px;height:40px;flex-basis:40px}.audit-access{margin-left:52px}.audit-filters{padding:15px}.audit-feed-head{align-items:flex-start;padding:14px 15px}.audit-timeline{padding:4px 12px 6px 27px}.audit-timeline:before{left:15px}.audit-event{margin:12px 0}.audit-event:before{left:-17px}.audit-event-head{grid-template-columns:1fr auto;gap:11px;padding:13px}.audit-event-time{grid-column:1}.audit-actor{grid-column:1}.audit-record{grid-column:1}.audit-event-actions{grid-column:2;grid-row:1/4;align-self:start;flex-direction:column;align-items:flex-end;gap:7px}.audit-detail summary{padding:11px 13px}.audit-detail-body{padding:0 12px 13px}.audit-reason{flex-wrap:wrap;gap:4px}.audit-diff{min-width:470px}.audit-pagination{align-items:flex-start;flex-direction:column;padding:13px 15px}.audit-pagination>div:last-child{width:100%;justify-content:space-between}}
+</style>
+
+<main class="audit-page">
+  <header class="audit-heading">
+    <div class="audit-heading-main">
+      <div class="audit-emblem" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></div>
+      <div>
+        <p class="audit-kicker">System record · superuser view</p>
+        <h1>Audit history</h1>
+        <p>Review who changed a record, when it happened, and the values recorded before and after.</p>
+      </div>
+    </div>
+    <span class="audit-access"><i class="fa-solid fa-lock" aria-hidden="true"></i> Restricted access</span>
+  </header>
+
+  <section class="audit-panel mb-4" aria-label="Filter audit events">
+    <form method="get" class="audit-filters">
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-sm-6 col-lg-3">
+          <label for="entity" class="form-label fw-semibold">Record type</label>
+          <select id="entity" name="entity" class="form-select">
+            <option value="">All records</option>
+            {% for entity in entities %}<option value="{{ entity }}" {% if request.GET.entity == entity %}selected{% endif %}>{{ entity }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-2">
+          <label for="action" class="form-label fw-semibold">Action</label>
+          <select id="action" name="action" class="form-select">
+            <option value="">All actions</option>
+            {% for value, label in action_choices %}<option value="{{ value }}" {% if request.GET.action == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-3">
+          <label for="actor" class="form-label fw-semibold">Performed by</label>
+          <input id="actor" name="actor" value="{{ request.GET.actor }}" class="form-control" placeholder="Search a user">
+        </div>
+        <div class="col-6 col-sm-3 col-lg-2">
+          <label for="start" class="form-label fw-semibold">From</label>
+          <input type="date" id="start" name="start" value="{{ request.GET.start }}" class="form-control">
+        </div>
+        <div class="col-6 col-sm-3 col-lg-2">
+          <label for="end" class="form-label fw-semibold">To</label>
+          <input type="date" id="end" name="end" value="{{ request.GET.end }}" class="form-control">
+        </div>
+        <div class="col-12 d-flex flex-wrap gap-2">
+          <button type="submit" class="btn btn-primary px-4"><i class="fa-solid fa-filter me-2" aria-hidden="true"></i>Apply filters</button>
+          <a class="btn btn-outline-secondary" href="{% url 'audit_log' %}">Clear filters</a>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <section class="audit-panel" aria-labelledby="auditEventsHeading">
+    <div class="audit-feed-head">
+      <div>
+        <h2 id="auditEventsHeading">Activity events</h2>
+        <p>Newest events appear first · {{ page_obj.paginator.count }} matching events</p>
+      </div>
+      <span class="audit-page-count">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages|default:1 }}</span>
+    </div>
+
+    {% if page_obj.object_list %}
+      <ol class="audit-timeline">
+        {% for event in page_obj %}
+          <li>
+            <article class="audit-event">
+              <header class="audit-event-head">
+                <div class="audit-event-time">
+                  <time datetime="{{ event.created_at|date:'c' }}">{{ event.created_at|date:'j M Y' }}</time>
+                  <span>{{ event.created_at|date:'H:i:s' }}</span>
+                </div>
+                <div class="audit-actor">
+                  <span class="audit-avatar" aria-hidden="true">{{ event.actor_name|default:'S'|first|upper }}</span>
+                  <div class="min-w-0">
+                    <span class="audit-actor-name">{{ event.actor_name|default:'System' }}</span>
+                    <span class="audit-actor-id">{% if event.actor_id %}User #{{ event.actor_id }}{% else %}System process{% endif %}</span>
+                  </div>
+                </div>
+                <div class="audit-record">
+                  <strong>{{ event.entity }}</strong>
+                  <span>Record #{{ event.object_id }}</span>
+                </div>
+                <div class="audit-event-actions">
+                  <span class="audit-action {% if event.action == 'create' %}is-create{% elif event.action == 'update' %}is-update{% elif event.action == 'delete' %}is-delete{% elif event.entity == 'Authentication' %}is-auth{% else %}is-system{% endif %}">
+                    {% if event.action == 'create' %}<i class="fa-solid fa-plus" aria-hidden="true"></i>{% elif event.action == 'update' %}<i class="fa-solid fa-pen" aria-hidden="true"></i>{% elif event.action == 'delete' %}<i class="fa-solid fa-trash" aria-hidden="true"></i>{% elif event.action == 'login' %}<i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i>{% elif event.action == 'logout' %}<i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i>{% elif event.action == 'lock' %}<i class="fa-solid fa-lock" aria-hidden="true"></i>{% elif event.action == 'unlock' %}<i class="fa-solid fa-lock-open" aria-hidden="true"></i>{% else %}<i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>{% endif %}
+                    {{ event.action_label }}
+                  </span>
+                </div>
+              </header>
+
+              <details class="audit-detail">
+                <summary>
+                  <span>Change details</span>
+                  {% if event.change_rows %}<span class="audit-change-count">{{ event.change_rows|length }} field{{ event.change_rows|length|pluralize }}</span>{% endif %}
+                </summary>
+                <div class="audit-detail-body">
+                  {% if event.reason %}<div class="audit-reason"><strong>Reason</strong><span>{{ event.reason }}</span></div>{% endif %}
+                  {% if event.change_rows %}
+                    <div class="audit-diff-wrap">
+                      <table class="audit-diff">
+                        <thead><tr><th scope="col">Field</th><th scope="col">Before</th><th scope="col">After</th></tr></thead>
+                        <tbody>
+                          {% for row in event.change_rows %}
+                            <tr>
+                              <td>{{ row.label }}</td>
+                              <td>{% if row.before is not None %}{{ row.before }}{% else %}<span class="audit-value-empty">—</span>{% endif %}</td>
+                              <td>{% if row.after is not None %}{{ row.after }}{% else %}<span class="audit-value-empty">—</span>{% endif %}</td>
+                            </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                  {% else %}
+                    <p class="audit-no-changes">No record fields changed for this event.</p>
+                  {% endif %}
+                  <div class="audit-request"><span>Request ID</span><code>{{ event.request_id|default:'System operation' }}</code></div>
+                </div>
+              </details>
+            </article>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <div class="audit-empty">
+        <div class="audit-empty-icon" aria-hidden="true"><i class="fa-regular fa-folder-open"></i></div>
+        <h3>No audit events found</h3>
+        <p>Try changing or clearing the filters to see more activity.</p>
+      </div>
+    {% endif %}
+
+    <nav class="audit-pagination" aria-label="Audit pagination">
+      <span>Showing {{ page_obj.start_index|default:0 }}–{{ page_obj.end_index|default:0 }} of {{ page_obj.paginator.count }}</span>
+      <div class="d-flex gap-2">
+        {% if page_obj.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="?{{ filter_query }}&page={{ page_obj.previous_page_number }}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i>Previous</a>{% endif %}
+        {% if page_obj.has_next %}<a class="btn btn-sm btn-outline-primary" href="?{{ filter_query }}&page={{ page_obj.next_page_number }}">Next<i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>{% endif %}
+      </div>
+    </nav>
+  </section>
+</main>
+{% endblock %}

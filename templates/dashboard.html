@@ -1,0 +1,805 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+
+<style>
+    :root {
+        --color-primary: #3b82f6;
+        --color-primary-dark: #1d4ed8;
+        --color-success: #10b981;
+        --color-info: #06b6d4;
+        --color-warning: #f59e0b;
+        --color-danger: #ef4444;
+        --color-dark: #1e293b;
+        --color-muted: #64748b;
+        --bg-main: #f8fafc;
+        --border-color: #e2e8f0;
+        
+        --card-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.05);
+        --card-shadow-hover: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.08);
+        --transition-smooth: all 0.2s ease-in-out;
+    }
+
+    body {
+        background-color: var(--bg-main) !important;
+    }
+
+    .dashboard-wrapper {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 1.5rem;
+    }
+
+    /* Command Center Header */
+    .header-section {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 1.5rem 2rem;
+        margin-bottom: 1.5rem;
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--border-color);
+        transition: var(--transition-smooth);
+    }
+
+    .header-section:hover {
+        box-shadow: var(--card-shadow-hover);
+    }
+
+    .header-icon-box {
+        width: 48px;
+        height: 48px;
+        background-color: #eff6ff;
+        color: var(--color-primary);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .admin-badge {
+        background-color: #f1f5f9;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+        padding: 0.5rem 1.25rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        letter-spacing: 0.3px;
+    }
+
+    /* KPI Display Metrics & Hover states */
+    .kpi-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 1.25rem;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--card-shadow);
+        transition: var(--transition-smooth);
+        position: relative;
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--card-shadow-hover);
+    }
+
+    /* Interactive stats elements styling */
+    .kpi-card[data-list-id], .interactive-badge[data-list-id] {
+        cursor: pointer;
+    }
+
+    .kpi-card[data-list-id]:hover {
+        transform: translateY(-4px);
+        border-color: var(--color-primary);
+    }
+
+    .interactive-badge[data-list-id] {
+        transition: var(--transition-smooth);
+    }
+
+    .interactive-badge[data-list-id]:hover {
+        background-color: var(--color-primary) !important;
+        color: #ffffff !important;
+        border-color: var(--color-primary-dark) !important;
+        transform: scale(1.05);
+    }
+
+    .kpi-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.75rem;
+        font-size: 1.15rem;
+    }
+
+    .icon-total { background-color: #eff6ff; color: var(--color-primary); }
+    .icon-present { background-color: #ecfdf5; color: var(--color-success); }
+    .icon-onduty { background-color: #ecfeff; color: var(--color-info); }
+    .icon-absent { background-color: #fef2f2; color: var(--color-danger); }
+    .icon-late { background-color: #fffbeb; color: var(--color-warning); }
+    .icon-accuracy { background-color: #f8fafc; color: var(--color-dark); }
+
+    .kpi-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--color-dark);
+        line-height: 1.2;
+        margin-bottom: 0.25rem;
+    }
+
+    .kpi-label {
+        font-size: 0.725rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--color-muted);
+    }
+
+    /* Main Container Elements */
+    .modern-card {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        box-shadow: var(--card-shadow);
+        transition: var(--transition-smooth);
+        overflow: hidden;
+    }
+
+    .modern-card:hover {
+        box-shadow: var(--card-shadow-hover);
+    }
+
+    .modern-card-header {
+        background: #f8fafc;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: var(--color-dark);
+        letter-spacing: 0.2px;
+    }
+
+    .modern-card-body {
+        padding: 1.5rem;
+    }
+
+    /* Medical Status Snapshot */
+    .status-card-header {
+        background-color: #f8fafc !important;
+        color: var(--color-dark) !important;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .status-badge {
+        background-color: #ecfdf5;
+        color: var(--color-success);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        padding: 0.35rem 1rem;
+        border-radius: 15px;
+        font-weight: 600;
+        font-size: 0.8rem;
+    }
+
+    /* Custom Progress Bars */
+    .progress {
+        height: 6px;
+        border-radius: 3px;
+        background-color: #f1f5f9;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        border-radius: 3px;
+        background-color: var(--color-success);
+    }
+
+    /* Tabular Layouts */
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table thead th {
+        background-color: #f8fafc;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.725rem;
+        letter-spacing: 0.5px;
+        color: var(--color-muted);
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.75rem 1rem;
+    }
+
+    .table tbody tr td {
+        padding: 0.85rem 1rem;
+        color: var(--color-dark);
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .table tbody tr {
+        transition: var(--transition-smooth);
+    }
+
+    .table tbody tr:hover {
+        background-color: #f8fafc;
+    }
+
+    /* Verification Channel Sub-Lists */
+    .list-card-header {
+        padding: 0.85rem 1.25rem;
+        font-weight: 700;
+        font-size: 0.875rem;
+        letter-spacing: 0.3px;
+        border-radius: 12px 12px 0 0 !important;
+    }
+
+    .list-card-header.onduty { background-color: #ecfdf5; color: #065f46; }
+    .list-card-header.absent { background-color: #fef2f2; color: #991b1b; }
+    .list-card-header.late { background-color: #fffbeb; color: #92400e; }
+
+    .list-group-item {
+        padding: 0.85rem 1.25rem;
+        border-left: 3px solid transparent;
+        transition: var(--transition-smooth);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: var(--color-dark);
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .list-group-item:hover {
+        border-left: 3px solid var(--color-primary);
+        background-color: #f8fafc;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 280px;
+        width: 100%;
+    }
+
+    /* Layout Responsive Scaling */
+    @media (max-width: 768px) {
+        .dashboard-wrapper {
+            padding: 1rem;
+        }
+        .header-section {
+            padding: 1.25rem;
+        }
+        .kpi-value {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+
+<div class="dashboard-wrapper">
+
+    <!-- 1. ADMINISTRATIVE HEADER SECTION -->
+
+    <!-- 2. KPI PERFORMANCE GRID -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="kpi-card" data-list-id="list-total-staff" data-title="Total Staff List">
+                <div class="kpi-icon icon-total">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="kpi-value">{{ total_employees }}</div>
+                <div class="kpi-label">Total Staff</div>
+            </div>
+        </div>
+
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="kpi-card present" data-list-id="list-present-today" data-title="Present Today List">
+                <div class="kpi-icon icon-present">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div class="kpi-value">{{ present_count }}</div>
+                <div class="kpi-label">Present Today</div>
+            </div>
+        </div>
+
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="kpi-card onduty" data-list-id="list-on-duty" data-title="Active On Duty Staff">
+                <div class="kpi-icon icon-onduty">
+                    <i class="fas fa-stethoscope"></i>
+                </div>
+                <div class="kpi-value">{{ on_duty_count }}</div>
+                <div class="kpi-label">On Duty</div>
+            </div>
+        </div>
+
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="kpi-card absent" data-list-id="list-absent" data-title="Absent / Not Marked Today">
+                <div class="kpi-icon icon-absent">
+                    <i class="fas fa-user-times"></i>
+                </div>
+                <div class="kpi-value">{{ absent_count }}</div>
+                <div class="kpi-label">Absent</div>
+            </div>
+        </div>
+
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="kpi-card late" data-list-id="list-late-arrivals" data-title="Late Arrivals Today">
+                <div class="kpi-icon icon-late">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="kpi-value">{{ late_count }}</div>
+                <div class="kpi-label">Late Arrivals</div>
+            </div>
+        </div>
+
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="kpi-card accuracy">
+                <div class="kpi-icon icon-accuracy">
+                    <i class="fas fa-fingerprint"></i>
+                </div>
+                <div class="kpi-value">{{ avg_confidence }}%</div>
+                <div class="kpi-label">Avg match</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 3. SECONDARY ANALYTICAL DATA PANELS -->
+    <div class="row g-4">
+
+        <!-- Attendance Trend Panel -->
+        <div class="col-lg-8">
+            <div class="modern-card h-100">
+                <div class="modern-card-header">
+                    <i class="fas fa-chart-line text-primary me-2"></i>
+                    30-Day Attendance Trend
+                </div>
+                <div class="modern-card-body">
+                    <div class="chart-container">
+                        <canvas id="attendanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Personal Staff Duty Badge Snapshot -->
+        <div class="col-lg-4">
+            <div class="modern-card h-100">
+                <div class="modern-card-header status-card-header">
+                    <i class="fas fa-user-md text-primary me-2"></i>
+                    Clinical Status
+                </div>
+                <div class="modern-card-body">
+                    <h5 class="fw-bold mb-3 text-dark">{{ employee.user.get_full_name }}</h5>
+
+                    <div class="d-flex align-items-center gap-2 mb-4">
+                        <span class="text-muted small">Shift Status:</span>
+                        <span class="status-badge">
+                            <i class="fas fa-circle me-1 small" style="font-size: 0.5rem; vertical-align: middle;"></i>
+                            {{ current_status }}
+                        </span>
+                    </div>
+
+                    <hr class="text-muted opacity-25">
+
+                    <div class="d-flex justify-content-between mb-3 small">
+                        <span class="text-muted"><i class="far fa-clock me-2"></i>Hours Today</span>
+                        <strong class="fw-bold text-dark font-monospace">{{ total_hours }} hrs</strong>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-3 small">
+                        <span class="text-muted"><i class="far fa-calendar-alt me-2"></i>Hours This Week</span>
+                        <strong class="fw-bold text-dark font-monospace">{{ total_hours_week }} hrs</strong>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-3 small">
+                        <span class="text-muted"><i class="far fa-calendar-check me-2"></i>Hours This Month</span>
+                        <strong class="fw-bold text-dark font-monospace">{{ total_hours_month }} hrs</strong>
+                    </div>
+
+                    <hr class="text-muted opacity-25">
+
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted small fw-semibold">Attendance Completeness</span>
+                            <span class="text-success small fw-bold font-monospace">{{ attendance_percentage }}%</span>
+                        </div>
+                        <div class="progress mt-2">
+                            <div class="progress-bar" style="width: {{ attendance_percentage }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 4. WARD / DEPARTMENT STAFF ROSTERS -->
+    <div class="modern-card mt-4">
+        <div class="modern-card-header">
+            <i class="fas fa-building text-primary me-2"></i>
+            Department Attendance Matrix
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Department</th>
+                        <th>Managed Staff</th>
+                        <th>Present Today</th>
+                        <th>Fulfillment Level</th>
+                    </tr>
+                </thead>
+                <tbody class="small" style="font-size: 0.85rem;">
+                {% for stat in department_stats %}
+                    <tr>
+                        <td class="fw-semibold text-dark">{{ stat.department_name }}</td>
+                        <td>
+                            <span class="badge bg-light text-dark px-3 py-1.5 border interactive-badge" 
+                                  data-list-id="list-dept-managed-{{ forloop.counter }}" 
+                                  data-title="Managed Staff - {{ stat.department_name }}">
+                                {{ stat.total_count }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark px-3 py-1.5 border interactive-badge" 
+                                  data-list-id="list-dept-present-{{ forloop.counter }}" 
+                                  data-title="Present Staff - {{ stat.department_name }}">
+                                {{ stat.present_count }}
+                            </span>
+                        </td>
+                        <td style="min-width: 240px;">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="progress flex-grow-1">
+                                    <div class="progress-bar" style="width:{{ stat.presence_rate }}%"></div>
+                                </div>
+                                <span class="fw-bold font-monospace text-secondary" style="font-size: 0.8rem;">{{ stat.presence_rate }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">No statistics recorded for this period.</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 5. REAL-TIME VERIFICATION CHANNELS -->
+    <div class="row g-4 mt-2">
+        <!-- On duty -->
+        <div class="col-lg-4">
+            <div class="modern-card">
+                <div class="list-card-header onduty">
+                    <i class="fas fa-user-nurse me-2"></i>Present on Duty
+                </div>
+                <div class="card-body p-0" style="max-height: 350px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush border-0">
+                        {% for emp in on_duty_employees %}
+                        <li class="list-group-item d-flex align-items-center justify-content-between border-0">
+                            <div>
+                                <i class="fas fa-circle text-success me-2" style="font-size: 0.45rem; vertical-align: middle;"></i>
+                                {{ emp.user.get_full_name }}
+                            </div>
+                            <span class="text-muted small" style="font-size: 0.7rem;">{{ emp.position }}</span>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-muted text-center py-4 border-0">
+                            <i class="fas fa-info-circle me-1"></i>No staff currently active
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Missing Shifts / Unregistered -->
+        <div class="col-lg-4">
+            <div class="modern-card">
+                <div class="list-card-header absent">
+                    <i class="fas fa-user-slash me-2"></i>Absent / Not Marked Today
+                </div>
+                <div class="card-body p-0" style="max-height: 350px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush border-0">
+                        {% for emp in not_marked_employees %}
+                        <li class="list-group-item d-flex align-items-center justify-content-between border-0">
+                            <div>
+                                <i class="fas fa-circle text-danger me-2" style="font-size: 0.45rem; vertical-align: middle;"></i>
+                                {{ emp.user.get_full_name }}
+                            </div>
+                            <span class="text-muted small" style="font-size: 0.7rem;">{{ emp.department.get_name_display|default:emp.position }}</span>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-muted text-center py-4 border-0">
+                            <i class="fas fa-check-circle me-1"></i>All active staff checked-in
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Late Check-ins -->
+        <div class="col-lg-4">
+            <div class="modern-card">
+                <div class="list-card-header late">
+                    <i class="fas fa-running me-2"></i>Late Arrivals Today
+                </div>
+                <div class="card-body p-0" style="max-height: 350px; overflow-y: auto;">
+                    <ul class="list-group list-group-flush border-0">
+                        {% for emp in late_employees %}
+                        <li class="list-group-item d-flex align-items-center justify-content-between border-0">
+                            <div>
+                                <i class="fas fa-circle text-warning me-2" style="font-size: 0.45rem; vertical-align: middle;"></i>
+                                {{ emp.user.get_full_name }}
+                            </div>
+                            <span class="text-muted small font-monospace" style="font-size: 0.7rem;">Punched late</span>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-muted text-center py-4 border-0">
+                            <i class="fas fa-smile me-1"></i>No late arrivals registered
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- 📦 HIDDEN CONTAINERS FOR EMPLOYEE MODAL LISTS (Django-generated) -->
+<div id="hidden-employee-lists" style="display: none;">
+    
+    <!-- KPI Lists -->
+    <div id="list-total-staff">
+        {% for emp in employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.department.get_name_display|default:"Unassigned" }} | {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-info-circle me-1"></i>No active staff records found.</p>
+        {% endfor %}
+    </div>
+
+    <div id="list-present-today">
+        {% for emp in present_details %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-success-subtle text-success border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.department.get_name_display|default:"Unassigned" }} | {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-info-circle me-1"></i>No employees registered present today.</p>
+        {% endfor %}
+    </div>
+
+    <div id="list-on-duty">
+        {% for emp in on_duty_employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-info-subtle text-info border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.department.get_name_display|default:"Unassigned" }} | {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-info-circle me-1"></i>No employees currently active on duty.</p>
+        {% endfor %}
+    </div>
+
+    <div id="list-absent">
+        {% for emp in not_marked_employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-danger-subtle text-danger border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.department.get_name_display|default:"Unassigned" }} | {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-check-circle me-1"></i>All active employees have punched-in.</p>
+        {% endfor %}
+    </div>
+
+    <div id="list-late-arrivals">
+        {% for emp in late_employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-warning-subtle text-warning border px-2 py-1" style="font-size: 0.7rem;">
+                Late Punch
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-smile me-1"></i>No late arrivals registered today.</p>
+        {% endfor %}
+    </div>
+
+    <!-- Department Rosters (Generated Dynamically via Loop counters) -->
+    {% for stat in department_stats %}
+    <div id="list-dept-managed-{{ forloop.counter }}">
+        {% for emp in stat.managed_employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-info-circle me-1"></i>No active staff assigned to this department.</p>
+        {% endfor %}
+    </div>
+
+    <div id="list-dept-present-{{ forloop.counter }}">
+        {% for emp in stat.present_employees %}
+        <div class="d-flex justify-content-between align-items-center py-2.5 border-bottom">
+            <div>
+                <strong class="text-dark d-block" style="font-size: 0.9rem;">{{ emp.user.get_full_name }}</strong>
+                <span class="text-muted small" style="font-size: 0.75rem;">{{ emp.employee_id }}</span>
+            </div>
+            <span class="badge bg-success-subtle text-success border px-2 py-1" style="font-size: 0.7rem;">
+                {{ emp.position }}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center py-4"><i class="fas fa-info-circle me-1"></i>No staff present today from this department.</p>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+</div>
+
+<!-- 📦 THE INTERACTIVE STATS DETAILS MODAL -->
+<div class="modal fade" id="statsDetailModal" tabindex="-1" aria-labelledby="statsDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+            <div class="modal-header border-bottom bg-light py-3">
+                <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="statsDetailModalLabel" style="font-size: 1.05rem;">
+                    <i class="fas fa-list-ul text-primary"></i>
+                    <span>Staff Record Details</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" style="max-height: 400px; min-height: 120px;">
+                <div id="modal-employee-container" style="max-height: 100%;">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" style="font-size: 0.8rem; font-weight: 500;" data-bs-dismiss="modal">Close Window</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- 1. REUSABLE STATS MODAL INTEGRATION ---
+        const clickableStats = document.querySelectorAll('[data-list-id]');
+        const modalElement = document.getElementById('statsDetailModal');
+        
+        if (clickableStats.length > 0 && modalElement) {
+            const statsModal = new bootstrap.Modal(modalElement);
+            const modalTitle = document.getElementById('statsDetailModalLabel').querySelector('span');
+            const container = document.getElementById('modal-employee-container');
+            
+            clickableStats.forEach(elem => {
+                elem.addEventListener('click', function() {
+                    const listId = this.getAttribute('data-list-id');
+                    const titleText = this.getAttribute('data-title') || 'Staff Records';
+                    
+                    const sourceList = document.getElementById(listId);
+                    if (sourceList) {
+                        modalTitle.textContent = titleText;
+                        container.innerHTML = sourceList.innerHTML;
+                        statsModal.show();
+                    }
+                });
+            });
+        }
+
+        // --- 2. ATTENDANCE TREND LINE CHART ---
+        const labels = {{ attendance_labels_json|safe|default:"[]" }};
+        const values = {{ attendance_values_json|safe|default:"[]" }};
+
+        const ctx = document.getElementById("attendanceChart").getContext("2d");
+        
+        const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+        gradient.addColorStop(0, "rgba(59, 130, 246, 0.15)");
+        gradient.addColorStop(0.5, "rgba(59, 130, 246, 0.05)");
+        gradient.addColorStop(1, "rgba(59, 130, 246, 0.0)");
+
+        new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Staff Present",
+                    data: values,
+                    tension: 0.35,
+                    fill: true,
+                    backgroundColor: gradient,
+                    borderColor: "#3b82f6",
+                    borderWidth: 2,
+                    pointBackgroundColor: "#3b82f6",
+                    pointBorderColor: "#ffffff",
+                    pointBorderWidth: 1.5,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    pointHoverBackgroundColor: "#1d4ed8",
+                    pointHoverBorderColor: "#ffffff",
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: "rgba(30, 41, 59, 0.95)",
+                        titleFont: { size: 12, weight: "600" },
+                        bodyFont: { size: 11 },
+                        padding: 10,
+                        cornerRadius: 8,
+                        displayColors: false,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: "rgba(0, 0, 0, 0.03)",
+                            drawBorder: false,
+                        },
+                        ticks: {
+                            font: { size: 11 },
+                            color: "#64748b",
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false,
+                        },
+                        ticks: {
+                            font: { size: 10 },
+                            color: "#64748b",
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: "index",
+                }
+            }
+        });
+    });
+</script>
+
+{% endblock %}

@@ -1,0 +1,1 @@
+{% extends "base.html" %}{% block content %}<main class="container py-5"><h2>{{ title }}</h2><p>Review this change before confirming.</p><form method="post">{% csrf_token %}<button class="btn btn-danger" type="submit">{{ confirm_label }}</button><a class="btn btn-secondary" href="{% url 'leave_application_list' %}">Cancel</a></form></main>{% endblock %}

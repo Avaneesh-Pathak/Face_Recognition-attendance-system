@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Attendance · {{ employee.user.get_full_name }}{% endblock %}
+{% block page_title %}Attendance{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/attendance-calendar.css' %}">
+<section class="attendance-calendar" id="attendanceCalendar" data-employee="{{ employee.pk }}">
+  <header class="ac-heading">
+    <div><div class="ac-eyebrow"><span></span> YOUR WORKDAY, AT A GLANCE</div><h1>Attendance overview<span>.</span></h1><p>A clear view of every check-in, every shift, and every hour.</p></div>
+    <div class="ac-person">
+      <span class="ac-avatar" aria-hidden="true">{{ employee.user.first_name|first|default:employee.user.username|first|upper }}{{ employee.user.last_name|first|upper }}</span>
+      <div class="ac-person-select"><label for="calendarEmployee">Employee <span>{{ employee.employee_id }}</span></label>
+        <select id="calendarEmployee" data-url="{% url 'attendance_calendar' 999999 year month %}">{% for emp in all_employees %}<option value="{{ emp.pk }}" {% if emp.pk == employee.pk %}selected{% endif %}>{{ emp.user.get_full_name|default:emp.user.username }}</option>{% endfor %}</select>
+      </div>
+    </div>
+  </header>
+
+  <div class="ac-metrics" aria-label="Monthly attendance summary">
+    <div class="ac-metric metric-present"><span class="metric-icon" aria-hidden="true"><i class="fa-solid fa-check"></i></span><div><span class="metric-label">Present days</span><strong>{{ totals.present }}<small>days</small></strong></div><span class="metric-note">Full shifts completed</span></div>
+    <div class="ac-metric metric-half"><span class="metric-icon" aria-hidden="true"><i class="fa-solid fa-circle-half-stroke"></i></span><div><span class="metric-label">Half days</span><strong>{{ totals.half }}<small>days</small></strong></div><span class="metric-note">Partial shifts completed</span></div>
+    <div class="ac-metric metric-absent"><span class="metric-icon" aria-hidden="true"><i class="fa-solid fa-calendar-xmark"></i></span><div><span class="metric-label">Absent days</span><strong>{{ totals.absent }}<small>days</small></strong></div><span class="metric-note">Below required hours</span></div>
+    <div class="ac-metric metric-pending"><span class="metric-icon" aria-hidden="true"><i class="fa-regular fa-clock"></i></span><div><span class="metric-label">Needs attention</span><strong>{{ totals.pending }}<small>days</small></strong></div><span class="metric-note">Checkout or review needed</span></div>
+    <div class="ac-metric metric-hours"><span class="metric-icon" aria-hidden="true"><i class="fa-solid fa-business-time"></i></span><div><span class="metric-label">Working hours</span><strong>{{ total_working_hours|floatformat:2 }}<small>hrs</small></strong></div><span class="metric-note">Completed sessions only</span></div>
+  </div>
+
+  <div class="ac-calendar-panel">
+    <div class="ac-calendar-toolbar">
+      <div class="ac-month-group">
+        <div class="ac-month-icon" aria-hidden="true"><i class="fa-regular fa-calendar"></i></div>
+        <div><h2>{{ month_name }} <span>{{ year }}</span></h2><p>{{ employee.organisation.name }}</p></div>
+      </div>
+      <div class="ac-tools">
+        <div class="ac-view-switch" role="group" aria-label="Calendar view"><button type="button" id="monthViewButton" class="is-active" aria-pressed="true" aria-controls="monthView"><i class="fa-solid fa-table-cells" aria-hidden="true"></i> Month</button><button type="button" id="listViewButton" aria-pressed="false" aria-controls="listView"><i class="fa-solid fa-list" aria-hidden="true"></i> List</button></div>
+        <div class="ac-date-controls">
+          <a class="ac-today" href="{% url 'attendance_calendar' employee.id today_year today_month %}">This month</a>
+          <div class="ac-month-picker"><label for="monthPicker" class="visually-hidden">Jump to month</label><input id="monthPicker" type="month" min="2000-01" max="2100-12" value="{{ year }}-{{ month|stringformat:'02d' }}" aria-label="Jump to month"></div>
+          <nav class="ac-arrows" aria-label="Month navigation"><a aria-label="Previous month" href="{% url 'attendance_calendar' employee.id previous_year previous_month %}"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></a><a aria-label="Next month" href="{% url 'attendance_calendar' employee.id next_year next_month %}"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a></nav>
+        </div>
+      </div>
+    </div>
+    <div class="ac-legend" aria-label="Attendance status legend"><span><i class="legend-dot dot-present"></i>Present</span><span><i class="legend-dot dot-half"></i>Half day</span><span><i class="legend-dot dot-absent"></i>Absent</span><span><i class="legend-dot dot-pending"></i>Needs attention</span><span><i class="legend-dot dot-leave"></i>Leave / holiday</span><span><i class="legend-dot dot-rest"></i>Rest day</span><small>Tap a day to see all records <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></small></div>
+
+    {% if can_edit_attendance %}<div class="ac-calendar-editbar"><label for="addAttendanceDate">Add record for</label><input type="date" id="addAttendanceDate" class="form-control" value="{{ today_date }}" min="{{ employee.date_of_joining|date:'Y-m-d' }}" max="{{ today_date }}"><button type="button" id="calendarAddRecord" class="ac-primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add attendance</button></div>{% endif %}
+
+    <div id="monthView" role="region" aria-label="Monthly attendance">
+      <div class="ac-grid">
+        {% for name in day_names %}<div class="ac-weekday">{{ name }}</div>{% endfor %}
+        {% for blank in padding %}<div class="ac-empty" aria-hidden="true"></div>{% endfor %}
+        {% for day in data %}
+        <button type="button" class="ac-day status-{{ day.status }} {% if day.is_today %}is-today{% endif %}" data-date="{{ day.date|date:'Y-m-d' }}" {% if day.is_future or day.status == 'not_employed' %}disabled{% endif %} aria-label="{{ day.date|date:'j F Y' }}, {{ day.label }}, {{ day.hours_display }} hours">
+          <span class="ac-day-top"><span class="ac-day-number">{{ day.day }}</span>{% if day.is_today %}<span class="ac-today-label">TODAY</span>{% endif %}<span class="ac-day-dot" aria-hidden="true"></span></span>
+          <span class="ac-status">{{ day.label }}</span>
+          <span class="ac-short-status" aria-hidden="true">{% if day.status == 'present' %}Present{% elif day.status == 'half' %}½ day{% elif day.status == 'absent' %}Absent{% elif day.status == 'pending' %}Review{% elif day.status == 'paid_leave' or day.status == 'unpaid_leave' %}Leave{% elif day.status == 'holiday' %}Holiday{% elif day.status == 'rest' %}Rest{% elif day.status == 'awaiting' %}—{% endif %}</span>
+          {% if day.check_in or day.check_out %}<span class="ac-day-times"><span><small>IN</small><b>{{ day.check_in|date:'H:i'|default:'—' }}</b></span><span><small>OUT</small><b>{{ day.check_out|date:'H:i'|default:'—' }}</b></span></span>{% else %}<span class="ac-day-placeholder">{% if day.is_future %}Upcoming{% elif day.status == 'rest' %}Take a well-earned break{% elif day.status == 'awaiting' %}Your day starts here{% elif day.status == 'absent' %}No completed shift{% else %}No attendance records{% endif %}</span>{% endif %}
+          <span class="ac-day-footer">{% if day.hours %}<span class="ac-day-hours"><i class="fa-regular fa-clock" aria-hidden="true"></i> {{ day.hours_display }}<small>h</small></span>{% elif day.pending %}<span class="ac-pending-note">Review records <span aria-hidden="true">↗</span></span>{% endif %}</span>
+        </button>{% endfor %}
+      </div>
+    </div>
+
+    <div id="listView" class="ac-agenda" hidden role="region" aria-label="Attendance list">
+      <div class="ac-agenda-head"><span>Date</span><span>Status</span><span>Check in</span><span>Check out</span><span>Hours</span><span></span></div>
+      {% for day in data %}<button type="button" class="ac-agenda-row status-{{ day.status }} {% if day.is_today %}is-today{% endif %}" data-date="{{ day.date|date:'Y-m-d' }}" {% if day.is_future or day.status == 'not_employed' %}disabled{% endif %} aria-label="{{ day.date|date:'j F Y' }}, {{ day.label }}, {{ day.hours_display }} hours">
+        <span class="agenda-date"><b>{{ day.day|stringformat:'02d' }}</b><span>{{ day.date|date:'D' }}<small>{{ day.date|date:'M' }}{% if day.is_today %} · Today{% endif %}</small></span></span><span class="ac-status">{{ day.label }}</span><span class="agenda-time"><small>IN</small>{{ day.check_in|date:'H:i'|default:'—' }}</span><span class="agenda-time"><small>OUT</small>{{ day.check_out|date:'H:i'|default:'—' }}</span><span class="agenda-hours">{{ day.hours_display }}<small>h</small></span><span class="agenda-chevron" aria-hidden="true">↗</span>
+      </button>{% endfor %}
+    </div>
+    <div class="ac-calendar-footer"><span><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Based on recorded attendance</span><span>Times shown in {{ display_timezone }} <span class="footer-dot">·</span> {{ total_days }} days this month</span></div>
+  </div>
+  <details class="ac-explainer"><summary><i class="fa-regular fa-circle-question" aria-hidden="true"></i> How are attendance and hours calculated? <span aria-hidden="true">+</span></summary><p>Working hours include completed check-in/out sessions only. Overnight shifts belong to the check-in work date. Present requires 90% of the assigned full-day hours; half days follow the employee’s work rule. Pending or inconsistent records need review before payroll.</p></details>
+
+  <dialog id="calendarDetail" class="ac-dialog" aria-labelledby="detailTitle">
+    <div class="ac-dialog-heading"><div><span class="ac-eyebrow">DAILY ATTENDANCE</span><h2 id="detailTitle">Attendance details</h2></div><button type="button" class="ac-close" id="closeDetail" aria-label="Close attendance details">×</button></div>
+    <p id="detailSummary" class="ac-detail-summary" role="status" aria-live="polite"></p>
+    <div class="ac-records-wrap"><table class="ac-records"><thead><tr><th>Event</th><th>Date & time</th><th>Location</th><th>Reason</th><th>Actions</th></tr></thead><tbody id="detailLogs"></tbody></table></div>
+    {% if can_edit_attendance %}
+    <button type="button" id="addRecord" class="ac-primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Add attendance record</button>
+    <form id="correctionForm" class="ac-correction" hidden>{% csrf_token %}<input type="hidden" id="recordId"><h3>Attendance correction</h3><p>Changes are saved with your name and reason in audit history. Related paid payroll remains unchanged.</p>
+      <div class="row g-3">
+        <div class="col-sm-6"><label for="recordType" class="form-label">Event</label><select id="recordType" class="form-select" required><option value="check_in">Check In</option><option value="check_out">Check Out</option></select></div>
+        <div class="col-sm-6"><label for="recordTime" class="form-label">Date & time</label><input type="datetime-local" id="recordTime" class="form-control" required></div>
+        <div class="col-12"><label for="recordLocation" class="form-label">Location</label><input id="recordLocation" class="form-control" maxlength="100" placeholder="Office or work location"></div>
+        <div class="col-12"><label for="recordReason" class="form-label">Correction reason</label><textarea id="recordReason" class="form-control" required minlength="5" maxlength="1000" placeholder="Explain what needs correcting…" rows="3"></textarea></div>
+      </div><div class="ac-form-actions"><button type="button" id="cancelCorrection" class="ac-secondary">Cancel</button><button type="submit" class="ac-primary">Save correction</button></div>
+    </form>{% endif %}
+    <p id="correctionError" class="text-danger mt-3" role="alert"></p>
+  </dialog>
+</section>
+<script src="{% static 'js/attendance-calendar.js' %}" defer></script>
+{% endblock %}

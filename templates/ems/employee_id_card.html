@@ -1,0 +1,257 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: Helvetica, Arial, sans-serif;
+        background: #ffffff;
+    }
+
+    /* Vertical ID Card */
+    @page {
+        size: 54mm 85.6mm;
+        margin: 0;
+    }
+
+    .card {
+        width: 54mm;
+        height: 85.6mm;
+        position: relative;
+        background: #ffffff;
+        overflow: hidden;
+        border: 1px solid #cfd8dc;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Optional: adds a slight shadow to the card for web viewing */
+    }
+
+    /* -----------------------------
+       STYLISH ANIMATION (Blue Flowing Line)
+    ----------------------------- */
+    .flowing-line {
+        position: absolute;
+        top: -10px;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: #00e5ff; /* Bright cyan/blue core */
+        /* Creates a glowing blue trail effect */
+        box-shadow: 0 0 10px 2px #0b4ea2, 0 10px 20px 4px rgba(11, 78, 162, 0.5);
+        z-index: 100;
+        pointer-events: none; /* Ensures the line doesn't block text selection */
+        animation: scanFlow 3.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes scanFlow {
+        0% {
+            top: -20px;
+            opacity: 0;
+        }
+        10% {
+            opacity: 1;
+        }
+        90% {
+            opacity: 1;
+        }
+        100% {
+            top: 100%;
+            opacity: 0;
+        }
+    }
+
+    /* Hide animation when physically printing the ID Card */
+    @media print {
+        .flowing-line {
+            display: none !important;
+        }
+        .card {
+            box-shadow: none;
+            border: none;
+        }
+    }
+
+    /* Header */
+    .header {
+        height: 11mm;
+        background: #082c58; /* hospital blue */
+        text-align: center;
+    }
+
+    .header img {
+        height: 10mm;
+        margin-top: 0.5mm;
+    }
+
+    /* Thin red accent like original card */
+    .accent-bar {
+        height: 1mm;
+        background: #e53935;
+    }
+
+    /* Photo */
+    .photo-wrapper {
+        width: 22mm;
+        height: 22mm;
+        margin: 4mm auto 2mm auto;
+        border: 2px solid #0b4ea2;
+        background: #ffffff;
+        position: relative;
+        z-index: 10;
+    }
+
+    .photo-wrapper img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    /* Name & Role */
+    .name {
+        text-align: center;
+        font-size: 9pt;
+        font-weight: bold;
+        color: #000;
+        margin-top: 1mm;
+    }
+
+    .role {
+        text-align: center;
+        font-size: 6.5pt;
+        font-weight: bold;
+        color: #0b4ea2;
+        text-transform: uppercase;
+        margin-bottom: 2mm;
+    }
+
+    /* Details */
+    table {
+        width: 92%;
+        margin: auto;
+        border-collapse: collapse;
+    }
+
+    td {
+        font-size: 6.8pt;
+        padding: 1.2mm 0;
+        border-bottom: 0.5px solid #e0e0e0;
+    }
+
+    .label {
+        width: 18mm;
+        font-weight: bold;
+        color: #000;
+    }
+
+    /* Footer like original ID */
+    .footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 12mm;
+        background: #082c58;
+        color: #ffffff;
+        text-align: center;
+        font-size: 5.8pt;
+        line-height: 1.3;
+        padding-top: 1.5mm;
+        box-sizing: border-box;
+    }
+
+    .footer span {
+        display: block;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="card">
+    
+    <!-- ANIMATED FLOWING LINE -->
+    <div class="flowing-line"></div>
+
+    <!-- HEADER -->
+<div class="header">
+
+    {% if organisation.logo %}
+        <img class="hospital-logo" src="{{ organisation.logo.url }}" alt="{{ organisation.name }}">
+    {% else %}
+        <img class="hospital-logo" src="{% static 'logo/logo.webp' %}" alt="Hospital">
+    {% endif %}
+
+    <!-- <div class="hospital-name">
+        {{ organisation.name }}
+    </div> -->
+
+</div>
+
+<div class="accent-bar"></div>
+    <div class="accent-bar"></div>
+
+    <!-- PHOTO -->
+    <div class="photo-wrapper">
+        {% if employee.face_image %}
+            <img src="{{ employee.face_image.url }}">
+        {% else %}
+            <img src="/static/logo/logo.webp employee.user.get_full_name|urlencode }}&background=0b4ea2&color=fff">
+        {% endif %}
+    </div>
+
+    <!-- NAME & ROLE -->
+    <div class="name">{{ employee.user.get_full_name }}</div>
+    <div class="role">{{ employee.role }}</div>
+
+    <!-- DETAILS -->
+    <table>
+        <tr>
+            <td class="label">Emp Code</td>
+            <td>{{ employee.employee_id }}</td>
+        </tr>
+        <tr>
+            <td class="label">Department</td>
+            <td>{{ employee.department.name }}</td>
+        </tr>
+        <tr>
+            <td class="label">Contact</td>
+            <td>{{ employee.phone_number }}</td>
+        </tr>
+        <tr>
+            <td class="label">Shift</td>
+            <td>{{ employee.work_rule }}</td>
+        </tr>
+    </table>
+
+<div class="footer">
+
+    {% if organisation.address %}
+    <span>{{ organisation.address }}</span>
+    {% endif %}
+
+    {% if organisation.city %}
+    <span>
+        {{ organisation.city }}
+        {% if organisation.pincode %}
+            - {{ organisation.pincode }}
+        {% endif %}
+    </span>
+    {% endif %}
+
+    {% if organisation.phone %}
+    <span>
+        Call : {{ organisation.phone }}
+        {% if organisation.alternate_phone %}
+            • {{ organisation.alternate_phone }}
+        {% endif %}
+    </span>
+    {% endif %}
+
+</div>
+
+</div>
+
+</body>
+</html>

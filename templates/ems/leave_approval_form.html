@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">{{ title }}</h5>
+            </div>
+            <div class="card-body">
+                <!-- Leave Application Details -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h6 class="card-title mb-0">Leave Application Details</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Employee:</strong> {{ leave_app.employee.user.get_full_name }}</p>
+                                <p><strong>Leave Type:</strong> {{ leave_app.leave_type.name }}</p>
+                                <p><strong>Start Date:</strong> {{ leave_app.start_date|date:"M d, Y" }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>End Date:</strong> {{ leave_app.end_date|date:"M d, Y" }}</p>
+                                <p><strong>Total Days:</strong> {{ leave_app.total_days }}</p>
+                                <p><strong>Applied On:</strong> {{ leave_app.applied_on|date:"M d, Y H:i" }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <p><strong>Reason:</strong></p>
+                            <p class="border p-3 rounded">{{ leave_app.reason }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Approval Form -->
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    {% for field in form %}
+                    <div class="mb-3">
+                        <label for="{{ field.id_for_label }}" class="form-label">
+                            {{ field.label }}
+                            {% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                        </label>
+                        {{ field }}
+                        {% if field.help_text %}
+                        <div class="form-text">{{ field.help_text }}</div>
+                        {% endif %}
+                        {% for error in field.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'leave_application_list' %}" class="btn btn-secondary">Cancel</a>
+                        <div>
+                            <button type="submit" name="status" value="rejected" class="btn btn-danger me-2">
+                                <i class="fas fa-times"></i> Reject
+                            </button>
+                            <button type="submit" name="status" value="approved" class="btn btn-success">
+                                <i class="fas fa-check"></i> Approve
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const inputs = document.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            input.classList.add('form-control');
+        });
+
+        // Auto-fill remarks based on status
+        const statusField = document.querySelector('#id_status');
+        const remarksField = document.querySelector('#id_remarks');
+
+        statusField.addEventListener('change', function() {
+            if (this.value === 'approved' && !remarksField.value) {
+                remarksField.value = 'Leave application approved.';
+            } else if (this.value === 'rejected' && !remarksField.value) {
+                remarksField.value = 'Leave application rejected.';
+            }
+        });
+    });
+</script>
+{% endblock %}

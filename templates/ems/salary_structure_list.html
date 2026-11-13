@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Salary Structures{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="bg-primary-soft p-3 rounded-circle me-3">
+                    <i class="fas fa-users text-primary fa-lg"></i>
+                </div>
+                <div>
+                    <h6 class="text-muted mb-1 text-uppercase small fw-bold">Total Employees</h6>
+                    <h3 class="mb-0 fw-bold">{{ structures.count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Add more real stats if available in context, for now placeholders or removed if not accurate -->
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fw-bold text-dark">Salary Structures</h5>
+        {% if user.is_staff %}
+        <a href="{% url 'salary_structure_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Add Structure
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        {% if structures %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4">Employee</th>
+                        <th>Basic Salary</th>
+                        <th>HRA</th>
+                        <th>Allowances</th>
+                        <th>Deductions</th>
+                        <th>Total Salary</th>
+                        <th>Effective From</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for structure in structures %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-initials bg-primary-soft text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
+                                    style="width: 40px; height: 40px;">
+                                    {{ structure.employee.user.first_name|first }}
+                                </div>
+                                <div>
+                                    <h6 class="mb-0 fw-bold small">{{ structure.employee.user.get_full_name }}</h6>
+                                    <small class="text-muted">{{ structure.employee.employee_id }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>₹{{ structure.base_salary }}</td>
+                        <td>₹{{ structure.hra }}</td>
+                        <td>₹{{ structure.allowances }}</td>
+                        <td class="text-danger">-₹{{ structure.deductions }}</td>
+                        <td><span class="badge bg-success-soft text-success fw-bold fs-6">₹{{ structure.total_salary}}</span></td>
+                        <td>{{ structure.effective_from|date:"M d, Y" }}</td>
+                        <td class="text-end pe-4">
+                            {% if user.is_staff %}
+                            <div class="btn-group">
+                                <button class="btn btn-icon" data-bs-toggle="modal"
+                                    data-bs-target="#detailsModal{{ structure.id }}" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <a href="#" class="btn btn-icon" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <!-- Details Modal -->
+                    <div class="modal fade" id="detailsModal{{ structure.id }}" tabindex="-1">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow">
+                                <div class="modal-header border-bottom-0 pb-0">
+                                    <h5 class="modal-title fw-bold">Salary Breakdown</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body pt-4">
+                                    <div class="text-center mb-4">
+                                        <div class="avatar-initials bg-primary-soft text-primary rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center"
+                                            style="width: 64px; height: 64px; font-size: 1.5rem;">
+                                            {{ structure.employee.user.first_name|first }}
+                                        </div>
+                                        <h5 class="fw-bold">{{ structure.employee.user.get_full_name }}</h5>
+                                        <p class="text-muted small">Effective: {{ structure.effective_from|date:"M d, Y"}}</p>
+                                    </div>
+
+                                    <div class="card bg-light border-0 p-3 mb-3">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted">Basic Salary</span>
+                                            <span class="fw-bold">₹{{ structure.base_salary }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted">HRA</span>
+                                            <span class="fw-bold">₹{{ structure.hra }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <span class="text-muted">Allowances</span>
+                                            <span class="fw-bold">₹{{ structure.allowances }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between border-top pt-2 mt-2">
+                                            <span class="text-danger">Deductions</span>
+                                            <span class="text-danger fw-bold">-₹{{ structure.deductions }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        class="d-flex justify-content-between align-items-center p-3 bg-primary-soft rounded">
+                                        <span class="text-primary fw-bold text-uppercase small">Total Monthly
+                                            Salary</span>
+                                        <span class="text-primary fw-bold fs-5">₹{{ structure.total_salary }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-file-invoice-dollar"></i>
+            <h6>No Salary Structures</h6>
+            <p class="small">Define salary structures for your employees.</p>
+            {% if user.is_staff %}
+            <a href="{% url 'salary_structure_create' %}" class="btn btn-primary mt-3">
+                <i class="fas fa-plus me-2"></i>Create Structure
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+
+{% block page_title %}Resignation Management{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- My Resignations -->
+    <div class="col-lg-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-user-minus me-2 text-danger"></i>My Resignations
+                </h5>
+                <a href="{% url 'resignation_create' %}" class="btn btn-danger">
+                    <i class="fas fa-plus me-2"></i>Submit Resignation
+                </a>
+            </div>
+            <div class="card-body p-0">
+                {% if my_resignations %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Submitted On</th>
+                                <th>Last Working Day</th>
+                                <th>Reason</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for resignation in my_resignations %}
+                            <tr>
+                                <td class="ps-4">{{ resignation.resignation_date|date:"M d, Y" }}</td>
+                                <td>{{ resignation.last_working_day|date:"M d, Y" }}</td>
+                                <td>
+                                    <span class="text-muted small">{{ resignation.reason|truncatewords:5 }}</span>
+                                </td>
+                                <td>
+                                    <span
+                                        class="badge {% if resignation.approval_status == 'approved' %}bg-success-soft text-success{% elif resignation.approval_status == 'rejected' %}bg-danger-soft text-danger{% else %}bg-warning-soft text-warning{% endif %}">
+                                        {{ resignation.approval_status|title }}
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-icon" data-bs-toggle="modal"
+                                        data-bs-target="#reasonModal{{ resignation.id }}" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <!-- Reason Modal -->
+                            <div class="modal fade" id="reasonModal{{ resignation.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content border-0 shadow">
+                                        <div class="modal-header border-bottom-0 pb-0">
+                                            <h5 class="modal-title fw-bold">Resignation Details</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body pt-4">
+                                            <div class="mb-3">
+                                                <label class="small text-muted fw-bold text-uppercase">Reason</label>
+                                                <p class="bg-light p-3 rounded">{{ resignation.reason }}</p>
+                                            </div>
+                                            {% if resignation.approved_by %}
+                                            <div class="d-flex align-items-center mt-3">
+                                                <div class="avatar-initials bg-success-soft text-success rounded-circle me-2 d-flex align-items-center justify-content-center"
+                                                    style="width: 32px; height: 32px;">
+                                                    {{ resignation.approved_by.user.first_name|first }}
+                                                </div>
+                                                <div>
+                                                    <small class="text-muted d-block">Reviewed By</small>
+                                                    <span class="fw-bold">{{ resignation.approved_by.user.get_full_name
+                                                        }}</span>
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-file-alt"></i>
+                    <h6>No Resignations</h6>
+                    <p class="small">You have not submitted any resignation requests.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Approvals (for managers) -->
+    {% if user.is_staff or pending_resignations %}
+    <div class="col-lg-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3">
+                <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-tasks me-2 text-warning"></i>Pending Approvals</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if pending_resignations %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Employee</th>
+                                <th>Submitted On</th>
+                                <th>Last Working Day</th>
+                                <th class="text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for resignation in pending_resignations %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-initials bg-primary-soft text-primary rounded-circle me-3 d-flex align-items-center justify-content-center"
+                                            style="width: 40px; height: 40px;">
+                                            {{ resignation.employee.user.first_name|first }}
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-0 fw-bold small">{{ resignation.employee.user.get_full_name }}
+                                            </h6>
+                                            <small class="text-muted">{{ resignation.employee.department.name }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ resignation.resignation_date|date:"M d, Y" }}</td>
+                                <td>{{ resignation.last_working_day|date:"M d, Y" }}</td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm btn-outline-primary me-2" data-bs-toggle="modal"
+                                        data-bs-target="#viewModal{{ resignation.id }}">
+                                        Review
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <!-- View Modal -->
+                            <div class="modal fade" id="viewModal{{ resignation.id }}" tabindex="-1">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content border-0 shadow">
+                                        <div class="modal-header border-bottom-0 pb-0">
+                                            <h5 class="modal-title fw-bold">Review Resignation</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body pt-4">
+                                            <div class="text-center mb-4">
+                                                <div class="avatar-initials bg-primary-soft text-primary rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center"
+                                                    style="width: 64px; height: 64px; font-size: 1.5rem;">
+                                                    {{ resignation.employee.user.first_name|first }}
+                                                </div>
+                                                <h5 class="fw-bold">{{ resignation.employee.user.get_full_name }}</h5>
+                                                <p class="text-muted small">{{ resignation.employee.position }}</p>
+                                            </div>
+
+                                            <div class="row g-3 mb-3">
+                                                <div class="col-6">
+                                                    <div class="p-3 bg-light rounded text-center">
+                                                        <small class="text-muted d-block text-uppercase fw-bold"
+                                                            style="font-size: 0.7rem;">Last Working Day</small>
+                                                        <span class="fw-bold text-danger">{{
+                                                            resignation.last_working_day|date:"M d, Y" }}</span>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6">
+                                                    <div class="p-3 bg-light rounded text-center">
+                                                        <small class="text-muted d-block text-uppercase fw-bold"
+                                                            style="font-size: 0.7rem;">Submitted On</small>
+                                                        <span class="fw-bold">{{ resignation.resignation_date|date:"M d,
+                                                            Y" }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-4">
+                                                <label class="small text-muted fw-bold text-uppercase">Reason</label>
+                                                <p class="bg-light p-3 rounded">{{ resignation.reason }}</p>
+                                            </div>
+
+                                            <form method="post" action="{% url 'resignation_approve' resignation.pk %}"
+                                                class="d-grid gap-2">
+                                                {% csrf_token %}
+                                                <button type="submit" name="action" value="approved"
+                                                    class="btn btn-success">
+                                                    <i class="fas fa-check me-2"></i>Approve Resignation
+                                                </button>
+                                                <button type="submit" name="action" value="rejected"
+                                                    class="btn btn-outline-danger">
+                                                    <i class="fas fa-times me-2"></i>Reject Request
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-check-circle text-success"></i>
+                    <h6>All Caught Up</h6>
+                    <p class="small">No pending resignation requests to review.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
