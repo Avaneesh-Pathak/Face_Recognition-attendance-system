@@ -68,6 +68,35 @@
             box-sizing: border-box;
         }
 
+        html {
+            scrollbar-color: #91a5ad #edf1f3;
+            scrollbar-width: auto;
+        }
+
+        *::-webkit-scrollbar {
+            width: 14px;
+            height: 14px;
+        }
+
+        *::-webkit-scrollbar-track {
+            background: #edf1f3;
+        }
+
+        *::-webkit-scrollbar-thumb {
+            border: 3px solid #edf1f3;
+            border-radius: 999px;
+            background: #91a5ad;
+        }
+
+        *::-webkit-scrollbar-thumb:hover {
+            background: #607c86;
+        }
+
+        @media (forced-colors: active) {
+            html { scrollbar-color: auto; }
+            *::-webkit-scrollbar-thumb { border-color: Canvas; }
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 50%, #e8ecf1 100%);
@@ -428,21 +457,95 @@
             box-shadow: var(--shadow-md);
         }
 
-        .notification-dot {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 8px;
-            height: 8px;
-            background: #ef4444;
-            border-radius: 50%;
-            border: 2px solid white;
-            animation: pulse-dot 2s infinite;
+        .notification-btn:focus-visible {
+            outline: 3px solid #667eea;
+            outline-offset: 2px;
         }
 
-        @keyframes pulse-dot {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+        .notification-count {
+            position: absolute;
+            top: -5px;
+            right: -6px;
+            display: grid;
+            place-items: center;
+            min-width: 19px;
+            height: 19px;
+            padding: 0 4px;
+            border: 2px solid #fff;
+            border-radius: 999px;
+            background: #b9433c;
+            color: #fff;
+            font-size: 10px;
+            line-height: 1;
+            font-weight: 700;
+        }
+
+        .notification-menu {
+            width: min(360px, calc(100vw - 24px));
+            max-height: min(72vh, 520px);
+            padding: 0;
+            overflow-y: auto;
+            border: 1px solid #e3e8ef;
+            border-radius: 12px;
+        }
+
+        .notification-menu-item {
+            display: grid;
+            grid-template-columns: 34px minmax(0, 1fr) auto;
+            align-items: start;
+            gap: 10px;
+            padding: 13px 15px;
+            border-bottom: 1px solid #eef1f4;
+            color: #253348;
+            text-decoration: none;
+            white-space: normal;
+        }
+
+        .notification-menu-item:hover,
+        .notification-menu-item:focus-visible {
+            background: #f5f8fb;
+            color: #18283c;
+        }
+
+        .notification-menu-item:focus-visible {
+            outline: 3px solid #667eea;
+            outline-offset: -3px;
+        }
+
+        .notification-menu-item.is-unread {
+            background: #f0f5fc;
+        }
+
+        .notification-menu-icon {
+            display: grid;
+            place-items: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 9px;
+            background: #e9eff8;
+            color: #425b80;
+        }
+
+        .notification-menu-message {
+            display: block;
+            font-size: 12px;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .notification-menu-time {
+            display: block;
+            margin-top: 4px;
+            color: #748197;
+            font-size: 10px;
+        }
+
+        .notification-unread-label {
+            color: #375f9a;
+            font-size: 9px;
+            font-weight: 750;
+            letter-spacing: .04em;
+            text-transform: uppercase;
         }
 
         /* ============ USER PROFILE ============ */
@@ -812,20 +915,39 @@
             <div class="d-flex align-items-center gap-3">
                 <!-- Notifications -->
                 <div class="dropdown">
-                    <button class="notification-btn" data-bs-toggle="dropdown" title="Notifications">
+                    <button class="notification-btn" id="notificationMenuButton" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false"
+                        aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}">
                         <i class="fa-regular fa-bell"></i>
-                        <span class="notification-dot"></span>
+                        {% if unread_notification_count %}
+                        <span class="notification-count" aria-hidden="true">{% if unread_notification_count > 99 %}99+{% else %}{{ unread_notification_count }}{% endif %}</span>
+                        {% endif %}
                     </button>
-                    <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 p-3" style="width: 320px;">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="dropdown-menu dropdown-menu-end notification-menu shadow-lg mt-2" aria-labelledby="notificationMenuButton">
+                        <div class="d-flex justify-content-between align-items-center px-3 py-3 border-bottom">
                             <span class="fw-bold">Notifications</span>
-                            <span class="badge rounded-pill" style="background: var(--gradient-primary); color: white;">3 New</span>
+                            {% if unread_notification_count %}
+                            <span class="small text-muted">{{ unread_notification_count }} unread</span>
+                            {% endif %}
                         </div>
-                        <div class="text-center py-4">
-                            <i class="fa-regular fa-bell-slash fa-2x text-muted mb-2"></i>
-                            <p class="text-muted small mb-0">No new alerts today</p>
-                            <p class="text-muted small">We'll notify you when something arrives</p>
+                        {% for notification in recent_notifications %}
+                        <a class="notification-menu-item {% if not notification.is_read %}is-unread{% endif %}"
+                            href="{% url 'notification_open' notification.pk %}">
+                            <span class="notification-menu-icon" aria-hidden="true"><i class="fa-regular fa-bell"></i></span>
+                            <span>
+                                <span class="notification-menu-message">{{ notification.message }}</span>
+                                <span class="notification-menu-time">{{ notification.created_at|timesince }} ago</span>
+                            </span>
+                            {% if not notification.is_read %}<span class="notification-unread-label">Unread</span>{% endif %}
+                        </a>
+                        {% empty %}
+                        <div class="px-3 py-4 text-center">
+                            <i class="fa-regular fa-bell-slash text-muted mb-2" aria-hidden="true"></i>
+                            <p class="text-muted small mb-0">No notifications yet</p>
                         </div>
+                        {% endfor %}
+                        <a class="d-block px-3 py-3 text-center small fw-semibold border-top text-decoration-none"
+                            href="{% url 'notification_list' %}">View all notifications</a>
                     </div>
                 </div>
 
@@ -848,7 +970,7 @@
                         </li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
-                            <form method="post" action="{% url 'logout' %}" class="m-0">
+                            <form method="post" action="{% url 'logout' %}" class="m-0" novalidate>
                                 {% csrf_token %}
                                 <button type="submit"
                                         class="dropdown-item py-2 text-danger border-0 bg-transparent text-start w-100">

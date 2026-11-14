@@ -61,7 +61,7 @@ from io import BytesIO
 from django.core.exceptions import PermissionDenied
 from django.views.decorators.csrf import csrf_protect
 from django.db.utils import ProgrammingError, OperationalError
-from .models import (Employee, Attendance, AttendanceSettings, DailyReport,Department, SalaryStructure, Payroll, LeaveType, 
+from .models import (Employee, Attendance, AttendanceSettings, DailyReport,Department, SalaryStructure, Payroll, LeaveType,
     LeaveApplication, LeaveWorkflowStage, LeaveApproval,
     JoiningDetail, Resignation, Notification,JoiningDocument,WorkRule,OfficeLocation,Holiday)
 
@@ -77,7 +77,9 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from datetime import timedelta
+from .notifications import create_user_notification
 from decimal import Decimal, InvalidOperation
 import json
 
@@ -2283,411 +2285,10 @@ def office_location_delete(request, pk):
 
 
 # ============================================================
-# 🏢 ORGANISATION STRUCTURE VIEWS
+# Organisation structure views live in core.org_chart.
+# Preserve these import paths for existing callers.
 # ============================================================
-
-@login_required
-def org_chart_view(request, employee_id=None):
-
-    # Only active employees can be viewed
-    active_filter = {
-        "is_active": True,
-        "employment_status": "active"
-    }
-
-    # Use requested employee or logged-in employee
-    if employee_id:
-        employee = get_object_or_404(
-            Employee,
-            employee_id=employee_id,
-            **active_filter
-        )
-    else:
-        employee = request.user.employee
-
-        # If logged-in employee is inactive
-        if not (
-            employee.is_active and
-            employee.employment_status == "active"
-        ):
-            messages.error(
-                request,
-                "This employee is inactive."
-            )
-            return redirect("dashboard")
-
-    # Build reporting chain excluding inactive managers
-    reporting_chain = []
-
-    current = employee
-    while current:
-        if (
-            current.is_active and
-            current.employment_status == "active"
-        ):
-            reporting_chain.append(current)
-
-        current = current.manager
-
-    reporting_chain.reverse()
-
-    return render(
-        request,
-        "ems/org_chart.html",
-        {
-            "reporting_chain": reporting_chain
-        }
-    )
-
-
-# -------- Helpers --------
-def employee_to_dict(emp):
-    return {
-        "id": emp.id,
-        "name": emp.user.get_full_name(),
-        "department": emp.department.name if emp.department else "",
-        "position": emp.position,
-        "profile_url": f"/employees/{emp.id}/profile/",
-        "children": [],
-        "is_current": False,
-    }
-
-def build_path_to_root(emp):
-    path = []
-    while emp:
-        path.append(emp)
-        emp = emp.manager
-    return list(reversed(path))
-
-def build_subtree(emp, visited=None):
-    if visited is None:
-        visited = set()
-    if emp.id in visited:
-        return None
-    visited.add(emp.id)
-
-    node = employee_to_dict(emp)
-    for child in emp.subordinates.all():
-        sub = build_subtree(child, visited)
-        if sub:
-            node["children"].append(sub)
-    return node
-
-def collect_ids(node, ids):
-    if not node:
-        return
-    ids.add(node["id"])
-    for c in node.get("children", []):
-        collect_ids(c, ids)
-
-def filter_tree(nodes, allowed_ids):
-    result = []
-    for n in nodes:
-        if n["id"] in allowed_ids:
-            n["children"] = filter_tree(n["children"], allowed_ids)
-            result.append(n)
-    return result
-
-def mark_current_employee(tree, emp_id):
-    for n in tree:
-        if n["id"] == emp_id:
-            n["is_current"] = True
-        mark_current_employee(n.get("children", []), emp_id)
-
-def get_active_employees_queryset():
-    return Employee.objects.filter(
-        is_active=True,
-        employment_status="active"
-    )
-
-# -------- APIs --------
-@login_required
-def org_tree_api_me(request):
-    user = request.user
-
-    if not hasattr(user, "employee"):
-        return JsonResponse({
-            "ok": True,
-            "tree": [{
-                "id": f"user-{user.id}",
-                "name": user.get_full_name() or user.username,
-                "department": "—",
-                "position": "User",
-                "image": "",
-                "profile_url": "",
-                "children": [],
-                "is_current": True,
-            }]
-        })
-
-    current_emp = user.employee
-
-    # Inactive employees cannot appear in org chart
-    if not (
-        current_emp.is_active and
-        current_emp.employment_status == "active"
-    ):
-        return JsonResponse({
-            "ok": True,
-            "tree": []
-        })
-
-    is_hr = (
-        user.is_superuser or
-        current_emp.role in ["HR", "Admin"]
-    )
-
-    employees = (
-        get_active_employees_queryset()
-        .select_related("user", "department", "manager")
-        .prefetch_related("subordinates")
-    )
-
-    emp_map = {}
-
-    for emp in employees:
-        try:
-            profile_url = reverse(
-                "employee_detail",
-                args=[emp.employee_id]
-            )
-        except Exception:
-            profile_url = f"/employees/{emp.id}/profile/"
-
-        emp_map[emp.id] = {
-            "id": emp.id,
-            "name": emp.user.get_full_name(),
-            "department": emp.department.name if emp.department else "",
-            "position": emp.position,
-            "manager_id": emp.manager_id,
-            "image": (
-                emp.profile_image.url
-                if getattr(emp, "profile_image", None)
-                else ""
-            ),
-            "profile_url": profile_url,
-            "children": [],
-            "is_current": emp.id == current_emp.id,
-        }
-
-    if current_emp.id not in emp_map:
-        return JsonResponse({
-            "ok": True,
-            "tree": []
-        })
-
-    roots = []
-
-    for emp in employees:
-        node = emp_map[emp.id]
-
-        if emp.manager_id and emp.manager_id in emp_map:
-            emp_map[emp.manager_id]["children"].append(node)
-        else:
-            roots.append(node)
-
-    if is_hr:
-        return JsonResponse({
-            "ok": True,
-            "tree": roots
-        })
-
-    allowed_ids = {current_emp.id}
-
-    mgr = current_emp.manager
-
-    while mgr:
-        if mgr.id in emp_map:
-            allowed_ids.add(mgr.id)
-        mgr = mgr.manager
-
-    def collect_children(emp_id):
-        if emp_id not in emp_map:
-            return
-
-        for child in emp_map[emp_id]["children"]:
-            allowed_ids.add(child["id"])
-            collect_children(child["id"])
-
-    collect_children(current_emp.id)
-
-    def filter_tree(nodes):
-        result = []
-
-        for node in nodes:
-            if node["id"] in allowed_ids:
-                copied = node.copy()
-                copied["children"] = filter_tree(
-                    node["children"]
-                )
-                result.append(copied)
-
-        return result
-
-    restricted_tree = filter_tree(roots)
-
-    if not restricted_tree:
-        return JsonResponse({
-            "ok": True,
-            "tree": [{
-                **emp_map[current_emp.id],
-                "children": []
-            }]
-        })
-
-    return JsonResponse({
-        "ok": True,
-        "tree": restricted_tree
-    })
-
-@login_required
-def org_chart_page(request):
-    """
-    Renders the HTML page. Data is fetched via AJAX.
-    """
-    return render(request, 'ems/org_chart.html')
-
-@login_required
-def org_tree_api(request):
-
-    if not hasattr(request.user, "employee"):
-        return JsonResponse(
-            {"ok": False, "error": "Employee not linked"},
-            status=403
-        )
-
-    current_emp = request.user.employee
-
-    if not (
-        current_emp.is_active and
-        current_emp.employment_status == "active"
-    ):
-        return JsonResponse({
-            "ok": True,
-            "tree": []
-        })
-
-    is_hr = (
-        request.user.is_superuser or
-        current_emp.role in ["HR", "Admin"]
-    )
-
-    employees = (
-        get_active_employees_queryset()
-        .select_related(
-            "user",
-            "department",
-            "manager"
-        )
-    )
-
-    emp_map = {}
-
-    for emp in employees:
-
-        try:
-            profile_url = reverse(
-                "employee_detail",
-                args=[emp.employee_id]
-            )
-        except Exception:
-            profile_url = f"/employees/{emp.id}/profile/"
-
-        emp_map[emp.id] = {
-            "id": emp.id,
-            "name": emp.user.get_full_name(),
-            "department": (
-                emp.department.name
-                if emp.department else ""
-            ),
-            "position": getattr(
-                emp,
-                "role",
-                getattr(
-                    emp,
-                    "designation",
-                    "Employee"
-                )
-            ),
-            "manager_id": emp.manager_id,
-            "image": (
-                emp.profile_image.url
-                if getattr(emp, "profile_image", None)
-                else ""
-            ),
-            "profile_url": profile_url,
-            "children": [],
-            "is_current": (
-                emp.id == current_emp.id
-            )
-        }
-
-    if current_emp.id not in emp_map:
-        return JsonResponse({
-            "ok": True,
-            "tree": []
-        })
-
-    roots = []
-
-    for emp in employees:
-        node = emp_map[emp.id]
-
-        if emp.manager_id and emp.manager_id in emp_map:
-            emp_map[emp.manager_id]["children"].append(node)
-        else:
-            roots.append(node)
-
-    if is_hr:
-        return JsonResponse({
-            "ok": True,
-            "tree": roots
-        })
-
-    allowed_ids = {current_emp.id}
-
-    mgr_id = current_emp.manager_id
-
-    while mgr_id and mgr_id in emp_map:
-        allowed_ids.add(mgr_id)
-        mgr_id = emp_map[mgr_id]["manager_id"]
-
-    def collect_subordinates(emp_id):
-        if emp_id not in emp_map:
-            return
-
-        for child in emp_map[emp_id]["children"]:
-            allowed_ids.add(child["id"])
-            collect_subordinates(child["id"])
-
-    collect_subordinates(current_emp.id)
-
-    def filter_tree(nodes):
-        result = []
-
-        for node in nodes:
-            if node["id"] in allowed_ids:
-                copied = node.copy()
-                copied["children"] = filter_tree(
-                    node["children"]
-                )
-                result.append(copied)
-
-        return result
-
-    restricted_tree = filter_tree(roots)
-
-    if not restricted_tree:
-        restricted_tree = [{
-            **emp_map[current_emp.id],
-            "children": []
-        }]
-
-    return JsonResponse({
-        "ok": True,
-        "tree": restricted_tree
-    })
-
+from .org_chart import org_chart_page, org_tree_api_me, org_tree_api
 
 def employee_detail(request, employee_id):
     employee = get_object_or_404(Employee, employee_id=employee_id)
@@ -3225,6 +2826,13 @@ def leave_application_create(request):
                     level=1,
                     status='pending'
                 )
+                employee_name = employee.user.get_full_name() or employee.user.get_username()
+                create_user_notification(
+                    approver.user,
+                    employee.organisation_id,
+                    f"Leave request from {employee_name} ({employee.employee_id}) needs your review.",
+                    reverse('leave_application_list'),
+                )
 
             messages.success(request, 'Leave submitted successfully.')
             return redirect('leave_application_list')
@@ -3303,10 +2911,24 @@ def leave_approval_action(request, pk, action):
                     level=next_stage.level,
                     status="pending",
                 )
+                employee = leave_app.employee
+                employee_name = employee.user.get_full_name() or employee.user.get_username()
+                create_user_notification(
+                    next_approver.user,
+                    leave_app.organisation_id,
+                    f"Leave request from {employee_name} ({employee.employee_id}) needs your review.",
+                    reverse('leave_application_list'),
+                )
         else:
             leave_app.status = "approved"
             leave_app.approved_by = approver
             leave_app.save()
+            create_user_notification(
+                leave_app.employee.user,
+                leave_app.organisation_id,
+                "Your leave request was approved.",
+                reverse('leave_application_detail', args=[leave_app.pk]),
+            )
 
         messages.success(request, "Leave approved successfully.")
         return redirect("leave_application_list")
@@ -3322,6 +2944,12 @@ def leave_approval_action(request, pk, action):
         leave_app.status = "rejected"
         leave_app.approved_by = approver
         leave_app.save()
+        create_user_notification(
+            leave_app.employee.user,
+            leave_app.organisation_id,
+            "Your leave request was rejected.",
+            reverse('leave_application_detail', args=[leave_app.pk]),
+        )
 
         messages.success(request, "Leave rejected successfully.")
         return redirect("leave_application_list")
@@ -3656,20 +3284,47 @@ def resignation_approve(request, pk):
 
 @login_required
 def notification_list(request):
-    notifications = Notification.objects.filter(recipient=request.user).order_by('-created_at')
-    unread_count = notifications.filter(is_read=False).count()
+    notification_queryset = Notification.objects.filter(recipient=request.user).order_by('-created_at', '-pk')
+    unread_count = notification_queryset.filter(is_read=False).count()
+    page_obj = Paginator(notification_queryset, 30).get_page(request.GET.get('page'))
     
     return render(request, 'ems/notification_list.html', {
-        'notifications': notifications,
+        'notifications': page_obj.object_list,
+        'page_obj': page_obj,
         'unread_count': unread_count,
         'title': 'Notifications'
     })
 
 @login_required
+@require_GET
+def notification_open(request, pk):
+    notification = get_object_or_404(
+        Notification.objects.filter(recipient=request.user),
+        pk=pk,
+    )
+    if not notification.is_read:
+        Notification.objects.filter(
+            pk=notification.pk,
+            recipient=request.user,
+            is_read=False,
+        ).update(is_read=True)
+
+    target = notification.link
+    if target and url_has_allowed_host_and_scheme(
+        target,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(target)
+    return redirect('notification_list')
+
+
+@login_required
+@require_POST
 def mark_notification_read(request, pk):
     notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
-    notification.is_read = True
-    notification.save()
+    if not notification.is_read:
+        Notification.objects.filter(pk=notification.pk, recipient=request.user).update(is_read=True)
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'success': True})
@@ -3677,6 +3332,7 @@ def mark_notification_read(request, pk):
     return redirect('notification_list')
 
 @login_required
+@require_POST
 def mark_all_notifications_read(request):
     Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
     
@@ -3688,24 +3344,10 @@ def mark_all_notifications_read(request):
 
 
 def notify_user(user: User, message: str, link_path: str = ""):
-    # In-app notification
-    Notification.objects.create(
-        recipient=user,
-        message=message,
-        link=link_path or None
-    )
-    # Email (best-effort)
-    if getattr(settings, "EMAIL_HOST", None) and user.email:
-        try:
-            send_mail(
-                subject="EMS Notification",
-                message=message + (f"\n\nOpen: {link_path}" if link_path else ""),
-                from_email=getattr(settings,"avaneeshpathak900@gmail.com"),
-                recipient_list=[user.email],
-                fail_silently=True,
-            )
-        except Exception:
-            pass
+    employee = Employee.global_objects.filter(user_id=user.pk).only('organisation_id').first()
+    if employee is None:
+        return None
+    return create_user_notification(user, employee.organisation_id, message, link_path)
 
 
 # =========================================================

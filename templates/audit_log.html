@@ -11,9 +11,9 @@
 .audit-panel{overflow:hidden;border:1px solid var(--audit-line);border-radius:14px;background:var(--audit-paper);box-shadow:0 8px 28px #2037440a}.audit-filters{padding:20px 22px}.audit-filters .form-label{font-size:11px;color:#415363}.audit-filters .form-select,.audit-filters .form-control{min-height:42px;border-color:#d8e1e7;border-radius:8px;font-size:13px}.audit-filters .form-control:focus,.audit-filters .form-select:focus{border-color:#48a7a6;box-shadow:0 0 0 .2rem #087f821a}
 .audit-feed-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:17px 22px;border-top:1px solid var(--audit-line);border-bottom:1px solid var(--audit-line);background:#f9fbfb}.audit-feed-head h2{margin:0;font-size:14px;font-weight:700;letter-spacing:-.01em}.audit-feed-head p{margin:4px 0 0;color:var(--audit-muted);font-size:11px}.audit-page-count{padding:6px 9px;border:1px solid #d7e3e6;border-radius:6px;background:#fff;color:#3d5962;font-size:11px;font-weight:650;white-space:nowrap}
 .audit-timeline{position:relative;list-style:none;margin:0;padding:6px 22px 8px 38px}.audit-timeline:before{position:absolute;top:22px;bottom:22px;left:23px;width:1px;background:#dbe5e8;content:""}.audit-event{position:relative;margin:16px 0;border:1px solid var(--audit-line);border-radius:11px;background:#fff}.audit-event:before{position:absolute;top:24px;left:-21px;width:9px;height:9px;border:2px solid #fff;border-radius:50%;background:#18878a;box-shadow:0 0 0 1px #8ebdbc;content:""}
-.audit-event-head{display:grid;grid-template-columns:minmax(145px,180px) minmax(160px,1fr) minmax(160px,1fr) auto;align-items:center;gap:14px;padding:15px 17px}.audit-event-time time{display:block;font-size:12px;font-weight:720;font-variant-numeric:tabular-nums}.audit-event-time span{display:block;margin-top:3px;color:var(--audit-muted);font-size:11px;font-variant-numeric:tabular-nums}
+.audit-event-head{display:grid;grid-template-columns:minmax(145px,180px) minmax(160px,1fr) minmax(220px,1.25fr) auto;align-items:center;gap:14px;padding:15px 17px}.audit-event-time time{display:block;font-size:12px;font-weight:720;font-variant-numeric:tabular-nums}.audit-event-time span{display:block;margin-top:3px;color:var(--audit-muted);font-size:11px;font-variant-numeric:tabular-nums}
 .audit-actor{display:flex;align-items:center;gap:10px;min-width:0}.audit-avatar{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;border-radius:50%;background:#e4f1ef;color:#17686a;font-size:12px;font-weight:750}.audit-actor-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:650}.audit-actor-id{display:block;margin-top:2px;color:var(--audit-muted);font-size:10px}
-.audit-record{min-width:0}.audit-record strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:650}.audit-record span{display:block;margin-top:3px;color:var(--audit-muted);font-size:10px;font-variant-numeric:tabular-nums}
+.audit-record{min-width:0}.audit-record strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:650}.audit-record span{display:block;margin-top:3px;color:var(--audit-muted);font-size:10px;overflow-wrap:anywhere;line-height:1.35}.audit-record .audit-record-org{color:#425d68;font-weight:600}
 .audit-event-actions{display:flex;align-items:center;gap:10px}.audit-action{display:inline-flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #dce5e9;border-radius:6px;background:#f7f9fa;color:#415363;font-size:10px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}.audit-action.is-create{border-color:#c9e7d7;background:#eff8f2;color:#28734b}.audit-action.is-update{border-color:#c9dfed;background:#eff6fa;color:#28617b}.audit-action.is-delete{border-color:#f0d2d0;background:#fff4f2;color:#9e453e}.audit-action.is-auth{border-color:#dce5e9;background:#f3f6f7;color:#586b75}.audit-action.is-system{border-color:#e7dfca;background:#faf7ef;color:#79643a}
 .audit-detail{border-top:1px solid #edf1f3}.audit-detail summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 17px;cursor:pointer;color:#176f72;font-size:11px;font-weight:700;list-style:none}.audit-detail summary::-webkit-details-marker{display:none}.audit-detail summary:after{content:"+";font-size:17px;font-weight:400;line-height:1}.audit-detail[open] summary:after{content:"−"}.audit-detail summary:focus-visible{outline:3px solid #087f823b;outline-offset:-3px}.audit-change-count{margin-left:auto;color:var(--audit-muted);font-size:10px;font-weight:500}
 .audit-detail-body{padding:0 17px 16px}.audit-reason{display:flex;align-items:flex-start;gap:9px;margin:0 0 12px;padding:10px 12px;border-left:3px solid #d6a950;border-radius:0 6px 6px 0;background:#fcf8ee;color:#604e2d;font-size:12px;line-height:1.5}.audit-reason strong{flex:0 0 auto;font-size:10px;letter-spacing:.04em;text-transform:uppercase}.audit-diff-wrap{overflow-x:auto;border:1px solid #e3e9ec;border-radius:8px}.audit-diff{width:100%;margin:0;border-collapse:collapse;font-size:11px}.audit-diff th{padding:9px 11px;background:#f5f8f9;color:#586b75;text-align:left;font-size:9px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}.audit-diff td{width:40%;padding:9px 11px;border-top:1px solid #edf1f3;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}.audit-diff td:first-child{width:20%;color:#485d68;font-weight:650}.audit-value-empty{color:#98a4aa;font-style:italic}.audit-no-changes{margin:0;padding:12px;border:1px dashed #dce5e9;border-radius:7px;background:#f8fafb;color:#586b75;font-size:12px}.audit-request{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--audit-muted);font-size:10px}.audit-request code{overflow-wrap:anywhere;color:#425763;font-size:10px}
@@ -37,7 +37,7 @@
   </header>
 
   <section class="audit-panel mb-4" aria-label="Filter audit events">
-    <form method="get" class="audit-filters">
+    <form method="get" class="audit-filters" novalidate>
       <div class="row g-3 align-items-end">
         <div class="col-12 col-sm-6 col-lg-3">
           <label for="entity" class="form-label fw-semibold">Record type</label>
@@ -93,15 +93,17 @@
                   <span>{{ event.created_at|date:'H:i:s' }}</span>
                 </div>
                 <div class="audit-actor">
-                  <span class="audit-avatar" aria-hidden="true">{{ event.actor_name|default:'S'|first|upper }}</span>
+                  <span class="audit-avatar" aria-hidden="true">{{ event.actor_display_name|default:event.actor_name|default:'S'|first|upper }}</span>
                   <div class="min-w-0">
-                    <span class="audit-actor-name">{{ event.actor_name|default:'System' }}</span>
-                    <span class="audit-actor-id">{% if event.actor_id %}User #{{ event.actor_id }}{% else %}System process{% endif %}</span>
+                    <span class="audit-actor-name">{{ event.actor_display_name|default:event.actor_name|default:'System' }}</span>
+                    <span class="audit-actor-id">{% if event.actor_employee_code %}Employee code {{ event.actor_employee_code }} · {% endif %}{% if event.actor_id %}User #{{ event.actor_id }}{% else %}System process{% endif %}</span>
                   </div>
                 </div>
                 <div class="audit-record">
-                  <strong>{{ event.entity }}</strong>
-                  <span>Record #{{ event.object_id }}</span>
+                  <strong>{{ event.entity }} · Record #{{ event.object_id }}</strong>
+                  <span>Employee: {{ event.subject_employee_name|default:'—' }}</span>
+                  <span>Employee code: {{ event.subject_employee_code|default:'—' }}</span>
+                  <span class="audit-record-org">Organisation: {{ event.organisation.name|default:'—' }}</span>
                 </div>
                 <div class="audit-event-actions">
                   <span class="audit-action {% if event.action == 'create' %}is-create{% elif event.action == 'update' %}is-update{% elif event.action == 'delete' %}is-delete{% elif event.entity == 'Authentication' %}is-auth{% else %}is-system{% endif %}">

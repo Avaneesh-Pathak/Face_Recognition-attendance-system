@@ -1,515 +1,382 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block page_title %}Organization Structure{% endblock %}
+{% block title %}Organisation chart | FaceAttend{% endblock %}
+{% block page_title %}Organisation chart{% endblock %}
 
 {% block content %}
-<div class="card border-0 shadow-sm" style="border-radius: 16px; overflow: hidden;">
-  <div class="card-header bg-white py-3 border-0" style="border-radius: 16px 16px 0 0;">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-      <div class="d-flex align-items-center gap-2">
-        <div class="p-2 bg-primary-subtle text-primary rounded-3" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
-          <i class="fas fa-sitemap"></i>
-        </div>
-        <div>
-          <h5 class="mb-0 fw-bold text-dark">Organization Directory</h5>
-          <small class="text-muted" style="font-size: 0.75rem;">Explore team hierarchies and direct reports</small>
-        </div>
+<main class="org-page">
+  <header class="org-heading">
+    <div class="org-heading-copy">
+      <p class="org-eyebrow">People directory</p>
+      <h1>Organisation chart</h1>
+      <p>See how teams connect, from the organisation’s top level to each employee.</p>
+    </div>
+    <div class="org-heading-controls">
+      {% if is_superuser_chart_view %}
+      <div class="org-organisation-select">
+        <label for="organisationSelect">Organisation</label>
+        <select id="organisationSelect" class="form-select" aria-describedby="organisationHelp">
+          <option value="">Choose an organisation</option>
+          {% for organisation in organizations %}
+          <option value="{{ organisation.pk }}" {% if selected_organisation_id == organisation.pk|stringformat:'s' %}selected{% endif %}>{{ organisation.name }}</option>
+          {% endfor %}
+        </select>
+        <span id="organisationHelp" class="visually-hidden">Only system superusers can switch organisation charts.</span>
+      </div>
+      {% endif %}
+
+      {% if has_employee_profile and not is_superuser_chart_view %}
+      <div class="org-view-switch" role="group" aria-label="Chart view">
+        <button type="button" class="org-view-button is-active" id="btnViewFull" aria-pressed="true">Full organisation</button>
+        <button type="button" class="org-view-button" id="btnViewTeam" aria-pressed="false">My team</button>
+      </div>
+      {% endif %}
+
+      <div class="org-zoom-controls" role="group" aria-label="Chart zoom">
+        <button type="button" class="org-icon-button" id="btnZoomOut" aria-label="Zoom out" title="Zoom out"><i class="fa-solid fa-minus" aria-hidden="true"></i></button>
+        <label class="visually-hidden" for="zoomSlider">Chart zoom</label>
+        <input id="zoomSlider" type="range" min="50" max="150" step="5" value="90" aria-label="Chart zoom">
+        <output id="zoomValue" for="zoomSlider">90%</output>
+        <button type="button" class="org-icon-button" id="btnZoomIn" aria-label="Zoom in" title="Zoom in"><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
+        <button type="button" class="org-text-button" id="btnFit">Fit width</button>
       </div>
 
-      <div class="d-flex flex-wrap align-items-center gap-3">
-        <!-- Modern Pill View Switcher -->
-        <div class="btn-group btn-group-sm p-1 bg-light border rounded-pill shadow-sm" role="group">
-          <button class="btn btn-white rounded-pill px-3 active" id="btnViewFull">
-            <i class="fas fa-sitemap me-1 text-primary"></i>Full Structure
-          </button>
-          <button class="btn btn-white rounded-pill px-3" id="btnViewTeam">
-            <i class="fas fa-users me-1 text-success"></i>My Direct Team
-          </button>
-        </div>
+      <button type="button" class="org-print-button" id="btnPrint"><i class="fa-solid fa-print" aria-hidden="true"></i><span>Print</span></button>
+    </div>
+  </header>
 
-        <!-- Action Buttons -->
-        <button class="btn btn-light border shadow-sm d-flex align-items-center gap-2 rounded-pill px-3" id="btnPrint" style="font-size: 0.85rem; font-weight: 500; height: 35px;">
-          <i class="fas fa-print text-secondary"></i> Print Directory
-        </button>
+  <section class="org-panel" aria-label="Organisation hierarchy">
+    <div class="org-chart-toolbar">
+      <div>
+        <p class="org-chart-count" id="orgStatus" role="status" aria-live="polite">Loading organisation chart…</p>
+        <p class="org-chart-help">Scroll in either direction to explore branches. Use the zoom controls to change the chart size.</p>
+      </div>
+      <span class="org-scroll-hint"><i class="fa-solid fa-arrows-left-right-to-line" aria-hidden="true"></i> Horizontal and vertical scrolling</span>
+    </div>
+    <div id="orgScrollPort" class="org-scrollport" tabindex="0" aria-label="Scrollable organisation chart">
+      <div id="orgStage" class="org-stage">
+      <div id="orgRoot" class="org-tree" role="list" aria-label="Organisation reporting hierarchy"></div>
       </div>
     </div>
-  </div>
-
-  <!-- Dotted AI Canvas Container -->
-  <div class="card-body org-canvas position-relative overflow-auto border-top" style="min-height: 75vh; border-radius: 0 0 16px 16px;">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-      <div class="alert alert-primary border-0 shadow-sm d-inline-flex align-items-center py-2 px-3 mb-0" style="border-radius: 10px; z-index: 5;">
-        <i class="fas fa-info-circle me-2"></i>
-        <small class="fw-medium">Click the arrow under any employee card to collapse or expand branches.</small>
-      </div>
-      
-      <div class="org-scroll-hint text-muted d-flex align-items-center gap-1" style="z-index: 5;">
-        <i class="fas fa-arrows-alt-h small"></i>
-        <small style="font-size: 0.75rem;">Pan or swipe horizontally to navigate branches</small>
-      </div>
-    </div>
-
-    <!-- Chart container -->
-    <div id="orgRoot" class="org-viewport mx-auto pb-5">
-      <div class="text-center py-5" id="loadingState">
-        <div class="spinner-border text-primary" role="status" style="width: 2.5rem; height: 2.5rem;">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-        <p class="mt-3 text-muted fw-medium" style="font-size: 0.9rem;">Retrieving organizational structure details...</p>
-      </div>
-    </div>
-  </div>
-</div>
+  </section>
+</main>
 
 <style>
-  /* Viewport & AI Dotted Canvas Background */
-  .org-canvas {
-    background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-    background-size: 20px 20px;
-    background-color: #f8fafc !important;
-  }
-
-  .org-viewport {
-    display: flex;
-    justify-content: center;
-    padding: 2rem 1rem;
-    min-width: max-content;
-  }
-
-  .org-scroll-hint {
-    background: #ffffff;
-    padding: 0.4rem 0.8rem;
-    border-radius: 20px;
-    border: 1px solid rgba(0,0,0,0.05);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-  }
-
-  /* Tree Nodes Wrapper */
-  .org-node-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    position: relative;
-    padding: 24px 12px 0 12px;
-    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  /* Modern Pill Buttons Switcher */
-  .btn-white {
-    background: transparent;
-    border: none;
-    color: #64748b;
-    font-weight: 600;
-    font-size: 0.8rem;
-    transition: all 0.2s ease;
-    height: 28px;
-    display: inline-flex;
-    align-items: center;
-  }
-  .btn-white.active, .btn-white:hover {
-    background: #ffffff !important;
-    color: #1e293b !important;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
-  }
-
-  /* Card Styles */
-  .org-card {
-    background: #ffffff;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-    width: 280px;
-    padding: 1.25rem;
-    position: relative;
-    z-index: 2;
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-                box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-                border-color 0.3s ease;
-    overflow: hidden;
-  }
-  
-  /* Internal radial neon hover effect */
-  .org-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.08), transparent 70%);
-    opacity: 0;
-    transition: opacity 0.4s ease;
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  .org-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
-    border-color: #3b82f6;
-  }
-  
-  .org-card:hover::before {
-    opacity: 1;
-  }
-
-  /* Top Accent color indicators */
-  .org-card-accent {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 4px;
-    background: linear-gradient(90deg, #667eea, #764ba2);
-    z-index: 3;
-  }
-  
-  /* Highlight Logged-in User with dynamic glowing border */
-  .org-card.is-current {
-    border: 2px solid #3b82f6;
-    background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%);
-    box-shadow: 0 8px 30px -4px rgba(59, 130, 246, 0.12), 0 4px 12px -2px rgba(59, 130, 246, 0.08);
-  }
-  .org-card.is-current .org-card-accent {
-    background: linear-gradient(90deg, #3b82f6, #1d4ed8);
-  }
-
-  /* Node Content Layout */
-  .org-head { display: flex; align-items: center; gap: 1rem; position: relative; z-index: 2; }
-  
-  /* Avatar Square-Circle Design */
-  .avatar-container {
-    position: relative;
-    display: inline-block;
-  }
-  .org-avatar { 
-    width: 54px; 
-    height: 54px; 
-    border-radius: 12px; 
-    object-fit: cover; 
-    border: 2px solid #ffffff; 
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
-  }
-  
-  /* Manager Reports Count Badge Overlay */
-  .direct-reports-badge {
-    position: absolute;
-    bottom: -4px;
-    right: -4px;
-    font-size: 0.65rem;
-    padding: 0.25rem 0.4rem;
-    border-radius: 6px;
-    border: 1.5px solid #ffffff;
-    font-weight: 700;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-
-  .org-info {
-    min-width: 0;
-    flex: 1;
-  }
-  .org-info .name { font-weight: 700; color: #1e293b; font-size: 0.95rem; margin-bottom: 0.15rem; }
-  .org-info .position { font-size: 0.775rem; color: #64748b; font-weight: 500; }
-  
-  /* Department Badges */
-  .dept-badge { 
-    display: inline-block;
-    font-size: 0.65rem; 
-    color: #4f46e5; 
-    background-color: #f5f3ff;
-    border: 1px solid rgba(79, 70, 229, 0.1);
-    font-weight: 700; 
-    text-transform: uppercase; 
-    letter-spacing: 0.3px;
-    padding: 0.2rem 0.5rem;
-    border-radius: 6px;
-    margin-top: 0.25rem;
-  }
-
-  /* Tree Connecting Lines */
-  .org-children {
-    display: flex;
-    justify-content: center;
-    padding-top: 24px;
-    position: relative;
-    /* Animated entry when branches expand */
-    animation: scaleBranch 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  }
-
-  @keyframes scaleBranch {
-    from {
-      opacity: 0;
-      transform: scale(0.97) translateY(-8px);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
-  }
-
-  /* Top down line from parent node */
-  .org-children::before {
-    content: ''; position: absolute; top: 0; left: 50%;
-    border-left: 2px solid #cbd5e1;
-    width: 0; height: 24px; transform: translateX(-50%);
-    transition: border-color 0.3s ease;
-  }
-  /* Vertical line rising from child node */
-  .org-node-wrapper::before {
-    content: ''; position: absolute; top: 0; left: 50%;
-    border-left: 2px solid #cbd5e1;
-    width: 0; height: 24px; transform: translateX(-50%);
-    transition: border-color 0.3s ease;
-  }
-  /* Horizontal line connecting siblings */ 
-  .org-node-wrapper::after {
-    content: ''; position: absolute; top: 0; left: 0;
-    border-top: 2px solid #cbd5e1;
-    width: 100%; height: 0;
-    transition: border-color 0.3s ease;
-  }
-  .org-viewport:has(> .org-node-wrapper:only-child) {
-    justify-content: center;
-  }
-  /* Adjust horizontal lines for first and last child branches */
-  .org-children > .org-node-wrapper:first-child::after { left: 50%; width: 50%; }
-  .org-children > .org-node-wrapper:last-child::after { left: 0; width: 50%; }
-  /* Remove horizontal lines if there is only a single branch child */
-  .org-children > .org-node-wrapper:only-child::after { display: none; }
-
-  /* Clear top lines for the ultimate parent */
-  .org-viewport > .org-node-wrapper { padding-top: 0; }
-  .org-viewport > .org-node-wrapper::before,
-  .org-viewport > .org-node-wrapper::after { display: none; }
-
-  /* Dropdown line from parent cards with child branches */
-  .org-card.has-children::after {
-    content: ''; position: absolute; bottom: -24px; left: 50%;
-    border-left: 2px solid #cbd5e1;
-    width: 0; height: 24px; transform: translateX(-50%);
-    transition: border-color 0.3s ease;
-  }
-
-  /* =========================================================
-     ⚡ AI CONNECTING LINES GLOW-ON-HOVER (CSS :has() SELECTION)
-     ========================================================= */
-  
-  /* 1. Glow line coming down out of hovered card */
-  .org-card.has-children:hover::after {
-    border-color: #3b82f6;
-  }
-  /* 2. Glow vertical child-connectors when card is hovered */
-  .org-node-wrapper:has(> .org-card:hover)::before {
-    border-color: #3b82f6;
-  }
-  /* 3. Glow the vertical top line inside parent branch */
-  .org-node-wrapper:has(> .org-card:hover) > .org-children::before {
-    border-color: #3b82f6;
-  }
-  /* 4. Glow the parent's horizontal bridge branch */
-  .org-children:has(> .org-node-wrapper > .org-card:hover) > .org-node-wrapper::after {
-    border-color: #3b82f6;
-  }
-
-  /* Dynamic Toggle Button styling */
-  .org-toggle-btn {
-    position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
-    background: #ffffff; border: 1px solid #cbd5e1; color: #64748b; border-radius: 50%;
-    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
-    font-size: 10px; cursor: pointer; z-index: 10;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .org-toggle-btn:hover { 
-    background: #3b82f6; 
-    color: #ffffff; 
-    border-color: #3b82f6; 
-    transform: translateX(-50%) scale(1.1);
-  }
-  .org-node-wrapper.collapsed > .org-children { display: none; }
-
-  /* Profile buttons within card footers */
-  .btn-action {
-    background-color: #f8fafc;
-    border: 1px solid #e2e8f0;
-    color: #4f46e5;
-    font-weight: 600;
-    font-size: 0.725rem;
-    padding: 0.25rem 0.6rem;
-    transition: all 0.2s ease;
-    position: relative;
-    z-index: 3;
-  }
-  .btn-action:hover {
-    background-color: #4f46e5;
-    border-color: #4f46e5;
-    color: #ffffff;
-  }
-
-  @media print {
-    .sidebar, .top-header, .btn-group, .alert, .org-toggle-btn, .org-scroll-hint, .btn, .card-header { display: none !important; }
-    .main-content { margin: 0 !important; }
-    .card { border: none !important; box-shadow: none !important; }
-    .org-viewport { padding: 0; display: block; overflow: visible; }
-    .org-card { box-shadow: none !important; border: 1px solid #cbd5e1 !important; page-break-inside: avoid; }
-  }
+  .org-page{--org-ink:#172638;--org-muted:#64748b;--org-line:#d9e2e7;--org-paper:#fff;--org-canvas:#f5f8f8;--org-teal:#087f82;--org-navy:#102a36;color:var(--org-ink);max-width:1600px;margin:0 auto}
+  .org-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin:0 0 18px;padding:22px 24px;border:1px solid #e1e8ec;border-radius:14px;background:#fff;box-shadow:0 6px 24px #2037440a}
+  .org-heading-copy{min-width:220px}.org-eyebrow{margin:0 0 5px;color:var(--org-teal);font-size:10px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}.org-heading h1{margin:0;font-size:clamp(24px,3vw,32px);font-weight:700;letter-spacing:-.04em}.org-heading-copy>p:last-child{max-width:530px;margin:6px 0 0;color:var(--org-muted);font-size:13px;line-height:1.5}
+  .org-heading-controls{display:flex;align-items:flex-end;justify-content:flex-end;flex-wrap:wrap;gap:10px}.org-organisation-select{width:min(260px,100%)}.org-organisation-select label{display:block;margin:0 0 5px;color:#526475;font-size:10px;font-weight:700}.org-organisation-select .form-select{min-height:40px;border-color:#d5dfe5;border-radius:8px;font-size:12px}.org-organisation-select .form-select:focus{border-color:#48a7a6;box-shadow:0 0 0 .2rem #087f821a}
+  .org-view-switch{display:flex;gap:3px;padding:3px;border:1px solid #dde5e9;border-radius:9px;background:#f4f7f8}.org-view-button{min-height:34px;padding:6px 11px;border:0;border-radius:6px;background:transparent;color:#536674;font-size:11px;font-weight:700;cursor:pointer}.org-view-button:hover{background:#eaf0f2;color:var(--org-ink)}.org-view-button.is-active{background:#fff;color:var(--org-navy);box-shadow:0 1px 3px #2037441a}.org-view-button:focus-visible,.org-icon-button:focus-visible,.org-text-button:focus-visible,.org-print-button:focus-visible,.org-branch-toggle:focus-visible{outline:3px solid #087f8255;outline-offset:2px}
+  .org-zoom-controls{display:flex;align-items:center;gap:7px;min-height:40px;padding:4px 7px;border:1px solid #dde5e9;border-radius:9px;background:#fff}.org-icon-button{display:grid;place-items:center;width:30px;height:30px;border:1px solid #e0e7eb;border-radius:6px;background:#f8fafb;color:#405563;cursor:pointer}.org-icon-button:hover{background:#eaf1f2;color:#102a36}.org-icon-button:disabled{cursor:not-allowed;opacity:.45}.org-zoom-controls input[type=range]{width:92px;accent-color:#087f82;cursor:pointer}.org-zoom-controls output{min-width:38px;color:#435763;font-size:10px;font-variant-numeric:tabular-nums;text-align:center}.org-text-button,.org-print-button{min-height:36px;padding:7px 10px;border:1px solid #dce5e9;border-radius:7px;background:#f8fafb;color:#405563;font-size:11px;font-weight:700;cursor:pointer}.org-text-button:hover,.org-print-button:hover{background:#edf3f4;color:var(--org-navy)}.org-print-button{display:inline-flex;align-items:center;gap:7px;background:#fff}
+  .org-panel{overflow:hidden;border:1px solid #dfe7ea;border-radius:14px;background:var(--org-paper);box-shadow:0 8px 28px #2037440a}.org-chart-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 18px;border-bottom:1px solid #e6ecef;background:#fbfcfc}.org-chart-count{margin:0;color:#304b57;font-size:12px;font-weight:750}.org-chart-help{margin:4px 0 0;color:var(--org-muted);font-size:10px;line-height:1.4}.org-scroll-hint{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid #e1e8eb;border-radius:7px;background:#fff;color:#60717d;font-size:10px;white-space:nowrap}
+  .org-scrollport{height:min(72vh,820px);min-height:420px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;background-color:var(--org-canvas);background-image:radial-gradient(#d7e0e3 1px,transparent 1px);background-size:20px 20px;touch-action:auto}.org-scrollport:focus-visible{outline:3px solid #087f8240;outline-offset:-3px}.org-stage{position:relative;min-width:100%;min-height:100%}.org-tree{position:absolute;top:0;left:0;display:flex;align-items:flex-start;gap:34px;width:max-content;min-width:max-content;padding:28px 32px;transform-origin:top left}
+  .org-node-wrapper{position:relative;display:flex;flex:0 0 auto;flex-direction:column;align-items:center;padding:26px 13px 0}.org-card{position:relative;z-index:2;width:260px;padding:15px 15px 12px;overflow:visible;border:1px solid #dce5e8;border-radius:11px;background:#fff;box-shadow:0 3px 12px #2037440d;transition:border-color .18s ease,box-shadow .18s ease}.org-card:hover{border-color:#8ebdbc;box-shadow:0 7px 19px #20374414}.org-card.is-current{border:2px solid #168183;background:#f4fbfa;box-shadow:0 0 0 3px #087f8214}.org-card-head{display:flex;align-items:center;gap:11px;min-width:0}.org-avatar{display:grid;place-items:center;width:43px;height:43px;flex:0 0 43px;border:1px solid #d6e5e4;border-radius:10px;background:#eaf4f2;color:#17686a;font-size:13px;font-weight:800;letter-spacing:.02em}.org-person{min-width:0;flex:1}.org-person-name{display:block;overflow:hidden;color:#19303e;font-size:13px;font-weight:750;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}.org-position{display:block;margin-top:3px;overflow:hidden;color:#647583;font-size:10px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}.org-top-level{display:inline-flex;margin:0 0 9px;padding:4px 7px;border:1px solid #cfe4df;border-radius:5px;background:#f1f8f6;color:#26706b;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.org-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 0;padding-top:10px;border-top:1px solid #edf1f2}.org-meta div{min-width:0}.org-meta dt{color:#84919a;font-size:8px;font-weight:750;letter-spacing:.06em;text-transform:uppercase}.org-meta dd{margin:3px 0 0;overflow-wrap:anywhere;color:#405563;font-size:10px;font-weight:650;line-height:1.35}.org-card-foot{display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-top:11px;padding-top:9px;border-top:1px solid #edf1f2}.org-report-count{color:#71818a;font-size:9px}.org-current-label{margin-left:auto;color:#176f72;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+  .org-children{position:relative;display:flex;justify-content:center;padding-top:24px;animation:org-branch-in .2s ease-out}.org-children:before{position:absolute;top:0;left:50%;height:24px;border-left:2px solid #c5d4d8;content:""}.org-node-wrapper:before{position:absolute;top:0;left:50%;height:26px;border-left:2px solid #c5d4d8;content:""}.org-node-wrapper:after{position:absolute;top:0;left:0;width:100%;border-top:2px solid #c5d4d8;content:""}.org-children>.org-node-wrapper:first-child:after{left:50%;width:50%}.org-children>.org-node-wrapper:last-child:after{width:50%}.org-children>.org-node-wrapper:only-child:after{display:none}.org-tree>.org-node-wrapper{padding-top:0}.org-tree>.org-node-wrapper:before,.org-tree>.org-node-wrapper:after{display:none}.org-card.has-children:after{position:absolute;bottom:-26px;left:50%;height:26px;border-left:2px solid #c5d4d8;content:""}.org-branch-toggle{position:absolute;z-index:4;bottom:-13px;left:50%;display:grid;place-items:center;width:27px;height:27px;transform:translateX(-50%);border:1px solid #cbd9dd;border-radius:50%;background:#fff;color:#526b76;font-size:9px;cursor:pointer;box-shadow:0 2px 5px #20374412}.org-branch-toggle:hover{border-color:#087f82;background:#087f82;color:#fff}.org-node-wrapper.collapsed>.org-children{display:none}.org-node-wrapper.collapsed>.org-card.has-children:after{display:none}.org-empty-state{display:flex;min-width:min(480px,calc(100vw - 48px));min-height:220px;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:28px;text-align:center;color:#677983}.org-empty-state i{font-size:23px;color:#80959d}.org-empty-state strong{color:#344e59;font-size:13px}.org-empty-state span{max-width:360px;font-size:11px;line-height:1.5}
+  @keyframes org-branch-in{from{opacity:.7;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+  @media(max-width:1100px){.org-heading{align-items:flex-start;flex-direction:column}.org-heading-controls{justify-content:flex-start;width:100%}}
+  @media(max-width:700px){.org-heading{padding:17px}.org-heading-controls{align-items:stretch;gap:8px}.org-organisation-select{width:100%}.org-view-switch{width:100%}.org-view-button{flex:1}.org-zoom-controls{justify-content:space-between;width:100%}.org-zoom-controls input[type=range]{flex:1;max-width:160px}.org-print-button{justify-content:center;flex:1}.org-chart-toolbar{align-items:flex-start;flex-direction:column;padding:12px 14px}.org-scroll-hint{white-space:normal}.org-scrollport{height:65svh;min-height:340px}.org-tree{gap:20px;padding:22px 20px}.org-node-wrapper{padding-right:9px;padding-left:9px}.org-card{width:238px;padding:13px}.org-empty-state{min-width:calc(100vw - 70px)}}
+  @media(prefers-reduced-motion:reduce){.org-card,.org-view-button,.org-icon-button,.org-branch-toggle{transition:none}.org-children{animation:none}}
+  @media print{.sidebar,.top-header,.org-heading-controls,.org-chart-toolbar{display:none!important}.content-body{padding:0!important}.org-heading{margin:0 0 10px;padding:0;border:0;box-shadow:none}.org-heading h1{font-size:22px}.org-heading-copy>p:last-child{display:none}.org-panel{overflow:visible;border:0;box-shadow:none}.org-scrollport{height:auto;min-height:0;max-height:none;overflow:visible;background:none}.org-stage{width:auto!important;height:auto!important}.org-tree{position:static!important;transform:none!important;display:flex;flex-wrap:wrap;gap:10px;padding:0}.org-card{width:220px;box-shadow:none;break-inside:avoid}.org-branch-toggle{display:none}.org-children{animation:none}}
 </style>
 
 <script>
-  document.addEventListener('DOMContentLoaded', async () => {
-    const rootEl = document.getElementById('orgRoot');
-    const btnFull = document.getElementById('btnViewFull');
-    const btnTeam = document.getElementById('btnViewTeam');
-    const btnPrint = document.getElementById('btnPrint');
-    
-    let rawTreeData = [];
+document.addEventListener('DOMContentLoaded', () => {
+  const root = document.getElementById('orgRoot');
+  const stage = document.getElementById('orgStage');
+  const scrollPort = document.getElementById('orgScrollPort');
+  const status = document.getElementById('orgStatus');
+  const organisationSelect = document.getElementById('organisationSelect');
+  const zoomSlider = document.getElementById('zoomSlider');
+  const zoomValue = document.getElementById('zoomValue');
+  const zoomOut = document.getElementById('btnZoomOut');
+  const zoomIn = document.getElementById('btnZoomIn');
+  const fitButton = document.getElementById('btnFit');
+  const fullButton = document.getElementById('btnViewFull');
+  const teamButton = document.getElementById('btnViewTeam');
+  const printButton = document.getElementById('btnPrint');
+  const isSuperuser = {{ is_superuser_chart_view|yesno:'true,false' }};
+  const chartApi = "{% url 'org_tree_api_me' %}";
+  let rawTree = [];
+  let showTeamOnly = false;
+  let totalEmployeeCount = 0;
+  let organisationName = '';
+  let zoom = Number(zoomSlider.value) / 100;
+  let activeRequest = null;
 
-    async function fetchData() {
-      try {
-        const res = await fetch("{% url 'org_tree_api_me' %}");
-        const data = await res.json();
-        if (!data.ok) throw new Error("Failed");
-        return data.tree;
-      } catch (e) {
-        rootEl.innerHTML = `
-          <div class="text-center text-danger py-5">
-            <i class="fas fa-exclamation-triangle fa-2x mb-3 text-opacity-75"></i>
-            <p class="fw-medium">Failed to retrieve organization hierarchy structure details.</p>
-          </div>`;
-        return null;
-      }
+  function announce(message) {
+    status.textContent = message;
+  }
+
+  function showEmptyState(title, detail, iconClass) {
+    root.replaceChildren();
+    const state = document.createElement('div');
+    state.className = 'org-empty-state';
+    state.setAttribute('role', 'listitem');
+    const icon = document.createElement('i');
+    icon.className = iconClass || 'fa-regular fa-folder-open';
+    icon.setAttribute('aria-hidden', 'true');
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    const description = document.createElement('span');
+    description.textContent = detail;
+    state.append(icon, heading, description);
+    root.appendChild(state);
+    updateStageGeometry();
+  }
+
+  function initials(name) {
+    return (name || 'Employee').trim().split(/\s+/).slice(0, 2).map(part => part[0] || '').join('').toUpperCase();
+  }
+
+  function createNode(node, depth) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'org-node-wrapper';
+    wrapper.setAttribute('role', 'listitem');
+
+    const card = document.createElement('article');
+    card.className = 'org-card' + (node.is_current ? ' is-current' : '');
+    if (depth === 0) {
+      const topLevel = document.createElement('span');
+      topLevel.className = 'org-top-level';
+      topLevel.textContent = 'Top level';
+      card.appendChild(topLevel);
     }
+    const head = document.createElement('div');
+    head.className = 'org-card-head';
+    const avatar = document.createElement('span');
+    avatar.className = 'org-avatar';
+    avatar.setAttribute('aria-hidden', 'true');
+    avatar.textContent = initials(node.name);
+    const person = document.createElement('span');
+    person.className = 'org-person';
+    const name = document.createElement('strong');
+    name.className = 'org-person-name';
+    name.textContent = node.name || 'Employee';
+    const position = document.createElement('span');
+    position.className = 'org-position';
+    position.textContent = node.position || 'Position not set';
+    person.append(name, position);
+    head.append(avatar, person);
+    card.appendChild(head);
 
-    function escapeHtml(str) {
-      return (str ?? "").toString().replace(/[&<>"']/g, s => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-      }[s]));
+    const metadata = document.createElement('dl');
+    metadata.className = 'org-meta';
+    [[ 'Employee code', node.employee_code || '—' ], [ 'Department', node.department || 'Not assigned' ]].forEach(([label, value]) => {
+      const item = document.createElement('div');
+      const term = document.createElement('dt');
+      term.textContent = label;
+      const detail = document.createElement('dd');
+      detail.textContent = value;
+      item.append(term, detail);
+      metadata.appendChild(item);
+    });
+    card.appendChild(metadata);
+
+    const footer = document.createElement('div');
+    footer.className = 'org-card-foot';
+    const reportCount = Array.isArray(node.children) ? node.children.length : 0;
+    const reportLabel = document.createElement('span');
+    reportLabel.className = 'org-report-count';
+    reportLabel.textContent = reportCount ? `${reportCount} direct report${reportCount === 1 ? '' : 's'}` : 'No direct reports';
+    footer.appendChild(reportLabel);
+    if (node.is_current) {
+      const currentLabel = document.createElement('span');
+      currentLabel.className = 'org-current-label';
+      currentLabel.textContent = 'You';
+      footer.appendChild(currentLabel);
     }
+    card.appendChild(footer);
+    wrapper.appendChild(card);
 
-    function createNodeCard(node) {
-      const card = document.createElement('div');
-      card.className = 'org-card' + (node.is_current ? ' is-current' : '');
-
-      const avatarUrl = node.image || '{% static "images/default_profile.png" %}';
-      const fallbackUrl = `/static/logo/logo.webp
-
-      const childrenCount = node.children ? node.children.length : 0;
-
-      card.innerHTML = `
-        <div class="org-card-accent"></div>
-        <div class="org-head">
-          <div class="avatar-container">
-            <img class="org-avatar" src="${avatarUrl}" alt="avatar" onerror="this.src='${fallbackUrl}'">
-            ${childrenCount > 0 ? `
-              <span class="badge bg-primary direct-reports-badge" title="${childrenCount} direct reports">
-                ${childrenCount}
-              </span>` : ''}
-          </div>
-          <div class="org-info">
-            <div class="name text-truncate" title="${escapeHtml(node.name || 'Unknown')}">${escapeHtml(node.name || 'Unknown')}</div>
-            <div class="position text-truncate" title="${escapeHtml(node.position || '-')}">${escapeHtml(node.position || '-')}</div>
-            <span class="dept-badge text-truncate" title="${escapeHtml(node.department || '-')}">${escapeHtml(node.department || '-')}</span>
-          </div>
-        </div>
-        ${node.profile_url ? `
-        <div class="mt-3 pt-2 border-top d-flex justify-content-end align-items-center">
-          <a class="btn btn-action rounded-pill" href="${node.profile_url}">
-            Profile <i class="fas fa-arrow-right ms-1" style="font-size: 0.65rem;"></i>
-          </a>
-        </div>` : ''}
-      `;
-      return card;
+    if (reportCount) {
+      card.classList.add('has-children');
+      const children = document.createElement('div');
+      children.className = 'org-children';
+      children.setAttribute('role', 'list');
+      children.setAttribute('aria-label', `Direct reports for ${node.name || 'employee'}`);
+      children.id = `org-branch-${node.id}`;
+      node.children.forEach(child => children.appendChild(createNode(child, depth + 1)));
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'org-branch-toggle';
+      toggle.setAttribute('aria-expanded', 'true');
+      toggle.setAttribute('aria-controls', children.id);
+      toggle.setAttribute('aria-label', `Collapse ${reportCount} direct reports for ${node.name || 'employee'}`);
+      const toggleIcon = document.createElement('i');
+      toggleIcon.className = 'fa-solid fa-chevron-up';
+      toggleIcon.setAttribute('aria-hidden', 'true');
+      toggle.appendChild(toggleIcon);
+      toggle.addEventListener('click', () => {
+        const collapsed = wrapper.classList.toggle('collapsed');
+        toggle.setAttribute('aria-expanded', String(!collapsed));
+        toggle.setAttribute('aria-label', `${collapsed ? 'Expand' : 'Collapse'} ${reportCount} direct reports for ${node.name || 'employee'}`);
+        toggle.querySelector('i').className = collapsed ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+        requestAnimationFrame(updateStageGeometry);
+      });
+      card.appendChild(toggle);
+      wrapper.appendChild(children);
     }
+    return wrapper;
+  }
 
-    function renderNode(node) {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'org-node-wrapper';
-
-      const card = createNodeCard(node);
-      wrapper.appendChild(card);
-
-      if (node.children && node.children.length > 0) {
-        card.classList.add('has-children');
-
-        // Collapse/Expand button
-        const toggleBtn = document.createElement('div');
-        toggleBtn.className = 'org-toggle-btn';
-        toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i>';
-        card.appendChild(toggleBtn);
-
-        const childrenWrap = document.createElement('div');
-        childrenWrap.className = 'org-children';
-
-        node.children.forEach(child => {
-          childrenWrap.appendChild(renderNode(child));
-        });
-
-        wrapper.appendChild(childrenWrap);
-
-        // Click event to toggle team visibility
-        toggleBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          wrapper.classList.toggle('collapsed');
-          const icon = toggleBtn.querySelector('i');
-          icon.className = wrapper.classList.contains('collapsed') ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
-        });
-      }
-      return wrapper;
+  function findCurrent(nodes) {
+    for (const node of nodes) {
+      if (node.is_current) return node;
+      const found = findCurrent(node.children || []);
+      if (found) return found;
     }
+    return null;
+  }
 
-    function renderTree(treeArray) {
-      rootEl.innerHTML = '';
-      if (!treeArray || treeArray.length === 0) {
-        rootEl.innerHTML = '<div class="alert alert-warning border-0">No organization directory branches found.</div>';
+  function renderTree() {
+    const tree = showTeamOnly ? [findCurrent(rawTree)].filter(Boolean) : rawTree;
+    root.replaceChildren();
+    if (!tree.length) {
+      if (showTeamOnly && rawTree.length) {
+        showEmptyState('Your profile is not in the active chart', 'Ask your organisation administrator to check your employee status and reporting manager.', 'fa-regular fa-user');
         return;
       }
-      treeArray.forEach(rootNode => {
-        rootEl.appendChild(renderNode(rootNode));
+      showEmptyState('No active employees found', 'There are no active employees to display for this organisation.', 'fa-regular fa-user');
+      return;
+    }
+    tree.forEach(node => root.appendChild(createNode(node, 0)));
+    requestAnimationFrame(updateStageGeometry);
+  }
+
+  function updateStageGeometry() {
+    if (!root || !stage || !scrollPort) return;
+    const naturalWidth = Math.max(root.offsetWidth, 1);
+    const naturalHeight = Math.max(root.offsetHeight, 1);
+    const scaledWidth = naturalWidth * zoom;
+    const scaledHeight = naturalHeight * zoom;
+    stage.style.width = `${Math.max(scrollPort.clientWidth, scaledWidth)}px`;
+    stage.style.height = `${Math.max(scrollPort.clientHeight, scaledHeight)}px`;
+    root.style.left = `${Math.max(0, (scrollPort.clientWidth - scaledWidth) / 2)}px`;
+    root.style.transform = `scale(${zoom})`;
+  }
+
+  function setZoom(nextZoom, preserveCenter = true) {
+    const nextValue = Math.max(0.5, Math.min(1.5, nextZoom));
+    const oldZoom = zoom;
+    const centerX = (scrollPort.scrollLeft + scrollPort.clientWidth / 2) / oldZoom;
+    const centerY = (scrollPort.scrollTop + scrollPort.clientHeight / 2) / oldZoom;
+    zoom = nextValue;
+    zoomSlider.value = String(Math.round(zoom * 100));
+    zoomValue.value = `${Math.round(zoom * 100)}%`;
+    zoomValue.textContent = zoomValue.value;
+    zoomOut.disabled = zoom <= 0.5;
+    zoomIn.disabled = zoom >= 1.5;
+    updateStageGeometry();
+    if (preserveCenter) {
+      requestAnimationFrame(() => {
+        scrollPort.scrollLeft = Math.max(0, centerX * zoom - scrollPort.clientWidth / 2);
+        scrollPort.scrollTop = Math.max(0, centerY * zoom - scrollPort.clientHeight / 2);
       });
     }
+  }
 
-    // Helper to find just the current logged in user to isolate "My Team"
-    function findCurrentUserNode(nodes) {
-      for (const node of nodes) {
-        if (node.is_current) return node;
-        if (node.children) {
-          const found = findCurrentUserNode(node.children);
-          if (found) return found;
-        }
-      }
-      return null;
+  function fitChartWidth() {
+    const width = Math.max(root.offsetWidth, 1);
+    const availableWidth = Math.max(scrollPort.clientWidth - 48, 1);
+    setZoom(Math.max(0.5, Math.min(1, availableWidth / width)), false);
+    scrollPort.scrollTop = 0;
+    scrollPort.scrollLeft = 0;
+  }
+
+  async function loadChart() {
+    const organisationId = organisationSelect ? organisationSelect.value : '';
+    if (isSuperuser && !organisationId) {
+      rawTree = [];
+      announce('Choose an organisation to view its chart.');
+      showEmptyState('Choose an organisation', 'Select an active organisation above. Only system superusers can switch between organisations.', 'fa-solid fa-building');
+      return;
     }
 
-    // Init process
-    rawTreeData = await fetchData();
+    if (activeRequest) activeRequest.abort();
+    activeRequest = new AbortController();
+    root.replaceChildren();
+    announce('Loading organisation chart…');
+    const endpoint = new URL(chartApi, window.location.href);
+    if (organisationId) endpoint.searchParams.set('organisation_id', organisationId);
 
-    if (rawTreeData) {
-      // 🔒 Normalize: force array even for single node
-      if (!Array.isArray(rawTreeData)) {
-        rawTreeData = [rawTreeData];
+    try {
+      const response = await fetch(endpoint, { credentials: 'same-origin', signal: activeRequest.signal });
+      if (!response.ok) {
+        throw new Error(response.status === 403 ? 'You do not have access to this organisation chart.' : response.status === 404 ? 'The selected organisation is unavailable.' : 'The organisation chart could not be loaded. Try again.');
       }
-      renderTree(rawTreeData);
+      const data = await response.json();
+      if (!data.ok) throw new Error('The organisation chart could not be loaded. Try again.');
+      if (data.needs_organisation) {
+        rawTree = [];
+        announce('Choose an organisation to view its chart.');
+        showEmptyState('Choose an organisation', 'Select an active organisation above.', 'fa-solid fa-building');
+        return;
+      }
+      rawTree = Array.isArray(data.tree) ? data.tree : [];
+      totalEmployeeCount = data.employee_count || 0;
+      organisationName = data.organisation_name || 'Organisation';
+      showTeamOnly = false;
+      if (fullButton && teamButton) {
+        fullButton.classList.add('is-active');
+        fullButton.setAttribute('aria-pressed', 'true');
+        teamButton.classList.remove('is-active');
+        teamButton.setAttribute('aria-pressed', 'false');
+      }
+      announce(`${totalEmployeeCount} active employee${totalEmployeeCount === 1 ? '' : 's'} · ${organisationName}`);
+      renderTree();
+      fitChartWidth();
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      rawTree = [];
+      announce(error.message || 'The organisation chart could not be loaded. Try again.');
+      showEmptyState('Chart unavailable', error.message || 'The organisation chart could not be loaded. Try again.', 'fa-solid fa-triangle-exclamation');
     }
+  }
 
-    // Button Logic
-    btnFull.addEventListener('click', () => {
-      btnFull.classList.add('active');
-      btnTeam.classList.remove('active');
-      renderTree(rawTreeData); // Renders complete tree from CEO downwards
-    });
-
-    btnTeam.addEventListener('click', () => {
-      btnTeam.classList.add('active');
-      btnFull.classList.remove('active');
-      
-      // Isolates tree so it ONLY starts from the logged in user downwards
-      const myNode = findCurrentUserNode(rawTreeData);
-      if (myNode) {
-        renderTree([myNode]); 
-      } else {
-        renderTree(rawTreeData); // Fallback
-      }
-    });
-
-    btnPrint.addEventListener('click', () => window.print());
+  zoomOut.addEventListener('click', () => setZoom(zoom - 0.1));
+  zoomIn.addEventListener('click', () => setZoom(zoom + 0.1));
+  zoomSlider.addEventListener('input', () => setZoom(Number(zoomSlider.value) / 100));
+  fitButton.addEventListener('click', fitChartWidth);
+  printButton.addEventListener('click', () => window.print());
+  organisationSelect?.addEventListener('change', () => {
+    const url = new URL(window.location.href);
+    if (organisationSelect.value) url.searchParams.set('organisation_id', organisationSelect.value);
+    else url.searchParams.delete('organisation_id');
+    window.history.replaceState({}, '', url);
+    showTeamOnly = false;
+    scrollPort.scrollTo({ left: 0, top: 0 });
+    loadChart();
   });
+  fullButton?.addEventListener('click', () => {
+    showTeamOnly = false;
+    fullButton.classList.add('is-active');
+    fullButton.setAttribute('aria-pressed', 'true');
+    teamButton.classList.remove('is-active');
+    teamButton.setAttribute('aria-pressed', 'false');
+    announce(`${totalEmployeeCount} active employees · ${organisationName}`);
+    renderTree();
+  });
+  teamButton?.addEventListener('click', () => {
+    showTeamOnly = true;
+    teamButton.classList.add('is-active');
+    teamButton.setAttribute('aria-pressed', 'true');
+    fullButton.classList.remove('is-active');
+    fullButton.setAttribute('aria-pressed', 'false');
+    const currentNode = findCurrent(rawTree);
+    const teamCount = currentNode ? (function count(node) { return 1 + (node.children || []).reduce((total, child) => total + count(child), 0); })(currentNode) : 0;
+    announce(`${teamCount} employee${teamCount === 1 ? '' : 's'} in your reporting branch · ${organisationName}`);
+    renderTree();
+  });
+
+  if ('ResizeObserver' in window) {
+    const resizeObserver = new ResizeObserver(updateStageGeometry);
+    resizeObserver.observe(root);
+  } else {
+    window.addEventListener('resize', updateStageGeometry);
+  }
+  setZoom(zoom, false);
+  loadChart();
+});
 </script>
 {% endblock %}

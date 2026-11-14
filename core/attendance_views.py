@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -164,10 +165,9 @@ def delete_attendance(request, att_id):
 @login_required
 @require_GET
 def audit_log(request):
-    profile = getattr(request.user, 'employee', None)
     if not request.user.is_superuser:
         return HttpResponseForbidden('Audit history is restricted to system superusers')
-    events = AuditEvent.objects.all()
+    events = AuditEvent.objects.select_related('organisation').all()
     entity = request.GET.get('entity', '')
     action = request.GET.get('action', '')
     if entity:
@@ -195,13 +195,87 @@ def audit_log(request):
     )
     action_labels = dict(action_choices)
     field_labels = {
-        'employee_id': 'Employee record ID', 'organisation_id': 'Organisation ID',
+        'employee_id': 'Employee code', 'employee_name': 'Employee name',
+        'employee_code': 'Employee code',
+        'organisation_id': 'Organisation ID',
         'attendance_type': 'Attendance event', 'timestamp': 'Attendance time',
         'actor_id': 'Actor ID', 'actor_name': 'Actor name', 'request_id': 'Request ID',
     }
-    for event in page_obj.object_list:
+    page_events = list(page_obj.object_list)
+    employee_pks = set()
+    employee_user_ids = set()
+    for event in page_events:
+        if event.actor_id:
+            employee_user_ids.add(event.actor_id)
+        if event.entity == 'Authentication':
+            try:
+                employee_user_ids.add(int(event.object_id))
+            except (TypeError, ValueError):
+                pass
+        elif event.entity == 'Employee':
+            try:
+                employee_pks.add(int(event.object_id))
+            except (TypeError, ValueError):
+                pass
+        else:
+            before = event.before if isinstance(event.before, dict) else {}
+            after = event.after if isinstance(event.after, dict) else {}
+            employee_id = after.get('employee_id') or before.get('employee_id')
+            try:
+                if employee_id:
+                    employee_pks.add(int(employee_id))
+            except (TypeError, ValueError):
+                pass
+
+    employee_profiles = Employee.global_objects.filter(
+        Q(pk__in=employee_pks) | Q(user_id__in=employee_user_ids)
+    ).select_related('user')
+    profiles_by_pk = {employee.pk: employee for employee in employee_profiles}
+    profiles_by_user = {employee.user_id: employee for employee in employee_profiles}
+
+    for event in page_events:
         before = event.before if isinstance(event.before, dict) else {}
         after = event.after if isinstance(event.after, dict) else {}
+        snapshot_values = before if event.action == 'delete' else after
+        subject_profile = None
+        if event.entity == 'Employee':
+            try:
+                subject_profile = profiles_by_pk.get(int(event.object_id))
+            except (TypeError, ValueError):
+                pass
+        elif event.entity == 'Authentication':
+            try:
+                subject_profile = profiles_by_user.get(int(event.object_id))
+            except (TypeError, ValueError):
+                pass
+        else:
+            employee_id = snapshot_values.get('employee_id') or before.get('employee_id')
+            try:
+                if employee_id:
+                    subject_profile = profiles_by_pk.get(int(employee_id))
+            except (TypeError, ValueError):
+                pass
+
+        actor_profile = profiles_by_user.get(event.actor_id)
+        if actor_profile and actor_profile.organisation_id != event.organisation_id:
+            actor_profile = None
+        if subject_profile and subject_profile.organisation_id != event.organisation_id:
+            subject_profile = None
+        event.actor_display_name = (
+            actor_profile.user.get_full_name() or actor_profile.user.get_username()
+            if actor_profile else event.actor_name
+        )
+        event.actor_employee_code = actor_profile.employee_id if actor_profile else ''
+        event.subject_employee_name = (
+            (subject_profile.user.get_full_name() or subject_profile.user.get_username())
+            if subject_profile else snapshot_values.get('employee_name', '')
+        )
+        event.subject_employee_code = (
+            subject_profile.employee_id if subject_profile
+            else (snapshot_values.get('employee_code') or
+                  (snapshot_values.get('employee_id', '') if event.entity == 'Employee' else ''))
+        )
+
         if event.action == 'create':
             changed_fields = after.keys()
         elif event.action == 'delete':
@@ -213,7 +287,9 @@ def audit_log(request):
             changed_fields = set()
         event.action_label = action_labels.get(event.action, event.action.replace('_', ' ').title())
         event.change_rows = [
-            {'label': field_labels.get(field, field.replace('_', ' ').capitalize()),
+            {'label': ('Employee code' if field == 'employee_id' and event.entity == 'Employee'
+                       else 'Employee record reference' if field == 'employee_id'
+                       else field_labels.get(field, field.replace('_', ' ').capitalize())),
              'before': before.get(field), 'after': after.get(field)}
             for field in sorted(changed_fields)
         ]

@@ -35,6 +35,19 @@ def snapshot(instance):
         'working_days', 'shift_start_time', 'shift_end_time', 'date', 'name',
         'count_weekend_overtime', 'count_holiday_overtime', 'flexible_attendance',
     }
-    return {field.attname: str(getattr(instance, field.attname))
-            if getattr(instance, field.attname) is not None else None
-            for field in instance._meta.concrete_fields if field.attname in fields}
+    values = {field.attname: str(getattr(instance, field.attname))
+              if getattr(instance, field.attname) is not None else None
+              for field in instance._meta.concrete_fields if field.attname in fields}
+    if type(instance).__name__ == 'Employee':
+        user = getattr(instance, 'user', None)
+        values['employee_name'] = (
+            (user.get_full_name() or user.get_username()) if user else ''
+        )
+        values['employee_code'] = str(instance.employee_id or '')
+    else:
+        employee = getattr(instance, 'employee', None)
+        if employee is not None:
+            user = employee.user
+            values['employee_name'] = user.get_full_name() or user.get_username()
+            values['employee_code'] = str(employee.employee_id or '')
+    return values

@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import org_chart
 from . import attendance_views
 from . import payroll_views
 from .security import kiosk
@@ -41,9 +42,9 @@ urlpatterns = [
     path('attendance-day-detail/<int:emp_id>/<str:date>/', attendance_views.attendance_day_detail, name='attendance_day_detail'),
     
     # 🏢 Organization Structure URLs
-    path('org-chart/', views.org_chart_page, name='org_chart'),
-    path('api/org-tree/me/', views.org_tree_api_me, name='org_tree_api_me'),
-    path('api/org-tree/<int:employee_id>/', views.org_tree_api, name='org_tree_api'),
+    path('org-chart/', org_chart.org_chart_page, name='org_chart'),
+    path('api/org-tree/me/', org_chart.org_tree_api_me, name='org_tree_api_me'),
+    path('api/org-tree/<int:employee_id>/', org_chart.org_tree_api, name='org_tree_api'),
 
     # ✅ Department URLs
     path('departments/', views.department_list, name='department_list'),
@@ -94,6 +95,7 @@ urlpatterns = [
     
     # 🔔 Notification URLs
     path('notifications/', views.notification_list, name='notification_list'),
+    path('notifications/<int:pk>/open/', views.notification_open, name='notification_open'),
     path('notifications/<int:pk>/read/', views.mark_notification_read, name='mark_notification_read'),
     path('notifications/mark-all-read/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
     path('get-managers/<int:dept_id>/', views.get_managers_by_department, name='get_managers'),
