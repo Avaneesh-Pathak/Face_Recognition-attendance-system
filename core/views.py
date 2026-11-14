@@ -1042,7 +1042,16 @@ def employee_profile(request, pk):
         ),
         pk=pk
     )
-    if not get_visible_employees(request.user).filter(pk=employee.pk).exists():
+    can_view_full_profile = get_visible_employees(request.user).filter(pk=employee.pk).exists()
+    if not can_view_full_profile:
+        viewer = getattr(request.user, 'employee', None)
+        organisation_id = getattr(getattr(request, 'organisation', None), 'pk', None)
+        if (not request.user.is_superuser and viewer and viewer.is_active and employee.is_active
+                and employee.employment_status == 'active'
+                and viewer.organisation_id == employee.organisation_id == organisation_id):
+            return render(request, "ems/employee_profile_directory.html", {
+                "employee": employee,
+            })
         raise PermissionDenied('Not authorised to view this employee')
     can_view_finance = request.user.is_superuser or (hasattr(request.user, 'employee') and
           (request.user.employee.role in ('Admin', 'Finance') or request.user.employee.pk == employee.pk))

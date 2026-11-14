@@ -50,9 +50,9 @@
     <div class="org-chart-toolbar">
       <div>
         <p class="org-chart-count" id="orgStatus" role="status" aria-live="polite">Loading organisation chart…</p>
-        <p class="org-chart-help">Scroll in either direction to explore branches. Use the zoom controls to change the chart size.</p>
+        <p class="org-chart-help">Use the mouse wheel to zoom, drag to pan, or click an employee to open their profile.</p>
       </div>
-      <span class="org-scroll-hint"><i class="fa-solid fa-arrows-left-right-to-line" aria-hidden="true"></i> Horizontal and vertical scrolling</span>
+      <span class="org-scroll-hint"><i class="fa-solid fa-arrows-left-right-to-line" aria-hidden="true"></i> Wheel to zoom · drag to move</span>
     </div>
     <div id="orgScrollPort" class="org-scrollport" tabindex="0" aria-label="Scrollable organisation chart">
       <div id="orgStage" class="org-stage">
@@ -73,6 +73,8 @@
   .org-scrollport{height:min(72vh,820px);min-height:420px;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;background-color:var(--org-canvas);background-image:radial-gradient(#d7e0e3 1px,transparent 1px);background-size:20px 20px;touch-action:auto}.org-scrollport:focus-visible{outline:3px solid #087f8240;outline-offset:-3px}.org-stage{position:relative;min-width:100%;min-height:100%}.org-tree{position:absolute;top:0;left:0;display:flex;align-items:flex-start;gap:34px;width:max-content;min-width:max-content;padding:28px 32px;transform-origin:top left}
   .org-node-wrapper{position:relative;display:flex;flex:0 0 auto;flex-direction:column;align-items:center;padding:26px 13px 0}.org-card{position:relative;z-index:2;width:260px;padding:15px 15px 12px;overflow:visible;border:1px solid #dce5e8;border-radius:11px;background:#fff;box-shadow:0 3px 12px #2037440d;transition:border-color .18s ease,box-shadow .18s ease}.org-card:hover{border-color:#8ebdbc;box-shadow:0 7px 19px #20374414}.org-card.is-current{border:2px solid #168183;background:#f4fbfa;box-shadow:0 0 0 3px #087f8214}.org-card-head{display:flex;align-items:center;gap:11px;min-width:0}.org-avatar{display:grid;place-items:center;width:43px;height:43px;flex:0 0 43px;border:1px solid #d6e5e4;border-radius:10px;background:#eaf4f2;color:#17686a;font-size:13px;font-weight:800;letter-spacing:.02em}.org-person{min-width:0;flex:1}.org-person-name{display:block;overflow:hidden;color:#19303e;font-size:13px;font-weight:750;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}.org-position{display:block;margin-top:3px;overflow:hidden;color:#647583;font-size:10px;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}.org-top-level{display:inline-flex;margin:0 0 9px;padding:4px 7px;border:1px solid #cfe4df;border-radius:5px;background:#f1f8f6;color:#26706b;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.org-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 0;padding-top:10px;border-top:1px solid #edf1f2}.org-meta div{min-width:0}.org-meta dt{color:#84919a;font-size:8px;font-weight:750;letter-spacing:.06em;text-transform:uppercase}.org-meta dd{margin:3px 0 0;overflow-wrap:anywhere;color:#405563;font-size:10px;font-weight:650;line-height:1.35}.org-card-foot{display:flex;justify-content:flex-start;align-items:center;gap:8px;margin-top:11px;padding-top:9px;border-top:1px solid #edf1f2}.org-report-count{color:#71818a;font-size:9px}.org-current-label{margin-left:auto;color:#176f72;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
   .org-children{position:relative;display:flex;justify-content:center;padding-top:24px;animation:org-branch-in .2s ease-out}.org-children:before{position:absolute;top:0;left:50%;height:24px;border-left:2px solid #c5d4d8;content:""}.org-node-wrapper:before{position:absolute;top:0;left:50%;height:26px;border-left:2px solid #c5d4d8;content:""}.org-node-wrapper:after{position:absolute;top:0;left:0;width:100%;border-top:2px solid #c5d4d8;content:""}.org-children>.org-node-wrapper:first-child:after{left:50%;width:50%}.org-children>.org-node-wrapper:last-child:after{width:50%}.org-children>.org-node-wrapper:only-child:after{display:none}.org-tree>.org-node-wrapper{padding-top:0}.org-tree>.org-node-wrapper:before,.org-tree>.org-node-wrapper:after{display:none}.org-card.has-children:after{position:absolute;bottom:-26px;left:50%;height:26px;border-left:2px solid #c5d4d8;content:""}.org-branch-toggle{position:absolute;z-index:4;bottom:-13px;left:50%;display:grid;place-items:center;width:27px;height:27px;transform:translateX(-50%);border:1px solid #cbd9dd;border-radius:50%;background:#fff;color:#526b76;font-size:9px;cursor:pointer;box-shadow:0 2px 5px #20374412}.org-branch-toggle:hover{border-color:#087f82;background:#087f82;color:#fff}.org-node-wrapper.collapsed>.org-children{display:none}.org-node-wrapper.collapsed>.org-card.has-children:after{display:none}.org-empty-state{display:flex;min-width:min(480px,calc(100vw - 48px));min-height:220px;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:28px;text-align:center;color:#677983}.org-empty-state i{font-size:23px;color:#80959d}.org-empty-state strong{color:#344e59;font-size:13px}.org-empty-state span{max-width:360px;font-size:11px;line-height:1.5}
+  .org-scrollport{cursor:grab;touch-action:none;user-select:none}.org-scrollport.is-panning{cursor:grabbing}.org-scrollport.is-panning *{user-select:none!important}
+  .org-card{padding:0;border-color:var(--level-border,#cbd5e1);border-top:4px solid var(--level-accent,#087f82);background:linear-gradient(145deg,var(--level-wash,#edf8f6) 0%,#fff 68%);box-shadow:0 5px 16px #1c344018}.org-card:hover{border-color:var(--level-accent,#087f82);box-shadow:0 10px 24px #1c344022;transform:translateY(-2px)}.org-card.is-current{border:2px solid #0f766e;border-top-width:4px;background:linear-gradient(145deg,#e2f7f1,#fff 72%);box-shadow:0 0 0 4px #0f766e20,0 9px 22px #0f766e1a}.org-card-link{display:block;padding:12px 14px 10px;border-radius:inherit;color:inherit;text-decoration:none}.org-card-link:hover{color:inherit;text-decoration:none}.org-card-link:focus-visible{position:relative;z-index:3;outline:3px solid var(--level-accent,#087f82);outline-offset:3px}.org-avatar{border-color:var(--level-border,#b8ded7);background:var(--level-accent,#087f82);color:#fff;box-shadow:0 3px 8px #1c34401c}.org-top-level{border-color:var(--level-border,#b8ded7);background:var(--level-wash,#e8f7f3);color:var(--level-accent,#087f82)}.org-node-wrapper:before,.org-node-wrapper:after{border-color:var(--level-border,#bdcbd2)}.org-children:before{border-color:var(--level-border,#bdcbd2)}.org-card.has-children:after{border-color:var(--level-accent,#087f82)}.org-branch-toggle{border-color:var(--level-border,#bdcbd2);color:var(--level-accent,#087f82)}.org-branch-toggle:hover{border-color:var(--level-accent,#087f82);background:var(--level-accent,#087f82)}
   @keyframes org-branch-in{from{opacity:.7;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
   @media(max-width:1100px){.org-heading{align-items:flex-start;flex-direction:column}.org-heading-controls{justify-content:flex-start;width:100%}}
   @media(max-width:700px){.org-heading{padding:17px}.org-heading-controls{align-items:stretch;gap:8px}.org-organisation-select{width:100%}.org-view-switch{width:100%}.org-view-button{flex:1}.org-zoom-controls{justify-content:space-between;width:100%}.org-zoom-controls input[type=range]{flex:1;max-width:160px}.org-print-button{justify-content:center;flex:1}.org-chart-toolbar{align-items:flex-start;flex-direction:column;padding:12px 14px}.org-scroll-hint{white-space:normal}.org-scrollport{height:65svh;min-height:340px}.org-tree{gap:20px;padding:22px 20px}.org-node-wrapper{padding-right:9px;padding-left:9px}.org-card{width:238px;padding:13px}.org-empty-state{min-width:calc(100vw - 70px)}}
@@ -97,12 +99,27 @@ document.addEventListener('DOMContentLoaded', () => {
   const printButton = document.getElementById('btnPrint');
   const isSuperuser = {{ is_superuser_chart_view|yesno:'true,false' }};
   const chartApi = "{% url 'org_tree_api_me' %}";
+  const profileUrlTemplate = "{% url 'employee_profile' 0 %}";
+  const levelThemes = [
+    { accent: '#0f766e', wash: '#e8f7f3', border: '#b6e1d7' },
+    { accent: '#2563eb', wash: '#edf4ff', border: '#bfd3fb' },
+    { accent: '#7c3aed', wash: '#f4efff', border: '#d8c6fb' },
+    { accent: '#c2410c', wash: '#fff3eb', border: '#f3c9ae' },
+    { accent: '#be185d', wash: '#fff0f6', border: '#f1bfd3' },
+    { accent: '#4d7c0f', wash: '#f2f8e9', border: '#cfe1ae' }
+  ];
   let rawTree = [];
   let showTeamOnly = false;
   let totalEmployeeCount = 0;
   let organisationName = '';
   let zoom = Number(zoomSlider.value) / 100;
   let activeRequest = null;
+  let panState = null;
+  let suppressProfileClickUntil = 0;
+
+  function employeeProfileUrl(employeeId) {
+    return profileUrlTemplate.replace(/\/0\/profile\/$/, `/${encodeURIComponent(employeeId)}/profile/`);
+  }
 
   function announce(message) {
     status.textContent = message;
@@ -133,14 +150,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const wrapper = document.createElement('div');
     wrapper.className = 'org-node-wrapper';
     wrapper.setAttribute('role', 'listitem');
+    const theme = levelThemes[depth % levelThemes.length];
+    wrapper.style.setProperty('--level-accent', theme.accent);
+    wrapper.style.setProperty('--level-wash', theme.wash);
+    wrapper.style.setProperty('--level-border', theme.border);
 
     const card = document.createElement('article');
     card.className = 'org-card' + (node.is_current ? ' is-current' : '');
+    const profileLink = document.createElement('a');
+    profileLink.className = 'org-card-link';
+    profileLink.href = employeeProfileUrl(node.id);
+    profileLink.setAttribute('aria-label', `Open profile for ${node.name || 'employee'}`);
+    profileLink.addEventListener('click', event => {
+      if (Date.now() < suppressProfileClickUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    });
     if (depth === 0) {
       const topLevel = document.createElement('span');
       topLevel.className = 'org-top-level';
       topLevel.textContent = 'Top level';
-      card.appendChild(topLevel);
+      profileLink.appendChild(topLevel);
     }
     const head = document.createElement('div');
     head.className = 'org-card-head';
@@ -158,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     position.textContent = node.position || 'Position not set';
     person.append(name, position);
     head.append(avatar, person);
-    card.appendChild(head);
+    profileLink.appendChild(head);
 
     const metadata = document.createElement('dl');
     metadata.className = 'org-meta';
@@ -171,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
       item.append(term, detail);
       metadata.appendChild(item);
     });
-    card.appendChild(metadata);
+    profileLink.appendChild(metadata);
 
     const footer = document.createElement('div');
     footer.className = 'org-card-foot';
@@ -186,7 +217,8 @@ document.addEventListener('DOMContentLoaded', () => {
       currentLabel.textContent = 'You';
       footer.appendChild(currentLabel);
     }
-    card.appendChild(footer);
+    profileLink.appendChild(footer);
+    card.appendChild(profileLink);
     wrapper.appendChild(card);
 
     if (reportCount) {
@@ -256,11 +288,13 @@ document.addEventListener('DOMContentLoaded', () => {
     root.style.transform = `scale(${zoom})`;
   }
 
-  function setZoom(nextZoom, preserveCenter = true) {
+  function setZoom(nextZoom, preserveCenter = true, anchorPoint = null) {
     const nextValue = Math.max(0.5, Math.min(1.5, nextZoom));
     const oldZoom = zoom;
-    const centerX = (scrollPort.scrollLeft + scrollPort.clientWidth / 2) / oldZoom;
-    const centerY = (scrollPort.scrollTop + scrollPort.clientHeight / 2) / oldZoom;
+    const anchorX = anchorPoint ? anchorPoint.x : scrollPort.clientWidth / 2;
+    const anchorY = anchorPoint ? anchorPoint.y : scrollPort.clientHeight / 2;
+    const contentX = (scrollPort.scrollLeft + anchorX - root.offsetLeft) / oldZoom;
+    const contentY = (scrollPort.scrollTop + anchorY - root.offsetTop) / oldZoom;
     zoom = nextValue;
     zoomSlider.value = String(Math.round(zoom * 100));
     zoomValue.value = `${Math.round(zoom * 100)}%`;
@@ -270,11 +304,56 @@ document.addEventListener('DOMContentLoaded', () => {
     updateStageGeometry();
     if (preserveCenter) {
       requestAnimationFrame(() => {
-        scrollPort.scrollLeft = Math.max(0, centerX * zoom - scrollPort.clientWidth / 2);
-        scrollPort.scrollTop = Math.max(0, centerY * zoom - scrollPort.clientHeight / 2);
+        scrollPort.scrollLeft = Math.max(0, root.offsetLeft + contentX * zoom - anchorX);
+        scrollPort.scrollTop = Math.max(0, root.offsetTop + contentY * zoom - anchorY);
       });
     }
   }
+
+  scrollPort.addEventListener('wheel', event => {
+    if (!event.deltaY) return;
+    event.preventDefault();
+    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? scrollPort.clientHeight : 1);
+    const rect = scrollPort.getBoundingClientRect();
+    const factor = Math.exp(-delta * 0.0014);
+    setZoom(zoom * factor, true, { x: event.clientX - rect.left, y: event.clientY - rect.top });
+  }, { passive: false });
+
+  scrollPort.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || event.target.closest('button, input, select, textarea')) return;
+    panState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: scrollPort.scrollLeft,
+      startTop: scrollPort.scrollTop,
+      moved: false
+    };
+  });
+
+  window.addEventListener('pointermove', event => {
+    if (!panState || panState.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - panState.startX;
+    const deltaY = event.clientY - panState.startY;
+    if (!panState.moved && Math.hypot(deltaX, deltaY) < 4) return;
+    panState.moved = true;
+    scrollPort.classList.add('is-panning');
+    if (!scrollPort.hasPointerCapture(event.pointerId)) scrollPort.setPointerCapture(event.pointerId);
+    scrollPort.scrollLeft = panState.startLeft - deltaX;
+    scrollPort.scrollTop = panState.startTop - deltaY;
+    if (event.cancelable) event.preventDefault();
+  }, { passive: false });
+
+  function finishPan(event) {
+    if (!panState || panState.pointerId !== event.pointerId) return;
+    if (panState.moved) suppressProfileClickUntil = Date.now() + 350;
+    const pointerId = panState.pointerId;
+    panState = null;
+    scrollPort.classList.remove('is-panning');
+    if (scrollPort.hasPointerCapture(pointerId)) scrollPort.releasePointerCapture(pointerId);
+  }
+  window.addEventListener('pointerup', finishPan);
+  window.addEventListener('pointercancel', finishPan);
 
   function fitChartWidth() {
     const width = Math.max(root.offsetWidth, 1);
